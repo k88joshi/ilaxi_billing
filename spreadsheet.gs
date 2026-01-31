@@ -1,6 +1,6 @@
 /**
- * Reads the header row (defined by HEADER_ROW_INDEX) and creates a mapping
- * of column names (e.g., "Customer Name") to their 0-based column index (e.g., 1).
+ * Reads the header row and creates a mapping of column names to their 0-based column index.
+ * Uses dynamic header row index from settings.
  * This makes the script resilient to column reordering.
  * Also detects and logs warnings for duplicate header names.
  *
@@ -10,25 +10,27 @@
  */
 function getHeaderColumnMap() {
   const sheet = SpreadsheetApp.getActiveSheet();
-  const headers = sheet.getRange(HEADER_ROW_INDEX, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const settings = getSettings();
+  const headerRowIndex = settings.behavior.headerRowIndex;
+  const headers = sheet.getRange(headerRowIndex, 1, 1, sheet.getLastColumn()).getValues()[0];
   const map = {};
   const seen = {};
-  
+
   headers.forEach((header, index) => {
     if (header) {
       const trimmed = header.trim();
-      
+
       // Check for duplicate headers, which can cause confusion
       if (seen[trimmed]) {
         Logger.log(`⚠️ Warning: Duplicate header "${trimmed}" found at columns ${seen[trimmed]} and ${index + 1}`);
         ui.alert(`Warning: Duplicate header "${trimmed}" found. Using the last occurrence (column ${index + 1}).`);
       }
-      
+
       map[trimmed] = index; // 0-based index
       seen[trimmed] = index + 1; // 1-based column for logging
     }
   });
-  
+
   return map;
 }
 
@@ -146,28 +148,31 @@ function sendBillsToUnpaid() {
     return;
   }
 
-  // 2. Get dynamic column mapping and data
+  // 2. Get settings and dynamic column mapping
+  const settings = getSettings();
+  const cols = settings.columns;
   const sheet = SpreadsheetApp.getActiveSheet();
   const columns = getHeaderColumnMap();
   const data = sheet.getDataRange().getValues();
 
   // 3. Validate columns and data
-  const requiredHeaders = [PHONE_NUMBER_HEADER, CUSTOMER_NAME_HEADER, BALANCE_HEADER, NUM_TIFFINS_HEADER, DUE_DATE_HEADER, MESSAGE_STATUS_HEADER, PAYMENT_STATUS_HEADER];
+  const requiredHeaders = [cols.phoneNumber, cols.customerName, cols.balance, cols.numTiffins, cols.dueDate, cols.messageStatus, cols.paymentStatus];
   const missingHeaders = requiredHeaders.filter(h => columns[h] === undefined);
 
   if (missingHeaders.length > 0) {
     ui.alert(`Error: The following required columns are missing: ${missingHeaders.join(", ")}.`);
     return;
   }
-  if (data.length <= HEADER_ROW_INDEX) {
+  if (data.length <= settings.behavior.headerRowIndex) {
     ui.alert("No customer data found.");
     return;
   }
 
   // 4. Prepare data for processing
-  const { [PAYMENT_STATUS_HEADER]: paymentCol, [MESSAGE_STATUS_HEADER]: statusCol } = columns;
+  const paymentCol = columns[cols.paymentStatus];
+  const statusCol = columns[cols.messageStatus];
   const rowsToProcess = [];
-  for (let i = HEADER_ROW_INDEX; i < data.length; i++) {
+  for (let i = settings.behavior.headerRowIndex; i < data.length; i++) {
     const rowData = data[i];
     if (rowData[paymentCol] && rowData[paymentCol].toString().toLowerCase() === "unpaid") {
       rowsToProcess.push({ data: rowData, row: i + 1 });
@@ -179,28 +184,33 @@ function sendBillsToUnpaid() {
   const errorDetails = [];
   const statusUpdates = []; // Array to hold {row, status, color}
 
+  const phoneCol = columns[cols.phoneNumber];
+  const nameCol = columns[cols.customerName];
+  const balanceCol = columns[cols.balance];
+  const tiffinsCol = columns[cols.numTiffins];
+  const dueDateCol = columns[cols.dueDate];
+
   for (const item of rowsToProcess) {
     const { data: rowData, row } = item;
-    const { [PHONE_NUMBER_HEADER]: phone, [CUSTOMER_NAME_HEADER]: name, [BALANCE_HEADER]: balance, [NUM_TIFFINS_HEADER]: tiffins, [DUE_DATE_HEADER]: dueDate } = columns;
 
-    if (!rowData[phone] || !rowData[name] || !rowData[balance] || !rowData[tiffins]) {
+    if (!rowData[phoneCol] || !rowData[nameCol] || !rowData[balanceCol] || !rowData[tiffinsCol]) {
       errorCount++;
-      errorDetails.push({ name: rowData[name] || `Row ${row}`, error: "Missing required data" });
-      statusUpdates.push({ row, status: "Error: Missing data", color: "#f4cccc" });
+      errorDetails.push({ name: rowData[nameCol] || `Row ${row}`, error: "Missing required data" });
+      statusUpdates.push({ row, status: "Error: Missing data", color: settings.colors.error });
       continue;
     }
 
-    const result = sendBill_(rowData[phone], rowData[name], rowData[balance], rowData[tiffins], rowData[dueDate]);
+    const result = sendBill_(rowData[phoneCol], rowData[nameCol], rowData[balanceCol], rowData[tiffinsCol], rowData[dueDateCol]);
     statusUpdates.push({ row, status: result.status, color: result.color });
 
     if (result.success) {
       sentCount++;
     } else {
       errorCount++;
-      errorDetails.push({ name: rowData[name], error: result.status });
+      errorDetails.push({ name: rowData[nameCol], error: result.status });
     }
 
-    Utilities.sleep(MESSAGE_DELAY_MS);
+    Utilities.sleep(settings.behavior.messageDelayMs);
   }
 
   // 6. Batch update the spreadsheet
@@ -218,7 +228,7 @@ function sendBillsToUnpaid() {
   }
 
   // 7. Display summary report
-  const skippedCount = data.length - HEADER_ROW_INDEX - rowsToProcess.length;
+  const skippedCount = data.length - settings.behavior.headerRowIndex - rowsToProcess.length;
   showSendSummary(sentCount, errorCount, skippedCount, errorDetails);
 }
 
@@ -234,29 +244,33 @@ function sendUnpaidByDueDate() {
   }
   const targetDate = result.getResponseText().trim().toLowerCase();
 
-  // 2. Validate credentials and data
+  // 2. Validate credentials and get settings
   if (!checkCredentials()) return;
+  const settings = getSettings();
+  const cols = settings.columns;
   const sheet = SpreadsheetApp.getActiveSheet();
   const columns = getHeaderColumnMap();
   const data = sheet.getDataRange().getValues();
 
   // 3. Validate columns and data
-  const requiredHeaders = [PHONE_NUMBER_HEADER, CUSTOMER_NAME_HEADER, BALANCE_HEADER, NUM_TIFFINS_HEADER, DUE_DATE_HEADER, MESSAGE_STATUS_HEADER, PAYMENT_STATUS_HEADER];
+  const requiredHeaders = [cols.phoneNumber, cols.customerName, cols.balance, cols.numTiffins, cols.dueDate, cols.messageStatus, cols.paymentStatus];
   const missingHeaders = requiredHeaders.filter(h => columns[h] === undefined);
 
   if (missingHeaders.length > 0) {
     ui.alert(`Error: The following required columns are missing: ${missingHeaders.join(", ")}.`);
     return;
   }
-  if (data.length <= HEADER_ROW_INDEX) {
+  if (data.length <= settings.behavior.headerRowIndex) {
     ui.alert("No customer data found.");
     return;
   }
 
   // 4. Prepare data for processing
-  const { [PAYMENT_STATUS_HEADER]: paymentCol, [DUE_DATE_HEADER]: dueDateCol, [MESSAGE_STATUS_HEADER]: statusCol } = columns;
+  const paymentCol = columns[cols.paymentStatus];
+  const dueDateCol = columns[cols.dueDate];
+  const statusCol = columns[cols.messageStatus];
   const rowsToProcess = [];
-  for (let i = HEADER_ROW_INDEX; i < data.length; i++) {
+  for (let i = settings.behavior.headerRowIndex; i < data.length; i++) {
     const rowData = data[i];
     const paymentStatus = rowData[paymentCol] ? rowData[paymentCol].toString().toLowerCase() : "";
     const dueDate = rowData[dueDateCol];
@@ -273,28 +287,32 @@ function sendUnpaidByDueDate() {
   const errorDetails = [];
   const statusUpdates = [];
 
+  const phoneCol = columns[cols.phoneNumber];
+  const nameCol = columns[cols.customerName];
+  const balanceCol = columns[cols.balance];
+  const tiffinsCol = columns[cols.numTiffins];
+
   for (const item of rowsToProcess) {
     const { data: rowData, row } = item;
-    const { [PHONE_NUMBER_HEADER]: phone, [CUSTOMER_NAME_HEADER]: name, [BALANCE_HEADER]: balance, [NUM_TIFFINS_HEADER]: tiffins, [DUE_DATE_HEADER]: dueDate } = columns;
 
-    if (!rowData[phone] || !rowData[name] || !rowData[balance] || !rowData[tiffins]) {
+    if (!rowData[phoneCol] || !rowData[nameCol] || !rowData[balanceCol] || !rowData[tiffinsCol]) {
       errorCount++;
-      errorDetails.push({ name: rowData[name] || `Row ${row}`, error: "Missing required data" });
-      statusUpdates.push({ row, status: "Error: Missing data", color: "#f4cccc" });
+      errorDetails.push({ name: rowData[nameCol] || `Row ${row}`, error: "Missing required data" });
+      statusUpdates.push({ row, status: "Error: Missing data", color: settings.colors.error });
       continue;
     }
 
-    const result = sendBill_(rowData[phone], rowData[name], rowData[balance], rowData[tiffins], rowData[dueDate]);
+    const result = sendBill_(rowData[phoneCol], rowData[nameCol], rowData[balanceCol], rowData[tiffinsCol], rowData[dueDateCol]);
     statusUpdates.push({ row, status: result.status, color: result.color });
 
     if (result.success) {
       sentCount++;
     } else {
       errorCount++;
-      errorDetails.push({ name: rowData[name], error: result.status });
+      errorDetails.push({ name: rowData[nameCol], error: result.status });
     }
 
-    Utilities.sleep(MESSAGE_DELAY_MS);
+    Utilities.sleep(settings.behavior.messageDelayMs);
   }
 
   // 6. Batch update the spreadsheet
@@ -311,7 +329,7 @@ function sendUnpaidByDueDate() {
   }
 
   // 7. Display summary report
-  const skippedCount = data.length - HEADER_ROW_INDEX - rowsToProcess.length;
+  const skippedCount = data.length - settings.behavior.headerRowIndex - rowsToProcess.length;
   showSendSummary(sentCount, errorCount, skippedCount, errorDetails, `for "${targetDate}"`);
 }
 
@@ -327,21 +345,23 @@ function sendBillByOrderID() {
   }
   const targetOrderID = result.getResponseText().trim();
 
-  // 2. Validate credentials and data
+  // 2. Validate credentials and get settings
   if (!checkCredentials()) return;
+  const settings = getSettings();
+  const cols = settings.columns;
   const sheet = SpreadsheetApp.getActiveSheet();
   const columns = getHeaderColumnMap();
   const data = sheet.getDataRange().getValues();
 
   // 3. Find the row with the matching Order ID
-  const { [ORDER_ID_HEADER]: orderIdCol } = columns;
+  const orderIdCol = columns[cols.orderId];
   if (orderIdCol === undefined) {
-    ui.alert(`Error: The column "${ORDER_ID_HEADER}" was not found.`);
+    ui.alert(`Error: The column "${cols.orderId}" was not found.`);
     return;
   }
 
   let foundRow = -1;
-  for (let i = HEADER_ROW_INDEX; i < data.length; i++) {
+  for (let i = settings.behavior.headerRowIndex; i < data.length; i++) {
     if (data[i][orderIdCol] && String(data[i][orderIdCol]).trim() === targetOrderID) {
       foundRow = i;
       break;
@@ -357,7 +377,12 @@ function sendBillByOrderID() {
   // 5. Extract data and validate
   const rowData = data[foundRow];
   const currentRow = foundRow + 1;
-  const { [PHONE_NUMBER_HEADER]: phoneCol, [CUSTOMER_NAME_HEADER]: nameCol, [BALANCE_HEADER]: balanceCol, [NUM_TIFFINS_HEADER]: tiffinsCol, [DUE_DATE_HEADER]: dueDateCol, [MESSAGE_STATUS_HEADER]: statusCol } = columns;
+  const phoneCol = columns[cols.phoneNumber];
+  const nameCol = columns[cols.customerName];
+  const balanceCol = columns[cols.balance];
+  const tiffinsCol = columns[cols.numTiffins];
+  const dueDateCol = columns[cols.dueDate];
+  const statusCol = columns[cols.messageStatus];
 
   const phone = rowData[phoneCol];
   const name = rowData[nameCol];
@@ -371,7 +396,7 @@ function sendBillByOrderID() {
   }
 
   // 6. Show preview and confirm with user
-  const dryRunNote = DRY_RUN_MODE ? '\n\n⚠️ [DRY RUN MODE - No actual SMS will be sent]' : '';
+  const dryRunNote = settings.behavior.dryRunMode ? '\n\n⚠️ [DRY RUN MODE - No actual SMS will be sent]' : '';
   const preview = ui.alert(
     "Confirm Send by Order ID",
     `Found Order ID ${targetOrderID}:\n\nName: ${name}\nPhone: ${phone}\nBalance: ${formatBalance(balance)}\n\nContinue?${dryRunNote}`,
@@ -391,7 +416,7 @@ function sendBillByOrderID() {
 
   // 8. Notify user of the outcome
   if (sendResult.success) {
-    const dryRunPrefix = DRY_RUN_MODE ? '[DRY RUN] ' : '';
+    const dryRunPrefix = settings.behavior.dryRunMode ? '[DRY RUN] ' : '';
     ui.alert(`✓ Bill ${dryRunPrefix}sent successfully to ${name} for Order ${targetOrderID}!`);
   } else {
     ui.alert(`✗ Bill failed to send. Check the Message Status column for details on row ${currentRow}.`);
@@ -404,26 +429,29 @@ function sendBillByOrderID() {
  * Shows a preview before sending to confirm the data looks correct.
  */
 function testSingleMessage() {
-  // 1. Validate credentials and data
+  // 1. Validate credentials and get settings
   if (!checkCredentials()) return;
+  const settings = getSettings();
+  const cols = settings.columns;
   const sheet = SpreadsheetApp.getActiveSheet();
   const columns = getHeaderColumnMap();
   const data = sheet.getDataRange().getValues();
 
   // 2. Validate columns and data
-  const { [PAYMENT_STATUS_HEADER]: paymentCol, [MESSAGE_STATUS_HEADER]: statusCol } = columns;
+  const paymentCol = columns[cols.paymentStatus];
+  const statusCol = columns[cols.messageStatus];
   if (paymentCol === undefined || statusCol === undefined) {
-    ui.alert(`Error: Missing required columns: "${PAYMENT_STATUS_HEADER}" or "${MESSAGE_STATUS_HEADER}".`);
+    ui.alert(`Error: Missing required columns: "${cols.paymentStatus}" or "${cols.messageStatus}".`);
     return;
   }
-  if (data.length <= HEADER_ROW_INDEX) {
+  if (data.length <= settings.behavior.headerRowIndex) {
     ui.alert("No customer data found.");
     return;
   }
 
   // 3. Find the first unpaid customer
   let testRow = -1;
-  for (let i = HEADER_ROW_INDEX; i < data.length; i++) {
+  for (let i = settings.behavior.headerRowIndex; i < data.length; i++) {
     if (data[i][paymentCol] && data[i][paymentCol].toString().toLowerCase() === "unpaid") {
       testRow = i;
       break;
@@ -438,7 +466,11 @@ function testSingleMessage() {
   // 4. Extract data and validate
   const rowData = data[testRow];
   const currentRow = testRow + 1;
-  const { [PHONE_NUMBER_HEADER]: phoneCol, [CUSTOMER_NAME_HEADER]: nameCol, [BALANCE_HEADER]: balanceCol, [NUM_TIFFINS_HEADER]: tiffinsCol, [DUE_DATE_HEADER]: dueDateCol } = columns;
+  const phoneCol = columns[cols.phoneNumber];
+  const nameCol = columns[cols.customerName];
+  const balanceCol = columns[cols.balance];
+  const tiffinsCol = columns[cols.numTiffins];
+  const dueDateCol = columns[cols.dueDate];
 
   const phone = rowData[phoneCol];
   const name = rowData[nameCol];
@@ -452,7 +484,7 @@ function testSingleMessage() {
   }
 
   // 5. Show preview and confirm with user
-  const dryRunNote = DRY_RUN_MODE ? '\n\n⚠️ [DRY RUN MODE - No actual SMS will be sent]' : '';
+  const dryRunNote = settings.behavior.dryRunMode ? '\n\n⚠️ [DRY RUN MODE - No actual SMS will be sent]' : '';
   const preview = ui.alert(
     "Test Message Preview",
     `About to send a test bill to the first UNPAID customer (row ${currentRow}):\n\nName: ${name}\nPhone: ${phone}\nBalance: ${formatBalance(balance)}\n\nContinue?${dryRunNote}`,
@@ -472,7 +504,7 @@ function testSingleMessage() {
 
   // 7. Notify user of the outcome
   if (sendResult.success) {
-    const dryRunPrefix = DRY_RUN_MODE ? '[DRY RUN] ' : '';
+    const dryRunPrefix = settings.behavior.dryRunMode ? '[DRY RUN] ' : '';
     ui.alert(`✓ Test bill ${dryRunPrefix}sent successfully to ${name}!`);
   } else {
     ui.alert(`✗ Test bill failed. Check the Message Status column on row ${currentRow} for details.`);
@@ -489,29 +521,37 @@ function clearAllStatuses() {
     "This will clear all message status entries in the 'Message Status' column. Are you sure?",
     ui.ButtonSet.YES_NO
   );
-  
+
   if (response == ui.Button.YES) {
+    const settings = getSettings();
+    const cols = settings.columns;
     const sheet = SpreadsheetApp.getActiveSheet();
     const columns = getHeaderColumnMap();
-    const statusColIndex = columns[MESSAGE_STATUS_HEADER];
+    const statusColIndex = columns[cols.messageStatus];
 
     // Validate that the status column exists
     if (statusColIndex === undefined) {
-      ui.alert(`Error: Could not find the '${MESSAGE_STATUS_HEADER}' column header. Please ensure it exists in row ${HEADER_ROW_INDEX}.`);
+      ui.alert(`Error: Could not find the '${cols.messageStatus}' column header. Please ensure it exists in row ${settings.behavior.headerRowIndex}.`);
       return;
     }
 
     const data = sheet.getDataRange().getValues();
     const statusCol = statusColIndex + 1; // 1-based
-    
-    // Clear status for all data rows (skip header)
-    for (let i = HEADER_ROW_INDEX; i < data.length; i++) {
-      // Check if cell is not already empty
-      if (data[i][statusColIndex] !== "") {
-        sheet.getRange(i + 1, statusCol).setValue("");
-      }
+
+    // Batch clear: collect all cells that need clearing and update at once
+    const clearValues = [];
+    const clearBackgrounds = [];
+    for (let i = settings.behavior.headerRowIndex; i < data.length; i++) {
+      clearValues.push([""]);
+      clearBackgrounds.push([null]);
     }
-    
+
+    if (clearValues.length > 0) {
+      const startRow = settings.behavior.headerRowIndex + 1;
+      sheet.getRange(startRow, statusCol, clearValues.length, 1).setValues(clearValues);
+      sheet.getRange(startRow, statusCol, clearValues.length, 1).setBackgrounds(clearBackgrounds);
+    }
+
     ui.alert("All message statuses cleared!");
   }
 }

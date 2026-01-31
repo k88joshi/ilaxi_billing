@@ -64,6 +64,144 @@ function deletePhoneNumber() {
 }
 
 
+// ========================================
+// SETTINGS SIDEBAR FUNCTIONS
+// ========================================
+
+/**
+ * Opens the settings sidebar in the Google Sheets UI.
+ */
+function showSettingsSidebar() {
+  const html = HtmlService.createHtmlOutputFromFile("settings")
+    .setTitle("Settings")
+    .setWidth(350);
+  SpreadsheetApp.getUi().showSidebar(html);
+}
+
+/**
+ * Retrieves settings and sheet headers for the sidebar UI.
+ * Called from settings.html via google.script.run.
+ *
+ * @returns {Object} Object containing settings and headers
+ */
+function getSettingsForUI() {
+  const settings = getSettings();
+  const headers = getSheetHeaders();
+  return {
+    settings: settings,
+    headers: headers
+  };
+}
+
+/**
+ * Saves settings from the sidebar UI.
+ * Called from settings.html via google.script.run.
+ *
+ * @param {Object} settings - Settings object from the UI form
+ * @returns {Object} Result with success boolean and optional error message
+ */
+function saveSettingsFromUI(settings) {
+  return saveSettings(settings);
+}
+
+/**
+ * Generates a preview of a message template with sample data.
+ * Called from settings.html via google.script.run.
+ *
+ * @param {string} template - Template string to preview
+ * @param {string} type - "bill" or "thankYou"
+ * @returns {string} Processed template with sample values
+ */
+function previewTemplate(template, type) {
+  const sampleData = getSampleDataForPreview();
+  return processTemplate(template, sampleData);
+}
+
+/**
+ * Retrieves all column headers from the active sheet.
+ * Used to populate column mapping dropdowns in the settings UI.
+ *
+ * @returns {Array<string>} Array of header names
+ */
+function getSheetHeaders() {
+  const sheet = SpreadsheetApp.getActiveSheet();
+  const settings = getSettings();
+  const headerRow = settings.behavior.headerRowIndex || 1;
+
+  const lastCol = sheet.getLastColumn();
+  if (lastCol === 0) return [];
+
+  const headers = sheet.getRange(headerRow, 1, 1, lastCol).getValues()[0];
+  return headers.filter(h => h && String(h).trim() !== "").map(h => String(h).trim());
+}
+
+/**
+ * Exports current settings to a downloadable JSON file.
+ * Shows a dialog with the JSON content that can be copied.
+ */
+function exportSettingsToFile() {
+  const json = exportSettings();
+  const html = HtmlService.createHtmlOutput(
+    '<pre style="white-space: pre-wrap; word-wrap: break-word; font-size: 12px; max-height: 400px; overflow-y: auto;">' +
+    json.replace(/</g, '&lt;').replace(/>/g, '&gt;') +
+    '</pre>' +
+    '<p style="margin-top: 16px; font-size: 13px;">Copy the above JSON and save it to a file.</p>'
+  )
+    .setWidth(450)
+    .setHeight(350);
+  SpreadsheetApp.getUi().showModalDialog(html, "Export Settings");
+}
+
+/**
+ * Prompts user to paste JSON settings for import.
+ */
+function importSettingsFromPrompt() {
+  const result = ui.prompt(
+    "Import Settings",
+    "Paste the JSON settings content below:",
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (result.getSelectedButton() !== ui.Button.OK) return;
+
+  const jsonString = result.getResponseText().trim();
+  if (!jsonString) {
+    ui.alert("Import cancelled: No content provided.");
+    return;
+  }
+
+  const importResult = importSettings(jsonString);
+  if (importResult.success) {
+    ui.alert("Settings imported successfully!");
+  } else {
+    ui.alert("Import failed: " + importResult.error);
+  }
+}
+
+/**
+ * Shows confirmation dialog before resetting settings to defaults.
+ */
+function confirmResetSettings() {
+  const response = ui.alert(
+    "Reset Settings",
+    "This will reset ALL settings to their default values. This cannot be undone.\n\nAre you sure?",
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response === ui.Button.YES) {
+    const result = resetToDefaults();
+    if (result.success) {
+      ui.alert("Settings have been reset to defaults.");
+    } else {
+      ui.alert("Reset failed: " + result.error);
+    }
+  }
+}
+
+// ========================================
+// SEND SUMMARY FUNCTIONS
+// ========================================
+
 /**
  * Displays a formatted summary report in a UI alert box after a bulk send.
  *
@@ -82,7 +220,8 @@ function showSendSummary(sentCount, errorCount, skippedCount, errorDetails, filt
   summary += `Total Processed: ${sentCount + errorCount + skippedCount}\n`;
   
   // Add dry run warning if applicable
-  if (DRY_RUN_MODE) {
+  const settings = getSettings();
+  if (settings.behavior.dryRunMode) {
     summary += `\n⚠️ DRY RUN MODE - No actual messages were sent!\n`;
   }
   

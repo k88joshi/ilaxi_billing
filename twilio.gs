@@ -53,25 +53,38 @@ function checkCredentials() {
  * @returns {boolean} True if the message was successfully queued, false otherwise.
  */
 function sendBill_(customerPhone, customerName, balance, numTiffins, dueDate) {
+  // Get current settings for dynamic configuration
+  const settings = getSettings();
+
   // 1. Format and validate phone number
   const formattedPhone = formatPhoneNumber(customerPhone);
   if (!formattedPhone) {
     const errorMsg = "Error: Invalid phone number format.";
     Logger.log(`✗ ${errorMsg} for ${customerName} (${customerPhone})`);
-    return { success: false, status: errorMsg, color: "#f4cccc" }; // Light red
+    return { success: false, status: errorMsg, color: settings.colors.error };
   }
 
   // 2. Format balance and month
   const formattedBalance = formatBalance(balance);
   const monthName = getMonthFromValue(dueDate);
 
-  // 3. Construct the SMS message body
-  const message = `Ilaxi's Gujarati Tiffin - Monthly Bill\n\nPlease see below your total bill pending for the month of ${monthName}:\n\nTotal - ${formattedBalance}\nTiffins - ${numTiffins}\n\nPlease e-transfer the amount to ${ETRANSFER_EMAIL} in the next 1-2 days. During the e-transfer, please include: your full name, phone number and month of payment to avoid any errors. If you have any questions, please call ${SCREENSHOT_PHONE}.\n\nThank you,\nIlaxi Gujarati Tiffin`;
+  // 3. Build template data and construct the SMS message body
+  const templateData = {
+    businessName: settings.business.name,
+    etransferEmail: settings.business.etransferEmail,
+    phoneNumber: settings.business.phoneNumber,
+    whatsappLink: settings.business.whatsappLink,
+    customerName: customerName,
+    balance: formattedBalance,
+    numTiffins: numTiffins,
+    month: monthName
+  };
+  const message = processTemplate(settings.templates.billMessage, templateData);
 
   // 4. Check for DRY RUN MODE
-  if (DRY_RUN_MODE) {
+  if (settings.behavior.dryRunMode) {
     Logger.log(`[DRY RUN] Would send bill to ${customerName} at ${formattedPhone}`);
-    return { success: true, status: `[DRY RUN] Bill at ${new Date().toLocaleString()}`, color: "#fff2cc" }; // Light yellow
+    return { success: true, status: `[DRY RUN] Bill at ${new Date().toLocaleString()}`, color: settings.colors.dryRun };
   }
 
   // 5. Prepare Twilio API request
@@ -99,42 +112,50 @@ function sendBill_(customerPhone, customerName, balance, numTiffins, dueDate) {
       // Success (HTTP 201 Created)
       const timestamp = new Date().toLocaleString();
       Logger.log(`✓ Bill sent to ${customerName} at ${formattedPhone}`);
-      return { success: true, status: `Sent: ${timestamp}`, color: "#d9ead3" }; // Light green
+      return { success: true, status: `Sent: ${timestamp}`, color: settings.colors.success };
     } else {
       // Failed (Twilio returned an error)
       const errorMsg = `Error ${result.code || 'API'}: ${result.message || 'Unknown error'}`;
       Logger.log(`✗ Failed to send to ${customerName}: ${errorMsg}`);
-      return { success: false, status: errorMsg, color: "#f4cccc" }; // Light red
+      return { success: false, status: errorMsg, color: settings.colors.error };
     }
   } catch (error) {
     // Exception (e.g., network error, Twilio offline)
     const errorMsg = `Error: ${error.message || error}`;
     Logger.log(`✗ Exception sending to ${customerName}: ${errorMsg}`);
-    return { success: false, status: errorMsg, color: "#f4cccc" }; // Light red
+    return { success: false, status: errorMsg, color: settings.colors.error };
   }
 }
 
 function sendThankYouMessage_(customerPhone, customerName, orderId) {
+  // Get current settings for dynamic configuration
+  const settings = getSettings();
+
   // Check credentials silently
   if (!checkCredentials()) {
     Logger.log("ERROR: Cannot send 'Thank You' message. Twilio credentials not set.");
-    return { success: false, status: "Thank You Error: Credentials not set", color: "#f4cccc" };
+    return { success: false, status: "Thank You Error: Credentials not set", color: settings.colors.error };
   }
 
   // Format and validate phone
   const formattedPhone = formatPhoneNumber(customerPhone);
   if (!formattedPhone) {
     Logger.log(`✗ Invalid phone for 'Thank You' msg: ${customerPhone}`);
-    return { success: false, status: "Thank You Error: Invalid Phone", color: "#f4cccc" };
+    return { success: false, status: "Thank You Error: Invalid Phone", color: settings.colors.error };
   }
 
-  // Construct the message
-  const message = `Hello ${customerName},\n\nThank you for your payment for Order ${orderId}. We have marked your bill as PAID.\n\nWe appreciate your business!\n- ${BUSINESS_NAME}`;
+  // Build template data and construct the message
+  const templateData = {
+    businessName: settings.business.name,
+    customerName: customerName,
+    orderId: orderId
+  };
+  const message = processTemplate(settings.templates.thankYouMessage, templateData);
 
   // Check for DRY RUN MODE
-  if (DRY_RUN_MODE) {
+  if (settings.behavior.dryRunMode) {
     Logger.log(`[DRY RUN] Would send 'Thank You' to ${customerName}`);
-    return { success: true, status: `[DRY RUN] Thank You at ${new Date().toLocaleString()}`, color: "#fff2cc" };
+    return { success: true, status: `[DRY RUN] Thank You at ${new Date().toLocaleString()}`, color: settings.colors.dryRun };
   }
 
   // Prepare and send the Twilio request
@@ -153,15 +174,15 @@ function sendThankYouMessage_(customerPhone, customerName, orderId) {
 
     if (response.getResponseCode() === 201) {
       Logger.log(`✓ 'Thank You' sent to ${customerName}`);
-      return { success: true, status: `Thank You Sent: ${new Date().toLocaleString()}`, color: "#d9ead3" };
+      return { success: true, status: `Thank You Sent: ${new Date().toLocaleString()}`, color: settings.colors.success };
     } else {
       const errorMsg = `Thank You Error: ${result.code || 'API'}: ${result.message || 'Unknown'}`;
       Logger.log(`✗ Failed to send 'Thank You' to ${customerName}: ${errorMsg}`);
-      return { success: false, status: errorMsg, color: "#f4cccc" };
+      return { success: false, status: errorMsg, color: settings.colors.error };
     }
   } catch (error) {
     const errorMsg = `Thank You Error: ${error.message || error}`;
     Logger.log(`✗ Exception sending 'Thank You' to ${customerName}: ${errorMsg}`);
-    return { success: false, status: errorMsg, color: "#f4cccc" };
+    return { success: false, status: errorMsg, color: settings.colors.error };
   }
 }

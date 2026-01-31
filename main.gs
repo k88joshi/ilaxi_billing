@@ -33,6 +33,15 @@ function onOpen() {
     .addItem("Test with First Unpaid Row", "testSingleMessage")
     .addItem("Clear All Message Statuses", "clearAllStatuses")
     .addToUi();
+
+  ui.createMenu("Settings")
+    .addItem("Open Settings", "showSettingsSidebar")
+    .addSeparator()
+    .addItem("Export Settings", "exportSettingsToFile")
+    .addItem("Import Settings", "importSettingsFromPrompt")
+    .addSeparator()
+    .addItem("Reset to Defaults", "confirmResetSettings")
+    .addToUi();
 }
 
 
@@ -52,7 +61,11 @@ function onEdit(e) {
   const sheet = range.getSheet();
   const row = range.getRow();
 
-  if (row <= HEADER_ROW_INDEX) return;
+  // Get settings for dynamic configuration
+  const settings = getSettings();
+  const cols = settings.columns;
+
+  if (row <= settings.behavior.headerRowIndex) return;
 
   const newValue = e.value ? String(e.value).toLowerCase() : "";
   const oldValue = e.oldValue ? String(e.oldValue).toLowerCase() : "";
@@ -60,14 +73,16 @@ function onEdit(e) {
   if (newValue !== "paid" || newValue === oldValue) return;
 
   const columns = getHeaderColumnMap();
-  const paymentCol = columns[PAYMENT_STATUS_HEADER];
-  const statusCol = columns[MESSAGE_STATUS_HEADER];
+  const paymentCol = columns[cols.paymentStatus];
+  const statusCol = columns[cols.messageStatus];
 
   if (range.getColumn() !== (paymentCol + 1)) return;
 
   Logger.log(`Payment status changed to "Paid" for row ${row}. Triggering "Thank You" message.`);
 
-  const { [CUSTOMER_NAME_HEADER]: nameCol, [PHONE_NUMBER_HEADER]: phoneCol, [ORDER_ID_HEADER]: orderIdCol } = columns;
+  const nameCol = columns[cols.customerName];
+  const phoneCol = columns[cols.phoneNumber];
+  const orderIdCol = columns[cols.orderId];
   const rowData = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
   const customerName = rowData[nameCol];
   const customerPhone = rowData[phoneCol];
@@ -77,7 +92,7 @@ function onEdit(e) {
 
   if (!customerName || !customerPhone || !orderId) {
     Logger.log(`Skipping auto-thanks for row ${row}: missing Name, Phone, or Order ID.`);
-    statusRange.setValue("Payment 'Paid', but auto-thanks failed: Missing data").setBackground("#f4cccc");
+    statusRange.setValue("Payment 'Paid', but auto-thanks failed: Missing data").setBackground(settings.colors.error);
     return;
   }
 

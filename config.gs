@@ -1,10 +1,17 @@
 // ========================================
-// SCRIPT CONFIGURATION
-// All user-tweakable settings are in this section.
+// LEGACY SCRIPT CONFIGURATION
+// ========================================
+//
+// @deprecated This file is maintained for backward compatibility only.
+// All settings are now managed through the Settings sidebar (Settings > Open Settings).
+// On first run, these values will be automatically migrated to the new settings system.
+//
+// To modify settings, use the Settings menu in Google Sheets instead of editing this file.
 // ========================================
 
 // --- A. Sheet Layout Configuration ---
 /**
+ * @deprecated Use Settings > Open Settings > Columns tab instead.
  * Column header names. These MUST exactly match the headers in row 1 of your spreadsheet.
  * The script uses these names to find columns, so reordering columns in your sheet is safe.
  */
@@ -18,6 +25,7 @@ const ORDER_ID_HEADER = "Order ID";
 const PAYMENT_STATUS_HEADER = "Payment";
 
 /**
+ * @deprecated Use Settings > Open Settings > Behavior tab instead.
  * The row number where your column headers are located.
  * This is 1-based (1 = the very first row in the sheet).
  */
@@ -25,6 +33,7 @@ const HEADER_ROW_INDEX = 1;
 
 // --- B. Business Information ---
 /**
+ * @deprecated Use Settings > Open Settings > Business tab instead.
  * Your business details, used in the SMS messages.
  */
 const BUSINESS_NAME = "Ilaxi's Gujarati Tiffin";
@@ -33,12 +42,14 @@ const SCREENSHOT_PHONE = "+1 (647) 537-5956"; // Used for display text
 
 // --- C. WhatsApp & Link Configuration ---
 /**
+ * @deprecated Use Settings > Open Settings > Business tab instead.
  * Creates a clickable WhatsApp link with a pre-filled message.
  */
 const WHATSAPP_LINK = `https://bit.ly/ilaxi-tiffins-etransfer-screenshot`;
 
 // --- D. Script Behavior Configuration ---
 /**
+ * @deprecated Use Settings > Open Settings > Behavior tab instead.
  * Set to true to test the script's logic without sending actual SMS messages.
  * When true, it logs actions to the Logger and updates the sheet with "[DRY RUN]".
  * Set to false for production use.
@@ -46,6 +57,7 @@ const WHATSAPP_LINK = `https://bit.ly/ilaxi-tiffins-etransfer-screenshot`;
 const DRY_RUN_MODE = false;
 
 /**
+ * @deprecated Use Settings > Open Settings > Behavior tab instead.
  * Maximum number of messages to send per execution (to avoid timeout).
  * Google Apps Script has a 6-minute execution limit.
  * Recommended: 50-100 messages per batch (about 1-2 minutes with 1 second delays).
@@ -53,6 +65,7 @@ const DRY_RUN_MODE = false;
 const BATCH_SIZE = 75;
 
 /**
+ * @deprecated Use Settings > Open Settings > Behavior tab instead.
  * Delay between messages in milliseconds (1000 = 1 second).
  * This prevents API rate limiting and helps avoid timeouts.
  */

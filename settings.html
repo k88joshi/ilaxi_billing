@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    /* Base styles */
+    * {
+      box-sizing: border-box;
+      font-family: 'Google Sans', Arial, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: #f8f9fa;
+      font-size: 13px;
+      color: #202124;
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, #4285f4 0%, #34a853 100%);
+      color: white;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 500;
+    }
+
+    .header p {
+      margin: 4px 0 0;
+      font-size: 11px;
+      opacity: 0.9;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+      overflow-x: auto;
+    }
+
+    .tab {
+      flex: 1;
+      min-width: 60px;
+      padding: 12px 8px;
+      text-align: center;
+      cursor: pointer;
+      font-size: 11px;
+      color: #5f6368;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .tab:hover {
+      background: #f1f3f4;
+    }
+
+    .tab.active {
+      color: #4285f4;
+      border-bottom-color: #4285f4;
+      font-weight: 500;
+    }
+
+    /* Content area */
+    .content {
+      padding: 16px;
+      max-height: calc(100vh - 200px);
+      overflow-y: auto;
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    /* Form elements */
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-weight: 500;
+      margin-bottom: 4px;
+      color: #202124;
+    }
+
+    .hint {
+      font-size: 11px;
+      color: #5f6368;
+      margin-bottom: 6px;
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="number"],
+    textarea,
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      font-size: 13px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      outline: none;
+      border-color: #4285f4;
+      box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
+    }
+
+    input[type="color"] {
+      width: 50px;
+      height: 36px;
+      padding: 2px;
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    textarea {
+      min-height: 150px;
+      resize: vertical;
+      font-family: monospace;
+      font-size: 12px;
+    }
+
+    /* Toggle switch */
+    .toggle-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .toggle {
+      position: relative;
+      width: 44px;
+      height: 24px;
+    }
+
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #dadce0;
+      transition: 0.3s;
+      border-radius: 24px;
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.3s;
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .toggle input:checked + .toggle-slider {
+      background-color: #4285f4;
+    }
+
+    .toggle input:checked + .toggle-slider:before {
+      transform: translateX(20px);
+    }
+
+    /* Color picker row */
+    .color-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .color-row label {
+      flex: 1;
+      margin-bottom: 0;
+    }
+
+    .color-preview {
+      width: 80px;
+      height: 24px;
+      border-radius: 4px;
+      border: 1px solid #dadce0;
+    }
+
+    /* Placeholder buttons */
+    .placeholder-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+
+    .placeholder-btn {
+      padding: 4px 8px;
+      font-size: 10px;
+      background: #e8f0fe;
+      color: #1967d2;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .placeholder-btn:hover {
+      background: #d2e3fc;
+    }
+
+    /* Preview section */
+    .preview-section {
+      margin-top: 12px;
+      padding: 12px;
+      background: #f1f3f4;
+      border-radius: 8px;
+      font-size: 12px;
+    }
+
+    .preview-section h4 {
+      margin: 0 0 8px;
+      font-size: 12px;
+      color: #5f6368;
+    }
+
+    .preview-content {
+      white-space: pre-wrap;
+      background: white;
+      padding: 12px;
+      border-radius: 4px;
+      border: 1px solid #dadce0;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    /* Footer */
+    .footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: white;
+      border-top: 1px solid #e0e0e0;
+      padding: 12px 16px;
+      display: flex;
+      gap: 8px;
+      justify-content: space-between;
+    }
+
+    .footer-left {
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: #4285f4;
+      color: white;
+      border: none;
+    }
+
+    .btn-primary:hover {
+      background: #3367d6;
+    }
+
+    .btn-secondary {
+      background: white;
+      color: #5f6368;
+      border: 1px solid #dadce0;
+    }
+
+    .btn-secondary:hover {
+      background: #f1f3f4;
+    }
+
+    .btn-danger {
+      background: white;
+      color: #d93025;
+      border: 1px solid #d93025;
+    }
+
+    .btn-danger:hover {
+      background: #fce8e6;
+    }
+
+    /* Status messages */
+    .status {
+      position: fixed;
+      top: 80px;
+      left: 16px;
+      right: 16px;
+      padding: 12px 16px;
+      border-radius: 4px;
+      font-size: 13px;
+      z-index: 100;
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateY(-20px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .status.success {
+      background: #e6f4ea;
+      color: #137333;
+      border: 1px solid #34a853;
+    }
+
+    .status.error {
+      background: #fce8e6;
+      color: #c5221f;
+      border: 1px solid #ea4335;
+    }
+
+    /* Loading overlay */
+    .loading {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #dadce0;
+      border-top-color: #4285f4;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Section divider */
+    .section-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: #202124;
+      margin: 20px 0 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .section-title:first-child {
+      margin-top: 0;
+    }
+  </style>
+</head>
+<body>
+  <!-- Loading overlay -->
+  <div id="loading" class="loading">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- Status message -->
+  <div id="status" class="status hidden"></div>
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Settings</h1>
+    <p>Configure your billing system</p>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" data-tab="business">Business</div>
+    <div class="tab" data-tab="templates">Templates</div>
+    <div class="tab" data-tab="behavior">Behavior</div>
+    <div class="tab" data-tab="colors">Colors</div>
+    <div class="tab" data-tab="columns">Columns</div>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+    <!-- Business Tab -->
+    <div id="business" class="tab-panel active">
+      <div class="form-group">
+        <label for="businessName">Business Name</label>
+        <div class="hint">Displayed in SMS messages</div>
+        <input type="text" id="businessName" maxlength="100" placeholder="Your Business Name">
+      </div>
+
+      <div class="form-group">
+        <label for="etransferEmail">E-Transfer Email</label>
+        <div class="hint">Where customers send payments</div>
+        <input type="email" id="etransferEmail" placeholder="payments@example.com">
+      </div>
+
+      <div class="form-group">
+        <label for="phoneNumber">Contact Phone Number</label>
+        <div class="hint">For customer questions</div>
+        <input type="text" id="phoneNumber" maxlength="20" placeholder="+1 (123) 456-7890">
+      </div>
+
+      <div class="form-group">
+        <label for="whatsappLink">WhatsApp Link</label>
+        <div class="hint">Optional link for screenshot submissions</div>
+        <input type="text" id="whatsappLink" placeholder="https://wa.me/...">
+      </div>
+    </div>
+
+    <!-- Templates Tab -->
+    <div id="templates" class="tab-panel">
+      <div class="section-title">Bill Message Template</div>
+      <div class="hint">Click placeholders to insert them:</div>
+      <div class="placeholder-buttons" data-target="billMessage">
+        <button type="button" class="placeholder-btn" data-placeholder="{{businessName}}">businessName</button>
+        <button type="button" class="placeholder-btn" data-placeholder="{{etransferEmail}}">etransferEmail</button>
+        <button type="button" class="placeholder-btn" data-placeholder="{{phoneNumber}}">phoneNumber</button>
+        <button type="button" class="placeholder-btn" data-placeholder="{{whatsappLink}}">whatsappLink</button>
+        <button type="button" class="placeholder-btn" data-placeholder="{{customerName}}">customerName</button>
+        <button type="button" class="placeholder-btn" data-placeholder="{{balance}}">balance</button>
+        <button type="button" class="placeholder-btn" data-placeholder="{{numTiffins}}">numTiffins</button>
+        <button type="button" class="placeholder-btn" data-placeholder="{{month}}">month</button>
+      </div>
+      <div class="form-group">
+        <textarea id="billMessage" placeholder="Enter bill message template..."></textarea>
+        <div class="hint">50-1600 characters. SMS may be split into multiple parts.</div>
+      </div>
+      <button type="button" class="btn-secondary" onclick="previewTemplate('bill')">Preview Bill Message</button>
+      <div id="billPreview" class="preview-section hidden">
+        <h4>Preview (with sample data):</h4>
+        <div class="preview-content"></div>
+      </div>
+
+      <div class="section-title">Thank You Message Template</div>
+      <div class="hint">Click placeholders to insert them:</div>
+      <div class="placeholder-buttons" data-target="thankYouMessage">
+        <button type="button" class="placeholder-btn" data-placeholder="{{businessName}}">businessName</button>
+        <button type="button" class="placeholder-btn" data-placeholder="{{customerName}}">customerName</button>
+        <button type="button" class="placeholder-btn" data-placeholder="{{orderId}}">orderId</button>
+      </div>
+      <div class="form-group">
+        <textarea id="thankYouMessage" placeholder="Enter thank you message template..."></textarea>
+        <div class="hint">50-1600 characters. Sent automatically when payment is marked as Paid.</div>
+      </div>
+      <button type="button" class="btn-secondary" onclick="previewTemplate('thankYou')">Preview Thank You Message</button>
+      <div id="thankYouPreview" class="preview-section hidden">
+        <h4>Preview (with sample data):</h4>
+        <div class="preview-content"></div>
+      </div>
+    </div>
+
+    <!-- Behavior Tab -->
+    <div id="behavior" class="tab-panel">
+      <div class="form-group">
+        <label>Dry Run Mode</label>
+        <div class="hint">When enabled, no actual SMS messages are sent</div>
+        <div class="toggle-group">
+          <label class="toggle">
+            <input type="checkbox" id="dryRunMode">
+            <span class="toggle-slider"></span>
+          </label>
+          <span id="dryRunLabel">Disabled (messages will be sent)</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="batchSize">Batch Size</label>
+        <div class="hint">Maximum messages per execution (1-200). Prevents timeout.</div>
+        <input type="number" id="batchSize" min="1" max="200" value="75">
+      </div>
+
+      <div class="form-group">
+        <label for="messageDelayMs">Message Delay (ms)</label>
+        <div class="hint">Delay between messages (500-5000ms). Prevents rate limiting.</div>
+        <input type="number" id="messageDelayMs" min="500" max="5000" step="100" value="1000">
+      </div>
+
+      <div class="form-group">
+        <label for="headerRowIndex">Header Row</label>
+        <div class="hint">Row number containing column headers (usually 1)</div>
+        <input type="number" id="headerRowIndex" min="1" max="100" value="1">
+      </div>
+    </div>
+
+    <!-- Colors Tab -->
+    <div id="colors" class="tab-panel">
+      <div class="hint" style="margin-bottom: 16px;">Choose colors for cell backgrounds in the Message Status column</div>
+
+      <div class="color-row">
+        <label>Success (message sent)</label>
+        <input type="color" id="colorSuccess" value="#d9ead3">
+        <div class="color-preview" id="previewSuccess"></div>
+      </div>
+
+      <div class="color-row">
+        <label>Error (message failed)</label>
+        <input type="color" id="colorError" value="#f4cccc">
+        <div class="color-preview" id="previewError"></div>
+      </div>
+
+      <div class="color-row">
+        <label>Dry Run (simulated)</label>
+        <input type="color" id="colorDryRun" value="#fff2cc">
+        <div class="color-preview" id="previewDryRun"></div>
+      </div>
+    </div>
+
+    <!-- Columns Tab -->
+    <div id="columns" class="tab-panel">
+      <div class="hint" style="margin-bottom: 16px;">Map required fields to your spreadsheet column headers. Headers are auto-detected from your sheet.</div>
+
+      <div class="form-group">
+        <label for="colPhoneNumber">Phone Number</label>
+        <select id="colPhoneNumber"></select>
+      </div>
+
+      <div class="form-group">
+        <label for="colCustomerName">Customer Name</label>
+        <select id="colCustomerName"></select>
+      </div>
+
+      <div class="form-group">
+        <label for="colBalance">Balance</label>
+        <select id="colBalance"></select>
+      </div>
+
+      <div class="form-group">
+        <label for="colNumTiffins">Number of Tiffins</label>
+        <select id="colNumTiffins"></select>
+      </div>
+
+      <div class="form-group">
+        <label for="colDueDate">Due Date</label>
+        <select id="colDueDate"></select>
+      </div>
+
+      <div class="form-group">
+        <label for="colMessageStatus">Message Status</label>
+        <select id="colMessageStatus"></select>
+      </div>
+
+      <div class="form-group">
+        <label for="colOrderId">Order ID</label>
+        <select id="colOrderId"></select>
+      </div>
+
+      <div class="form-group">
+        <label for="colPaymentStatus">Payment Status</label>
+        <select id="colPaymentStatus"></select>
+      </div>
+
+      <button type="button" class="btn-secondary" onclick="refreshHeaders()">Refresh Column Headers</button>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="footer-left">
+      <button type="button" class="btn-danger" onclick="confirmReset()">Reset</button>
+      <button type="button" class="btn-secondary" onclick="exportSettingsUI()">Export</button>
+      <button type="button" class="btn-secondary" onclick="importSettingsUI()">Import</button>
+    </div>
+    <button type="button" class="btn-primary" onclick="saveSettingsUI()">Save Settings</button>
+  </div>
+
+  <script>
+    // Global state
+    let currentSettings = null;
+    let sheetHeaders = [];
+
+    // Initialize on load
+    document.addEventListener('DOMContentLoaded', init);
+
+    function init() {
+      setupTabs();
+      setupPlaceholderButtons();
+      setupColorPreviews();
+      setupDryRunToggle();
+      loadSettings();
+    }
+
+    // Tab navigation
+    function setupTabs() {
+      document.querySelectorAll('.tab').forEach(function(tab) {
+        tab.addEventListener('click', function() {
+          document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+          document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+          tab.classList.add('active');
+          document.getElementById(tab.dataset.tab).classList.add('active');
+        });
+      });
+    }
+
+    // Placeholder button insertion
+    function setupPlaceholderButtons() {
+      document.querySelectorAll('.placeholder-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var target = btn.closest('.placeholder-buttons').dataset.target;
+          var textarea = document.getElementById(target);
+          var placeholder = btn.dataset.placeholder;
+          insertAtCursor(textarea, placeholder);
+        });
+      });
+    }
+
+    function insertAtCursor(textarea, text) {
+      var start = textarea.selectionStart;
+      var end = textarea.selectionEnd;
+      var before = textarea.value.substring(0, start);
+      var after = textarea.value.substring(end);
+      textarea.value = before + text + after;
+      textarea.selectionStart = textarea.selectionEnd = start + text.length;
+      textarea.focus();
+    }
+
+    // Color preview updates
+    function setupColorPreviews() {
+      var colorInputs = [
+        { input: 'colorSuccess', preview: 'previewSuccess' },
+        { input: 'colorError', preview: 'previewError' },
+        { input: 'colorDryRun', preview: 'previewDryRun' }
+      ];
+
+      colorInputs.forEach(function(item) {
+        var inputEl = document.getElementById(item.input);
+        var previewEl = document.getElementById(item.preview);
+        previewEl.style.backgroundColor = inputEl.value;
+        inputEl.addEventListener('input', function() {
+          previewEl.style.backgroundColor = inputEl.value;
+        });
+      });
+    }
+
+    // Dry run toggle label
+    function setupDryRunToggle() {
+      var toggle = document.getElementById('dryRunMode');
+      var label = document.getElementById('dryRunLabel');
+      toggle.addEventListener('change', function() {
+        label.textContent = toggle.checked
+          ? 'Enabled (no messages will be sent)'
+          : 'Disabled (messages will be sent)';
+      });
+    }
+
+    // Load settings from server
+    function loadSettings() {
+      showLoading(true);
+      google.script.run
+        .withSuccessHandler(onSettingsLoaded)
+        .withFailureHandler(onError)
+        .getSettingsForUI();
+    }
+
+    function onSettingsLoaded(data) {
+      currentSettings = data.settings;
+      sheetHeaders = data.headers || [];
+
+      // Business tab
+      document.getElementById('businessName').value = currentSettings.business.name;
+      document.getElementById('etransferEmail').value = currentSettings.business.etransferEmail;
+      document.getElementById('phoneNumber').value = currentSettings.business.phoneNumber;
+      document.getElementById('whatsappLink').value = currentSettings.business.whatsappLink || '';
+
+      // Templates tab
+      document.getElementById('billMessage').value = currentSettings.templates.billMessage;
+      document.getElementById('thankYouMessage').value = currentSettings.templates.thankYouMessage;
+
+      // Behavior tab
+      document.getElementById('dryRunMode').checked = currentSettings.behavior.dryRunMode;
+      document.getElementById('dryRunLabel').textContent = currentSettings.behavior.dryRunMode
+        ? 'Enabled (no messages will be sent)'
+        : 'Disabled (messages will be sent)';
+      document.getElementById('batchSize').value = currentSettings.behavior.batchSize;
+      document.getElementById('messageDelayMs').value = currentSettings.behavior.messageDelayMs;
+      document.getElementById('headerRowIndex').value = currentSettings.behavior.headerRowIndex;
+
+      // Colors tab
+      document.getElementById('colorSuccess').value = currentSettings.colors.success;
+      document.getElementById('colorError').value = currentSettings.colors.error;
+      document.getElementById('colorDryRun').value = currentSettings.colors.dryRun;
+      setupColorPreviews();
+
+      // Columns tab
+      populateColumnSelects();
+
+      showLoading(false);
+    }
+
+    // Populate column dropdowns using safe DOM methods
+    function populateColumnSelects() {
+      var selects = {
+        colPhoneNumber: currentSettings.columns.phoneNumber,
+        colCustomerName: currentSettings.columns.customerName,
+        colBalance: currentSettings.columns.balance,
+        colNumTiffins: currentSettings.columns.numTiffins,
+        colDueDate: currentSettings.columns.dueDate,
+        colMessageStatus: currentSettings.columns.messageStatus,
+        colOrderId: currentSettings.columns.orderId,
+        colPaymentStatus: currentSettings.columns.paymentStatus
+      };
+
+      Object.keys(selects).forEach(function(selectId) {
+        var currentValue = selects[selectId];
+        var select = document.getElementById(selectId);
+
+        // Clear existing options safely
+        while (select.firstChild) {
+          select.removeChild(select.firstChild);
+        }
+
+        // Add default option
+        var defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = '-- Select Column --';
+        select.appendChild(defaultOption);
+
+        // Add header options
+        sheetHeaders.forEach(function(header) {
+          var option = document.createElement('option');
+          option.value = header;
+          option.textContent = header;
+          if (header === currentValue) {
+            option.selected = true;
+          }
+          select.appendChild(option);
+        });
+
+        // Add custom option if current value not in headers
+        if (currentValue && sheetHeaders.indexOf(currentValue) === -1) {
+          var customOption = document.createElement('option');
+          customOption.value = currentValue;
+          customOption.textContent = currentValue + ' (not found in sheet)';
+          customOption.selected = true;
+          select.appendChild(customOption);
+        }
+      });
+    }
+
+    // Refresh headers from sheet
+    function refreshHeaders() {
+      showLoading(true);
+      google.script.run
+        .withSuccessHandler(function(headers) {
+          sheetHeaders = headers;
+          populateColumnSelects();
+          showLoading(false);
+          showStatus('Column headers refreshed!', 'success');
+        })
+        .withFailureHandler(onError)
+        .getSheetHeaders();
+    }
+
+    // Collect current form values
+    function collectFormData() {
+      return {
+        version: currentSettings.version,
+        business: {
+          name: document.getElementById('businessName').value.trim(),
+          etransferEmail: document.getElementById('etransferEmail').value.trim(),
+          phoneNumber: document.getElementById('phoneNumber').value.trim(),
+          whatsappLink: document.getElementById('whatsappLink').value.trim()
+        },
+        templates: {
+          billMessage: document.getElementById('billMessage').value,
+          thankYouMessage: document.getElementById('thankYouMessage').value
+        },
+        behavior: {
+          dryRunMode: document.getElementById('dryRunMode').checked,
+          batchSize: parseInt(document.getElementById('batchSize').value, 10),
+          messageDelayMs: parseInt(document.getElementById('messageDelayMs').value, 10),
+          headerRowIndex: parseInt(document.getElementById('headerRowIndex').value, 10)
+        },
+        colors: {
+          success: document.getElementById('colorSuccess').value,
+          error: document.getElementById('colorError').value,
+          dryRun: document.getElementById('colorDryRun').value
+        },
+        columns: {
+          phoneNumber: document.getElementById('colPhoneNumber').value,
+          customerName: document.getElementById('colCustomerName').value,
+          balance: document.getElementById('colBalance').value,
+          numTiffins: document.getElementById('colNumTiffins').value,
+          dueDate: document.getElementById('colDueDate').value,
+          messageStatus: document.getElementById('colMessageStatus').value,
+          orderId: document.getElementById('colOrderId').value,
+          paymentStatus: document.getElementById('colPaymentStatus').value
+        }
+      };
+    }
+
+    // Save settings
+    function saveSettingsUI() {
+      var settings = collectFormData();
+      showLoading(true);
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          showLoading(false);
+          if (result.success) {
+            currentSettings = settings;
+            showStatus('Settings saved successfully!', 'success');
+          } else {
+            showStatus('Error: ' + result.error, 'error');
+          }
+        })
+        .withFailureHandler(onError)
+        .saveSettingsFromUI(settings);
+    }
+
+    // Reset to defaults
+    function confirmReset() {
+      if (confirm('Reset all settings to defaults? This cannot be undone.')) {
+        showLoading(true);
+        google.script.run
+          .withSuccessHandler(function() {
+            loadSettings();
+            showStatus('Settings reset to defaults.', 'success');
+          })
+          .withFailureHandler(onError)
+          .resetToDefaults();
+      }
+    }
+
+    // Export settings
+    function exportSettingsUI() {
+      var settings = collectFormData();
+      var json = JSON.stringify(settings, null, 2);
+      var blob = new Blob([json], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'billing-settings.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      showStatus('Settings exported!', 'success');
+    }
+
+    // Import settings
+    function importSettingsUI() {
+      var input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.onchange = function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+
+        var reader = new FileReader();
+        reader.onload = function(event) {
+          try {
+            JSON.parse(event.target.result); // Validate JSON
+            showLoading(true);
+            google.script.run
+              .withSuccessHandler(function(result) {
+                if (result.success) {
+                  loadSettings();
+                  showStatus('Settings imported successfully!', 'success');
+                } else {
+                  showLoading(false);
+                  showStatus('Import error: ' + result.error, 'error');
+                }
+              })
+              .withFailureHandler(onError)
+              .importSettings(event.target.result);
+          } catch (err) {
+            showStatus('Invalid JSON file: ' + err.message, 'error');
+          }
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    }
+
+    // Preview template
+    function previewTemplate(type) {
+      var templateField = type === 'bill' ? 'billMessage' : 'thankYouMessage';
+      var previewDiv = type === 'bill' ? 'billPreview' : 'thankYouPreview';
+      var template = document.getElementById(templateField).value;
+
+      google.script.run
+        .withSuccessHandler(function(preview) {
+          var container = document.getElementById(previewDiv);
+          container.classList.remove('hidden');
+          container.querySelector('.preview-content').textContent = preview;
+        })
+        .withFailureHandler(onError)
+        .previewTemplate(template, type);
+    }
+
+    // UI helpers
+    function showLoading(show) {
+      document.getElementById('loading').classList.toggle('hidden', !show);
+    }
+
+    function showStatus(message, type) {
+      var status = document.getElementById('status');
+      status.textContent = message;
+      status.className = 'status ' + type;
+      setTimeout(function() { status.classList.add('hidden'); }, 4000);
+    }
+
+    function onError(error) {
+      showLoading(false);
+      showStatus('Error: ' + error.message, 'error');
+      console.error(error);
+    }
+  </script>
+</body>
+</html>
