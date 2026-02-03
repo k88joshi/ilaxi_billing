@@ -138,6 +138,37 @@ function getMonthFromValue(monthValue) {
 }
 
 /**
+ * Prompts the user to select a message type (First Notice, Follow-up, Final Notice).
+ * Returns the selected template type ID or null if cancelled.
+ *
+ * @returns {string|null} Template type ID ("firstNotice", "followUp", "finalNotice") or null
+ */
+function promptForMessageType() {
+  const settings = getSettings();
+  const templateTypes = getBillTemplateTypes(settings);
+
+  // Build the prompt options
+  const options = templateTypes.map((t, i) => `${i + 1}. ${t.name}`).join("\n");
+  const result = ui.prompt(
+    "Select Message Type",
+    `Which message would you like to send?\n\n${options}\n\nEnter the number (1-${templateTypes.length}):`,
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (result.getSelectedButton() !== ui.Button.OK) {
+    return null;
+  }
+
+  const choice = parseInt(result.getResponseText().trim(), 10);
+  if (isNaN(choice) || choice < 1 || choice > templateTypes.length) {
+    ui.alert("Invalid selection. Please enter a number between 1 and " + templateTypes.length);
+    return null;
+  }
+
+  return templateTypes[choice - 1].id;
+}
+
+/**
  * Sends billing SMS messages to ALL customers with "Unpaid" status.
  * This function will send reminders even if a message was "Sent" before,
  * as long as the payment status is still "Unpaid".
@@ -147,6 +178,10 @@ function sendBillsToUnpaid() {
   if (!checkCredentials()) {
     return;
   }
+
+  // 1.5. Prompt for message type
+  const templateType = promptForMessageType();
+  if (!templateType) return;
 
   // 2. Get settings and dynamic column mapping
   const settings = getSettings();
@@ -200,7 +235,7 @@ function sendBillsToUnpaid() {
       continue;
     }
 
-    const result = sendBill_(rowData[phoneCol], rowData[nameCol], rowData[balanceCol], rowData[tiffinsCol], rowData[dueDateCol]);
+    const result = sendBill_(rowData[phoneCol], rowData[nameCol], rowData[balanceCol], rowData[tiffinsCol], rowData[dueDateCol], templateType);
     statusUpdates.push({ row, status: result.status, color: result.color });
 
     if (result.success) {
@@ -243,6 +278,10 @@ function sendUnpaidByDueDate() {
     return; // User cancelled or entered nothing
   }
   const targetDate = result.getResponseText().trim().toLowerCase();
+
+  // 1.5. Prompt for message type
+  const templateType = promptForMessageType();
+  if (!templateType) return;
 
   // 2. Validate credentials and get settings
   if (!checkCredentials()) return;
@@ -302,7 +341,7 @@ function sendUnpaidByDueDate() {
       continue;
     }
 
-    const result = sendBill_(rowData[phoneCol], rowData[nameCol], rowData[balanceCol], rowData[tiffinsCol], rowData[dueDateCol]);
+    const result = sendBill_(rowData[phoneCol], rowData[nameCol], rowData[balanceCol], rowData[tiffinsCol], rowData[dueDateCol], templateType);
     statusUpdates.push({ row, status: result.status, color: result.color });
 
     if (result.success) {
@@ -329,8 +368,9 @@ function sendUnpaidByDueDate() {
   }
 
   // 7. Display summary report
+  const templateName = getBillTemplate(templateType, settings).name;
   const skippedCount = data.length - settings.behavior.headerRowIndex - rowsToProcess.length;
-  showSendSummary(sentCount, errorCount, skippedCount, errorDetails, `for "${targetDate}"`);
+  showSendSummary(sentCount, errorCount, skippedCount, errorDetails, `(${templateName}) for "${targetDate}"`);
 }
 
 /**
@@ -344,6 +384,10 @@ function sendBillByOrderID() {
     return; // User cancelled or entered nothing
   }
   const targetOrderID = result.getResponseText().trim();
+
+  // 1.5. Prompt for message type
+  const templateType = promptForMessageType();
+  if (!templateType) return;
 
   // 2. Validate credentials and get settings
   if (!checkCredentials()) return;
@@ -396,10 +440,11 @@ function sendBillByOrderID() {
   }
 
   // 6. Show preview and confirm with user
+  const templateName = getBillTemplate(templateType, settings).name;
   const dryRunNote = settings.behavior.dryRunMode ? '\n\n⚠️ [DRY RUN MODE - No actual SMS will be sent]' : '';
   const preview = ui.alert(
     "Confirm Send by Order ID",
-    `Found Order ID ${targetOrderID}:\n\nName: ${name}\nPhone: ${phone}\nBalance: ${formatBalance(balance)}\n\nContinue?${dryRunNote}`,
+    `Found Order ID ${targetOrderID}:\n\nName: ${name}\nPhone: ${phone}\nBalance: ${formatBalance(balance)}\nMessage Type: ${templateName}\n\nContinue?${dryRunNote}`,
     ui.ButtonSet.YES_NO
   );
 
@@ -409,7 +454,7 @@ function sendBillByOrderID() {
   }
 
   // 7. Send the bill and update the sheet
-  const sendResult = sendBill_(phone, name, balance, tiffins, dueDate);
+  const sendResult = sendBill_(phone, name, balance, tiffins, dueDate, templateType);
   const statusRange = sheet.getRange(currentRow, statusCol + 1);
   statusRange.setValue(sendResult.status);
   statusRange.setBackground(sendResult.color);
@@ -417,9 +462,9 @@ function sendBillByOrderID() {
   // 8. Notify user of the outcome
   if (sendResult.success) {
     const dryRunPrefix = settings.behavior.dryRunMode ? '[DRY RUN] ' : '';
-    ui.alert(`✓ Bill ${dryRunPrefix}sent successfully to ${name} for Order ${targetOrderID}!`);
+    ui.alert(`✓ ${templateName} ${dryRunPrefix}sent successfully to ${name} for Order ${targetOrderID}!`);
   } else {
-    ui.alert(`✗ Bill failed to send. Check the Message Status column for details on row ${currentRow}.`);
+    ui.alert(`✗ ${templateName} failed to send. Check the Message Status column for details on row ${currentRow}.`);
   }
 }
 
@@ -431,6 +476,10 @@ function sendBillByOrderID() {
 function testSingleMessage() {
   // 1. Validate credentials and get settings
   if (!checkCredentials()) return;
+
+  // 1.5. Prompt for message type
+  const templateType = promptForMessageType();
+  if (!templateType) return;
   const settings = getSettings();
   const cols = settings.columns;
   const sheet = SpreadsheetApp.getActiveSheet();
@@ -484,10 +533,11 @@ function testSingleMessage() {
   }
 
   // 5. Show preview and confirm with user
+  const templateName = getBillTemplate(templateType, settings).name;
   const dryRunNote = settings.behavior.dryRunMode ? '\n\n⚠️ [DRY RUN MODE - No actual SMS will be sent]' : '';
   const preview = ui.alert(
     "Test Message Preview",
-    `About to send a test bill to the first UNPAID customer (row ${currentRow}):\n\nName: ${name}\nPhone: ${phone}\nBalance: ${formatBalance(balance)}\n\nContinue?${dryRunNote}`,
+    `About to send a test "${templateName}" to the first UNPAID customer (row ${currentRow}):\n\nName: ${name}\nPhone: ${phone}\nBalance: ${formatBalance(balance)}\n\nContinue?${dryRunNote}`,
     ui.ButtonSet.YES_NO
   );
 
@@ -497,7 +547,7 @@ function testSingleMessage() {
   }
 
   // 6. Send the bill and update the sheet
-  const sendResult = sendBill_(phone, name, balance, tiffins, dueDate);
+  const sendResult = sendBill_(phone, name, balance, tiffins, dueDate, templateType);
   const statusRange = sheet.getRange(currentRow, statusCol + 1);
   statusRange.setValue(sendResult.status);
   statusRange.setBackground(sendResult.color);
@@ -505,9 +555,9 @@ function testSingleMessage() {
   // 7. Notify user of the outcome
   if (sendResult.success) {
     const dryRunPrefix = settings.behavior.dryRunMode ? '[DRY RUN] ' : '';
-    ui.alert(`✓ Test bill ${dryRunPrefix}sent successfully to ${name}!`);
+    ui.alert(`✓ Test "${templateName}" ${dryRunPrefix}sent successfully to ${name}!`);
   } else {
-    ui.alert(`✗ Test bill failed. Check the Message Status column on row ${currentRow} for details.`);
+    ui.alert(`✗ Test "${templateName}" failed. Check the Message Status column on row ${currentRow} for details.`);
   }
 }
 

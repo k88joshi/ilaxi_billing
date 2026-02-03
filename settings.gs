@@ -13,7 +13,7 @@ const SETTINGS_PROPERTY_KEY = "APP_SETTINGS";
  * Current settings schema version. Increment when settings structure changes.
  * @const {number}
  */
-const SETTINGS_VERSION = 1;
+const SETTINGS_VERSION = 2;
 
 /**
  * Returns the default settings object with all configuration values.
@@ -31,7 +31,10 @@ function getDefaultSettings() {
       whatsappLink: "https://bit.ly/ilaxi-tiffins-etransfer-screenshot"
     },
     templates: {
-      billMessage: `{{businessName}} - Monthly Bill
+      billMessages: {
+        firstNotice: {
+          name: "First Notice",
+          message: `{{businessName}} - Monthly Bill
 
 Please see below your total bill pending for the month of {{month}}:
 
@@ -41,7 +44,45 @@ Tiffins - {{numTiffins}}
 Please e-transfer the amount to {{etransferEmail}} in the next 1-2 days. During the e-transfer, please include: your full name, phone number and month of payment to avoid any errors. If you have any questions, please call {{phoneNumber}}.
 
 Thank you,
-{{businessName}}`,
+{{businessName}}`
+        },
+        followUp: {
+          name: "Follow-up Reminder",
+          message: `{{businessName}} - Payment Reminder
+
+Hi {{customerName}},
+
+This is a friendly reminder that your payment of {{balance}} for the month of {{month}} is still pending.
+
+Total - {{balance}}
+Tiffins - {{numTiffins}}
+
+Please e-transfer to {{etransferEmail}} at your earliest convenience. Include your full name, phone number and month of payment.
+
+Questions? Call us at {{phoneNumber}}.
+
+Thank you,
+{{businessName}}`
+        },
+        finalNotice: {
+          name: "Final Notice",
+          message: `{{businessName}} - Final Payment Notice
+
+Dear {{customerName}},
+
+This is a final reminder regarding your outstanding balance of {{balance}} for {{month}}.
+
+Total Due - {{balance}}
+Tiffins - {{numTiffins}}
+
+Please e-transfer to {{etransferEmail}} immediately to avoid service interruption. Include your full name, phone number and month of payment.
+
+If you have already paid, please disregard this message. For questions, call {{phoneNumber}}.
+
+Thank you,
+{{businessName}}`
+        }
+      },
       thankYouMessage: `Hello {{customerName}},
 
 Thank you for your payment for Order {{orderId}}. We have marked your bill as PAID.
@@ -104,8 +145,10 @@ function getSettings() {
     // Check for version upgrade needs
     if (parsed.version < SETTINGS_VERSION) {
       Logger.log(`Settings version ${parsed.version} -> ${SETTINGS_VERSION} upgrade needed.`);
-      merged.version = SETTINGS_VERSION;
-      saveSettings(merged);
+      const upgraded = migrateSettingsVersion(parsed, merged);
+      upgraded.version = SETTINGS_VERSION;
+      saveSettings(upgraded);
+      return upgraded;
     }
 
     return merged;
@@ -167,11 +210,34 @@ function validateSettings(settings) {
   if (!settings.templates) {
     errors.push("Missing templates section");
   } else {
-    if (!settings.templates.billMessage ||
-        settings.templates.billMessage.length < 50 ||
-        settings.templates.billMessage.length > 1600) {
-      errors.push("Bill message template must be between 50-1600 characters");
+    // Validate bill message templates (new structure)
+    if (settings.templates.billMessages) {
+      const templateTypes = ["firstNotice", "followUp", "finalNotice"];
+      templateTypes.forEach(type => {
+        const template = settings.templates.billMessages[type];
+        if (!template) {
+          errors.push(`Missing bill template: ${type}`);
+        } else {
+          if (!template.name || template.name.length > 50) {
+            errors.push(`${type} template name must be <= 50 characters`);
+          }
+          if (!template.message ||
+              template.message.length < 50 ||
+              template.message.length > 1600) {
+            errors.push(`${type} message must be between 50-1600 characters`);
+          }
+        }
+      });
+    } else if (settings.templates.billMessage) {
+      // Legacy single template validation (for migration)
+      if (settings.templates.billMessage.length < 50 ||
+          settings.templates.billMessage.length > 1600) {
+        errors.push("Bill message template must be between 50-1600 characters");
+      }
+    } else {
+      errors.push("Missing bill message templates");
     }
+
     if (!settings.templates.thankYouMessage ||
         settings.templates.thankYouMessage.length < 50 ||
         settings.templates.thankYouMessage.length > 1600) {
@@ -312,6 +378,40 @@ function migrateFromLegacyConfig() {
     Logger.log(`Migration error: ${e.message}`);
     return null;
   }
+}
+
+/**
+ * Migrates settings from one version to another.
+ * Handles structural changes between settings versions.
+ *
+ * @param {Object} oldSettings - Original settings object
+ * @param {Object} mergedSettings - Settings merged with defaults
+ * @returns {Object} Migrated settings object
+ */
+function migrateSettingsVersion(oldSettings, mergedSettings) {
+  const result = { ...mergedSettings };
+
+  // Migration from v1 to v2: Convert single billMessage to billMessages object
+  if (oldSettings.version === 1 || !oldSettings.version) {
+    if (oldSettings.templates && oldSettings.templates.billMessage && !oldSettings.templates.billMessages) {
+      Logger.log("Migrating v1 -> v2: Converting single billMessage to billMessages structure");
+
+      // Keep the old message as the first notice template
+      result.templates.billMessages = {
+        firstNotice: {
+          name: "First Notice",
+          message: oldSettings.templates.billMessage
+        },
+        followUp: mergedSettings.templates.billMessages.followUp,
+        finalNotice: mergedSettings.templates.billMessages.finalNotice
+      };
+
+      // Remove legacy billMessage field if present
+      delete result.templates.billMessage;
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -466,4 +566,40 @@ function buildThankYouTemplateData(rowData, settings) {
     customerName: rowData.customerName,
     orderId: rowData.orderId
   };
+}
+
+/**
+ * Gets a specific bill message template by type.
+ *
+ * @param {string} templateType - Template type: "firstNotice", "followUp", or "finalNotice"
+ * @param {Object} [settings] - Optional settings object (will be fetched if not provided)
+ * @returns {Object} Template object with name and message properties
+ */
+function getBillTemplate(templateType, settings) {
+  const s = settings || getSettings();
+  const validTypes = ["firstNotice", "followUp", "finalNotice"];
+
+  if (!validTypes.includes(templateType)) {
+    Logger.log(`Invalid template type: ${templateType}. Using firstNotice.`);
+    templateType = "firstNotice";
+  }
+
+  return s.templates.billMessages[templateType];
+}
+
+/**
+ * Gets all available bill template types with their display names.
+ *
+ * @param {Object} [settings] - Optional settings object
+ * @returns {Array} Array of {id, name} objects
+ */
+function getBillTemplateTypes(settings) {
+  const s = settings || getSettings();
+  const templates = s.templates.billMessages;
+
+  return [
+    { id: "firstNotice", name: templates.firstNotice.name },
+    { id: "followUp", name: templates.followUp.name },
+    { id: "finalNotice", name: templates.finalNotice.name }
+  ];
 }

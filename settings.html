@@ -789,6 +789,84 @@
     }
 
     /* ============================================
+       Template Sub-tabs
+       ============================================ */
+    .template-tabs {
+      display: flex;
+      gap: var(--space-2);
+      margin-bottom: var(--space-4);
+      padding: var(--space-1);
+      background: var(--color-border-light);
+      border-radius: var(--radius-md);
+    }
+
+    .template-tab {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      color: var(--color-text-secondary);
+      background: transparent;
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: var(--transition-fast);
+    }
+
+    .template-tab:hover {
+      color: var(--color-text);
+      background: rgba(255, 255, 255, 0.5);
+    }
+
+    .template-tab.active {
+      color: var(--color-primary);
+      background: var(--color-surface);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .template-tab-number {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      font-size: var(--text-xs);
+      font-weight: 600;
+      background: var(--color-border);
+      color: var(--color-text-secondary);
+      border-radius: 50%;
+      transition: var(--transition-fast);
+    }
+
+    .template-tab.active .template-tab-number {
+      background: var(--color-primary);
+      color: white;
+    }
+
+    .template-tab-label {
+      display: none;
+    }
+
+    @media (min-width: 400px) {
+      .template-tab-label {
+        display: inline;
+      }
+    }
+
+    .template-panel {
+      display: none;
+      animation: fadeIn var(--transition-base);
+    }
+
+    .template-panel.active {
+      display: block;
+    }
+
+    /* ============================================
        Utility Classes
        ============================================ */
     .hidden {
@@ -910,7 +988,7 @@
 
     <!-- Templates Tab -->
     <section id="panel-templates" class="tab-panel" role="tabpanel" aria-labelledby="tab-templates">
-      <!-- Bill Message -->
+      <!-- Bill Messages Card with Sub-tabs -->
       <div class="card">
         <div class="card-header">
           <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -919,45 +997,145 @@
             <line x1="12" y1="18" x2="12" y2="12"></line>
             <line x1="9" y1="15" x2="15" y2="15"></line>
           </svg>
-          <h2 class="card-title">Bill Message</h2>
+          <h2 class="card-title">Bill Messages</h2>
         </div>
 
-        <p class="form-hint" style="margin-bottom: var(--space-2);">Click placeholders to insert into your message:</p>
-        <div class="placeholder-chips" data-target="billMessage">
-          <button type="button" class="chip" data-placeholder="{{businessName}}">businessName</button>
-          <button type="button" class="chip" data-placeholder="{{etransferEmail}}">etransferEmail</button>
-          <button type="button" class="chip" data-placeholder="{{phoneNumber}}">phoneNumber</button>
-          <button type="button" class="chip" data-placeholder="{{whatsappLink}}">whatsappLink</button>
-          <button type="button" class="chip" data-placeholder="{{customerName}}">customerName</button>
-          <button type="button" class="chip" data-placeholder="{{balance}}">balance</button>
-          <button type="button" class="chip" data-placeholder="{{numTiffins}}">numTiffins</button>
-          <button type="button" class="chip" data-placeholder="{{month}}">month</button>
+        <p class="form-hint" style="margin-bottom: var(--space-3);">Choose which message type to send when billing customers:</p>
+
+        <!-- Template Type Selector -->
+        <div class="template-tabs" role="tablist">
+          <button type="button" class="template-tab active" data-template="firstNotice" role="tab" aria-selected="true">
+            <span class="template-tab-number">1</span>
+            <span class="template-tab-label">First Notice</span>
+          </button>
+          <button type="button" class="template-tab" data-template="followUp" role="tab" aria-selected="false">
+            <span class="template-tab-number">2</span>
+            <span class="template-tab-label">Follow-up</span>
+          </button>
+          <button type="button" class="template-tab" data-template="finalNotice" role="tab" aria-selected="false">
+            <span class="template-tab-number">3</span>
+            <span class="template-tab-label">Final Notice</span>
+          </button>
         </div>
 
-        <div class="form-group">
-          <div class="textarea-wrapper">
-            <textarea class="form-textarea" id="billMessage" placeholder="Enter your bill message template..." aria-describedby="billCounter"></textarea>
-            <span id="billCounter" class="char-counter">0 / 1600</span>
+        <!-- First Notice Template -->
+        <div id="template-firstNotice" class="template-panel active" role="tabpanel">
+          <div class="form-group">
+            <label class="form-label" for="firstNoticeName">Display Name</label>
+            <input type="text" class="form-input" id="firstNoticeName" maxlength="50" placeholder="First Notice">
+          </div>
+
+          <p class="form-hint" style="margin-bottom: var(--space-2);">Click placeholders to insert:</p>
+          <div class="placeholder-chips" data-target="firstNoticeMessage">
+            <button type="button" class="chip" data-placeholder="{{businessName}}">businessName</button>
+            <button type="button" class="chip" data-placeholder="{{etransferEmail}}">etransferEmail</button>
+            <button type="button" class="chip" data-placeholder="{{phoneNumber}}">phoneNumber</button>
+            <button type="button" class="chip" data-placeholder="{{whatsappLink}}">whatsappLink</button>
+            <button type="button" class="chip" data-placeholder="{{customerName}}">customerName</button>
+            <button type="button" class="chip" data-placeholder="{{balance}}">balance</button>
+            <button type="button" class="chip" data-placeholder="{{numTiffins}}">numTiffins</button>
+            <button type="button" class="chip" data-placeholder="{{month}}">month</button>
+          </div>
+
+          <div class="form-group">
+            <div class="textarea-wrapper">
+              <textarea class="form-textarea" id="firstNoticeMessage" placeholder="Enter your first notice message..." aria-describedby="firstNoticeCounter"></textarea>
+              <span id="firstNoticeCounter" class="char-counter">0 / 1600</span>
+            </div>
+          </div>
+
+          <button type="button" class="btn btn-secondary btn-sm" onclick="previewTemplate('firstNotice')">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            Preview
+          </button>
+
+          <div id="firstNoticePreview" class="preview-section hidden">
+            <div class="preview-header">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+              Sample Preview
+            </div>
+            <div class="preview-content"></div>
           </div>
         </div>
 
-        <button type="button" class="btn btn-secondary btn-sm" onclick="previewTemplate('bill')">
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-            <circle cx="12" cy="12" r="3"></circle>
-          </svg>
-          Preview
-        </button>
-
-        <div id="billPreview" class="preview-section hidden">
-          <div class="preview-header">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-              <polyline points="22 4 12 14.01 9 11.01"></polyline>
-            </svg>
-            Sample Preview
+        <!-- Follow-up Template -->
+        <div id="template-followUp" class="template-panel" role="tabpanel">
+          <div class="form-group">
+            <label class="form-label" for="followUpName">Display Name</label>
+            <input type="text" class="form-input" id="followUpName" maxlength="50" placeholder="Follow-up Reminder">
           </div>
-          <div class="preview-content"></div>
+
+          <p class="form-hint" style="margin-bottom: var(--space-2);">Click placeholders to insert:</p>
+          <div class="placeholder-chips" data-target="followUpMessage">
+            <button type="button" class="chip" data-placeholder="{{businessName}}">businessName</button>
+            <button type="button" class="chip" data-placeholder="{{etransferEmail}}">etransferEmail</button>
+            <button type="button" class="chip" data-placeholder="{{phoneNumber}}">phoneNumber</button>
+            <button type="button" class="chip" data-placeholder="{{whatsappLink}}">whatsappLink</button>
+            <button type="button" class="chip" data-placeholder="{{customerName}}">customerName</button>
+            <button type="button" class="chip" data-placeholder="{{balance}}">balance</button>
+            <button type="button" class="chip" data-placeholder="{{numTiffins}}">numTiffins</button>
+            <button type="button" class="chip" data-placeholder="{{month}}">month</button>
+          </div>
+
+          <div class="form-group">
+            <div class="textarea-wrapper">
+              <textarea class="form-textarea" id="followUpMessage" placeholder="Enter your follow-up message..." aria-describedby="followUpCounter"></textarea>
+              <span id="followUpCounter" class="char-counter">0 / 1600</span>
+            </div>
+          </div>
+
+          <button type="button" class="btn btn-secondary btn-sm" onclick="previewTemplate('followUp')">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            Preview
+          </button>
+
+          <div id="followUpPreview" class="preview-section hidden">
+            <div class="preview-header">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+              Sample Preview
+            </div>
+            <div class="preview-content"></div>
+          </div>
+        </div>
+
+        <!-- Final Notice Template -->
+        <div id="template-finalNotice" class="template-panel" role="tabpanel">
+          <div class="form-group">
+            <label class="form-label" for="finalNoticeName">Display Name</label>
+            <input type="text" class="form-input" id="finalNoticeName" maxlength="50" placeholder="Final Notice">
+          </div>
+
+          <p class="form-hint" style="margin-bottom: var(--space-2);">Click placeholders to insert:</p>
+          <div class="placeholder-chips" data-target="finalNoticeMessage">
+            <button type="button" class="chip" data-placeholder="{{businessName}}">businessName</button>
+            <button type="button" class="chip" data-placeholder="{{etransferEmail}}">etransferEmail</button>
+            <button type="button" class="chip" data-placeholder="{{phoneNumber}}">phoneNumber</button>
+            <button type="button" class="chip" data-placeholder="{{whatsappLink}}">whatsappLink</button>
+            <button type="button" class="chip" data-placeholder="{{customerName}}">customerName</button>
+            <button type="button" class="chip" data-placeholder="{{balance}}">balance</button>
+            <button type="button" class="chip" data-placeholder="{{numTiffins}}">numTiffins</button>
+            <button type="button" class="chip" data-placeholder="{{month}}">month</button>
+          </div>
+
+          <div class="form-group">
+            <div class="textarea-wrapper">
+              <textarea class="form-textarea" id="finalNoticeMessage" placeholder="Enter your final notice message..." aria-describedby="finalNoticeCounter"></textarea>
+              <span id="finalNoticeCounter" class="char-counter">0 / 1600</span>
+            </div>
+          </div>
+
+          <button type="button" class="btn btn-secondary btn-sm" onclick="previewTemplate('finalNotice')">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            Preview
+          </button>
+
+          <div id="finalNoticePreview" class="preview-section hidden">
+            <div class="preview-header">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+              Sample Preview
+            </div>
+            <div class="preview-content"></div>
+          </div>
         </div>
       </div>
 
@@ -1216,12 +1394,37 @@
 
     function init() {
       setupTabs();
+      setupTemplateTabs();
       setupPlaceholderChips();
       setupColorPickers();
       setupDryRunToggle();
       setupCharacterCounters();
       setupChangeTracking();
       loadSettings();
+    }
+
+    // ============================================
+    // Template Sub-tabs
+    // ============================================
+    function setupTemplateTabs() {
+      document.querySelectorAll('.template-tab').forEach(function(tab) {
+        tab.addEventListener('click', function() {
+          // Update tab states
+          document.querySelectorAll('.template-tab').forEach(function(t) {
+            t.classList.remove('active');
+            t.setAttribute('aria-selected', 'false');
+          });
+          tab.classList.add('active');
+          tab.setAttribute('aria-selected', 'true');
+
+          // Update panel visibility
+          document.querySelectorAll('.template-panel').forEach(function(p) {
+            p.classList.remove('active');
+          });
+          var panelId = 'template-' + tab.dataset.template;
+          document.getElementById(panelId).classList.add('active');
+        });
+      });
     }
 
     // ============================================
@@ -1279,22 +1482,32 @@
     // ============================================
     function setupCharacterCounters() {
       var textareas = [
-        { textarea: 'billMessage', counter: 'billCounter' },
+        { textarea: 'firstNoticeMessage', counter: 'firstNoticeCounter' },
+        { textarea: 'followUpMessage', counter: 'followUpCounter' },
+        { textarea: 'finalNoticeMessage', counter: 'finalNoticeCounter' },
         { textarea: 'thankYouMessage', counter: 'thankYouCounter' }
       ];
 
       textareas.forEach(function(item) {
         var textarea = document.getElementById(item.textarea);
-        var counter = document.getElementById(item.counter);
-
-        textarea.addEventListener('input', function() {
-          updateCharacterCounter(textarea);
-        });
+        if (textarea) {
+          textarea.addEventListener('input', function() {
+            updateCharacterCounter(textarea);
+          });
+        }
       });
     }
 
     function updateCharacterCounter(textarea) {
-      var counterId = textarea.id === 'billMessage' ? 'billCounter' : 'thankYouCounter';
+      var counterMap = {
+        'firstNoticeMessage': 'firstNoticeCounter',
+        'followUpMessage': 'followUpCounter',
+        'finalNoticeMessage': 'finalNoticeCounter',
+        'thankYouMessage': 'thankYouCounter'
+      };
+      var counterId = counterMap[textarea.id];
+      if (!counterId) return;
+
       var counter = document.getElementById(counterId);
       var length = textarea.value.length;
       var maxLength = 1600;
@@ -1409,10 +1622,26 @@
       document.getElementById('phoneNumber').value = currentSettings.business.phoneNumber || '';
       document.getElementById('whatsappLink').value = currentSettings.business.whatsappLink || '';
 
-      // Templates tab
-      document.getElementById('billMessage').value = currentSettings.templates.billMessage || '';
+      // Templates tab - Bill Messages
+      var billTemplates = currentSettings.templates.billMessages || {};
+
+      // First Notice
+      document.getElementById('firstNoticeName').value = (billTemplates.firstNotice && billTemplates.firstNotice.name) || 'First Notice';
+      document.getElementById('firstNoticeMessage').value = (billTemplates.firstNotice && billTemplates.firstNotice.message) || '';
+      updateCharacterCounter(document.getElementById('firstNoticeMessage'));
+
+      // Follow-up
+      document.getElementById('followUpName').value = (billTemplates.followUp && billTemplates.followUp.name) || 'Follow-up Reminder';
+      document.getElementById('followUpMessage').value = (billTemplates.followUp && billTemplates.followUp.message) || '';
+      updateCharacterCounter(document.getElementById('followUpMessage'));
+
+      // Final Notice
+      document.getElementById('finalNoticeName').value = (billTemplates.finalNotice && billTemplates.finalNotice.name) || 'Final Notice';
+      document.getElementById('finalNoticeMessage').value = (billTemplates.finalNotice && billTemplates.finalNotice.message) || '';
+      updateCharacterCounter(document.getElementById('finalNoticeMessage'));
+
+      // Thank You Message
       document.getElementById('thankYouMessage').value = currentSettings.templates.thankYouMessage || '';
-      updateCharacterCounter(document.getElementById('billMessage'));
       updateCharacterCounter(document.getElementById('thankYouMessage'));
 
       // Behavior tab
@@ -1510,7 +1739,20 @@
           whatsappLink: document.getElementById('whatsappLink').value.trim()
         },
         templates: {
-          billMessage: document.getElementById('billMessage').value,
+          billMessages: {
+            firstNotice: {
+              name: document.getElementById('firstNoticeName').value.trim() || 'First Notice',
+              message: document.getElementById('firstNoticeMessage').value
+            },
+            followUp: {
+              name: document.getElementById('followUpName').value.trim() || 'Follow-up Reminder',
+              message: document.getElementById('followUpMessage').value
+            },
+            finalNotice: {
+              name: document.getElementById('finalNoticeName').value.trim() || 'Final Notice',
+              message: document.getElementById('finalNoticeMessage').value
+            }
+          },
           thankYouMessage: document.getElementById('thankYouMessage').value
         },
         behavior: {
@@ -1618,9 +1860,25 @@
     }
 
     function previewTemplate(type) {
-      var templateField = type === 'bill' ? 'billMessage' : 'thankYouMessage';
-      var previewDiv = type === 'bill' ? 'billPreview' : 'thankYouPreview';
+      var templateFieldMap = {
+        'firstNotice': 'firstNoticeMessage',
+        'followUp': 'followUpMessage',
+        'finalNotice': 'finalNoticeMessage',
+        'thankYou': 'thankYouMessage'
+      };
+      var previewDivMap = {
+        'firstNotice': 'firstNoticePreview',
+        'followUp': 'followUpPreview',
+        'finalNotice': 'finalNoticePreview',
+        'thankYou': 'thankYouPreview'
+      };
+
+      var templateField = templateFieldMap[type];
+      var previewDiv = previewDivMap[type];
       var template = document.getElementById(templateField).value;
+
+      // Use 'bill' type for all bill templates in the server-side preview
+      var previewType = type === 'thankYou' ? 'thankYou' : 'bill';
 
       google.script.run
         .withSuccessHandler(function(preview) {
@@ -1629,7 +1887,7 @@
           container.querySelector('.preview-content').textContent = preview;
         })
         .withFailureHandler(onError)
-        .previewTemplate(template, type);
+        .previewTemplate(template, previewType);
     }
 
     // ============================================

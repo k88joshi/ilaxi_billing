@@ -25,14 +25,26 @@ All configuration is stored in `PropertiesService.getUserProperties()` as JSON u
 Settings structure:
 ```javascript
 {
-  version: 1,
+  version: 2,
   business: { name, etransferEmail, phoneNumber, whatsappLink },
-  templates: { billMessage, thankYouMessage },  // {{placeholder}} syntax
+  templates: {
+    billMessages: {
+      firstNotice: { name, message },   // First payment request
+      followUp: { name, message },      // Follow-up reminder
+      finalNotice: { name, message }    // Final notice
+    },
+    thankYouMessage  // Auto-sent when payment marked as Paid
+  },
   behavior: { dryRunMode, batchSize, messageDelayMs, headerRowIndex },
   colors: { success, error, dryRun },
   columns: { phoneNumber, customerName, balance, numTiffins, dueDate, messageStatus, orderId, paymentStatus }
 }
 ```
+
+**Message Types:** When sending bills, users are prompted to choose between:
+1. **First Notice** - Initial payment request
+2. **Follow-up Reminder** - For customers who haven't paid
+3. **Final Notice** - Last reminder before service interruption
 
 **Template Placeholders:** `{{businessName}}`, `{{etransferEmail}}`, `{{phoneNumber}}`, `{{whatsappLink}}`, `{{customerName}}`, `{{balance}}`, `{{numTiffins}}`, `{{month}}`, `{{orderId}}`
 

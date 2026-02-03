@@ -48,13 +48,18 @@ function checkCredentials() {
  * @param {number|string} balance - The amount owed (raw from sheet).
  * @param {number|string} numTiffins - The number of tiffins (raw from sheet).
  * @param {Date|string} dueDate - The due date or month (raw from sheet).
- * @param {number} row - The 1-based row number in the spreadsheet (for updating status).
- * @param {number} statusColIndex - The 0-based column index for the "Message Status" column.
- * @returns {boolean} True if the message was successfully queued, false otherwise.
+ * @param {string} [templateType="firstNotice"] - The template type to use: "firstNotice", "followUp", or "finalNotice".
+ * @returns {Object} Result object with success, status, and color properties.
  */
-function sendBill_(customerPhone, customerName, balance, numTiffins, dueDate) {
+function sendBill_(customerPhone, customerName, balance, numTiffins, dueDate, templateType) {
   // Get current settings for dynamic configuration
   const settings = getSettings();
+
+  // Default to firstNotice if no template type specified
+  templateType = templateType || "firstNotice";
+
+  // Get the appropriate template
+  const template = getBillTemplate(templateType, settings);
 
   // 1. Format and validate phone number
   const formattedPhone = formatPhoneNumber(customerPhone);
@@ -79,12 +84,12 @@ function sendBill_(customerPhone, customerName, balance, numTiffins, dueDate) {
     numTiffins: numTiffins,
     month: monthName
   };
-  const message = processTemplate(settings.templates.billMessage, templateData);
+  const message = processTemplate(template.message, templateData);
 
   // 4. Check for DRY RUN MODE
   if (settings.behavior.dryRunMode) {
-    Logger.log(`[DRY RUN] Would send bill to ${customerName} at ${formattedPhone}`);
-    return { success: true, status: `[DRY RUN] Bill at ${new Date().toLocaleString()}`, color: settings.colors.dryRun };
+    Logger.log(`[DRY RUN] Would send ${template.name} to ${customerName} at ${formattedPhone}`);
+    return { success: true, status: `[DRY RUN] ${template.name} at ${new Date().toLocaleString()}`, color: settings.colors.dryRun };
   }
 
   // 5. Prepare Twilio API request
@@ -111,18 +116,18 @@ function sendBill_(customerPhone, customerName, balance, numTiffins, dueDate) {
     if (response.getResponseCode() === 201) {
       // Success (HTTP 201 Created)
       const timestamp = new Date().toLocaleString();
-      Logger.log(`✓ Bill sent to ${customerName} at ${formattedPhone}`);
-      return { success: true, status: `Sent: ${timestamp}`, color: settings.colors.success };
+      Logger.log(`✓ ${template.name} sent to ${customerName} at ${formattedPhone}`);
+      return { success: true, status: `${template.name} Sent: ${timestamp}`, color: settings.colors.success };
     } else {
       // Failed (Twilio returned an error)
       const errorMsg = `Error ${result.code || 'API'}: ${result.message || 'Unknown error'}`;
-      Logger.log(`✗ Failed to send to ${customerName}: ${errorMsg}`);
+      Logger.log(`✗ Failed to send ${template.name} to ${customerName}: ${errorMsg}`);
       return { success: false, status: errorMsg, color: settings.colors.error };
     }
   } catch (error) {
     // Exception (e.g., network error, Twilio offline)
     const errorMsg = `Error: ${error.message || error}`;
-    Logger.log(`✗ Exception sending to ${customerName}: ${errorMsg}`);
+    Logger.log(`✗ Exception sending ${template.name} to ${customerName}: ${errorMsg}`);
     return { success: false, status: errorMsg, color: settings.colors.error };
   }
 }
