@@ -69,13 +69,14 @@ function deletePhoneNumber() {
 // ========================================
 
 /**
- * Opens the settings sidebar in the Google Sheets UI.
+ * Opens the settings dialog in the Google Sheets UI.
+ * Uses a modal dialog for more screen space than a sidebar.
  */
 function showSettingsSidebar() {
   const html = HtmlService.createHtmlOutputFromFile("settings")
-    .setTitle("Settings")
-    .setWidth(350);
-  SpreadsheetApp.getUi().showSidebar(html);
+    .setWidth(950)
+    .setHeight(650);
+  SpreadsheetApp.getUi().showModalDialog(html, "Settings");
 }
 
 /**
