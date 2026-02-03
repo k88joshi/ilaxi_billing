@@ -4,79 +4,83 @@
  */
 const ui = SpreadsheetApp.getUi();
 
-
+/**
+ * Prompts user to enter a credential value and saves it to User Properties.
+ *
+ * @param {string} propertyKey - The key to store in UserProperties
+ * @param {string} promptMessage - The message to display in the prompt
+ * @param {string} successMessage - The message to display on success
+ */
+function setCredential_(propertyKey, promptMessage, successMessage) {
+  const result = ui.prompt(promptMessage);
+  if (result.getSelectedButton() === ui.Button.OK) {
+    userProperties.setProperty(propertyKey, result.getResponseText().trim());
+    ui.alert(successMessage);
+  }
+}
 
 /**
- * Prompts user to enter their Twilio Account SID and saves it securely to User Properties.
+ * Deletes a credential from User Properties.
+ *
+ * @param {string} propertyKey - The key to delete
+ * @param {string} successMessage - The message to display on success
  */
+function deleteCredential_(propertyKey, successMessage) {
+  userProperties.deleteProperty(propertyKey);
+  ui.alert(successMessage);
+}
+
+/** Prompts user to enter their Twilio Account SID and saves it securely. */
 function setAccountSid() {
-  const result = ui.prompt("Enter your Twilio Account SID (found at twilio.com/console):");
-  if (result.getSelectedButton() == ui.Button.OK) {
-    userProperties.setProperty("TWILIO_ACCOUNT_SID", result.getResponseText().trim());
-    ui.alert("Account SID saved successfully!");
-  }
+  setCredential_("TWILIO_ACCOUNT_SID", "Enter your Twilio Account SID (found at twilio.com/console):", "Account SID saved successfully!");
 }
 
-/**
- * Prompts user to enter their Twilio Auth Token and saves it securely to User Properties.
- */
+/** Prompts user to enter their Twilio Auth Token and saves it securely. */
 function setAuthToken() {
-  const result = ui.prompt("Enter your Twilio Auth Token (found at twilio.com/console):");
-  if (result.getSelectedButton() == ui.Button.OK) {
-    userProperties.setProperty("TWILIO_AUTH_TOKEN", result.getResponseText().trim());
-    ui.alert("Auth Token saved successfully!");
-  }
+  setCredential_("TWILIO_AUTH_TOKEN", "Enter your Twilio Auth Token (found at twilio.com/console):", "Auth Token saved successfully!");
 }
 
-/**
- * Prompts user to enter their Twilio Phone Number and saves it securely to User Properties.
- */
+/** Prompts user to enter their Twilio Phone Number and saves it securely. */
 function setPhoneNumber() {
-  const result = ui.prompt("Enter your Twilio Phone Number (format: +1XXXXXXXXXX):");
-  if (result.getSelectedButton() == ui.Button.OK) {
-    userProperties.setProperty("TWILIO_PHONE_NUMBER", result.getResponseText().trim());
-    ui.alert("Phone Number saved successfully!");
-  }
+  setCredential_("TWILIO_PHONE_NUMBER", "Enter your Twilio Phone Number (format: +1XXXXXXXXXX):", "Phone Number saved successfully!");
 }
 
-/**
- * Deletes the stored Twilio Account SID from User Properties.
- */
+/** Deletes the stored Twilio Account SID from User Properties. */
 function deleteAccountSid() {
-  userProperties.deleteProperty("TWILIO_ACCOUNT_SID");
-  ui.alert("Account SID deleted.");
+  deleteCredential_("TWILIO_ACCOUNT_SID", "Account SID deleted.");
 }
 
-/**
- * Deletes the stored Twilio Auth Token from User Properties.
- */
+/** Deletes the stored Twilio Auth Token from User Properties. */
 function deleteAuthToken() {
-  userProperties.deleteProperty("TWILIO_AUTH_TOKEN");
-  ui.alert("Auth Token deleted.");
+  deleteCredential_("TWILIO_AUTH_TOKEN", "Auth Token deleted.");
 }
 
-/**
- * Deletes the stored Twilio Phone Number from User Properties.
- */
+/** Deletes the stored Twilio Phone Number from User Properties. */
 function deletePhoneNumber() {
-  userProperties.deleteProperty("TWILIO_PHONE_NUMBER");
-  ui.alert("Phone Number deleted.");
+  deleteCredential_("TWILIO_PHONE_NUMBER", "Phone Number deleted.");
 }
 
 
 // ========================================
-// SETTINGS SIDEBAR FUNCTIONS
+// SETTINGS DIALOG FUNCTIONS
 // ========================================
 
 /**
  * Opens the settings dialog in the Google Sheets UI.
  * Uses a modal dialog for more screen space than a sidebar.
  */
-function showSettingsSidebar() {
+function showSettingsDialog() {
   const html = HtmlService.createHtmlOutputFromFile("settings")
     .setWidth(950)
     .setHeight(650);
   SpreadsheetApp.getUi().showModalDialog(html, "Settings");
+}
+
+/**
+ * @deprecated Use showSettingsDialog() instead. Kept for backwards compatibility.
+ */
+function showSettingsSidebar() {
+  showSettingsDialog();
 }
 
 /**
@@ -110,12 +114,19 @@ function saveSettingsFromUI(settings) {
  * Called from settings.html via google.script.run.
  *
  * @param {string} template - Template string to preview
- * @param {string} type - "bill" or "thankYou"
  * @returns {string} Processed template with sample values
  */
-function previewTemplate(template, type) {
-  const sampleData = getSampleDataForPreview();
-  return processTemplate(template, sampleData);
+function previewTemplate(template) {
+  // Input validation
+  if (!template || typeof template !== "string") {
+    return "Error: Invalid template provided";
+  }
+  try {
+    return processTemplate(template, getSampleDataForPreview());
+  } catch (e) {
+    Logger.log(`previewTemplate error: ${e.message}`);
+    return `Error generating preview: ${e.message}`;
+  }
 }
 
 /**
@@ -157,12 +168,7 @@ function exportSettingsToFile() {
  * Prompts user to paste JSON settings for import.
  */
 function importSettingsFromPrompt() {
-  const result = ui.prompt(
-    "Import Settings",
-    "Paste the JSON settings content below:",
-    ui.ButtonSet.OK_CANCEL
-  );
-
+  const result = ui.prompt("Import Settings", "Paste the JSON settings content below:", ui.ButtonSet.OK_CANCEL);
   if (result.getSelectedButton() !== ui.Button.OK) return;
 
   const jsonString = result.getResponseText().trim();
@@ -172,11 +178,7 @@ function importSettingsFromPrompt() {
   }
 
   const importResult = importSettings(jsonString);
-  if (importResult.success) {
-    ui.alert("Settings imported successfully!");
-  } else {
-    ui.alert("Import failed: " + importResult.error);
-  }
+  ui.alert(importResult.success ? "Settings imported successfully!" : "Import failed: " + importResult.error);
 }
 
 /**
@@ -189,14 +191,10 @@ function confirmResetSettings() {
     ui.ButtonSet.YES_NO
   );
 
-  if (response === ui.Button.YES) {
-    const result = resetToDefaults();
-    if (result.success) {
-      ui.alert("Settings have been reset to defaults.");
-    } else {
-      ui.alert("Reset failed: " + result.error);
-    }
-  }
+  if (response !== ui.Button.YES) return;
+
+  const result = resetToDefaults();
+  ui.alert(result.success ? "Settings have been reset to defaults." : "Reset failed: " + result.error);
 }
 
 // ========================================
@@ -213,6 +211,13 @@ function confirmResetSettings() {
  * @param {string} [filter=""] - Optional string describing any filter (e.g., "for October").
  */
 function showSendSummary(sentCount, errorCount, skippedCount, errorDetails, filter = "") {
+  // Input validation - ensure counts are valid numbers
+  sentCount = typeof sentCount === "number" && !isNaN(sentCount) ? Math.max(0, sentCount) : 0;
+  errorCount = typeof errorCount === "number" && !isNaN(errorCount) ? Math.max(0, errorCount) : 0;
+  skippedCount = typeof skippedCount === "number" && !isNaN(skippedCount) ? Math.max(0, skippedCount) : 0;
+  errorDetails = Array.isArray(errorDetails) ? errorDetails : [];
+  filter = typeof filter === "string" ? filter : "";
+
   let summary = `📊 SEND SUMMARY ${filter}\n\n`;
   summary += `✅ Sent: ${sentCount}\n`;
   summary += `❌ Errors: ${errorCount}\n`;

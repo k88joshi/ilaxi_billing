@@ -154,6 +154,17 @@ function getSettings() {
     return merged;
   } catch (e) {
     Logger.log(`Error parsing settings: ${e.message}. Using defaults.`);
+    // Attempt to notify user via UI (may fail in triggers, but worth trying)
+    try {
+      SpreadsheetApp.getUi().alert(
+        "Settings Error",
+        `Your saved settings could not be loaded due to a parsing error. Using default settings instead.\n\nError: ${e.message}\n\nYou may want to check Settings > Export/Import to fix this.`,
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
+    } catch (uiError) {
+      // UI alert may fail in triggers - that's okay, we already logged the error
+      Logger.log(`Could not show UI alert for settings error: ${uiError.message}`);
+    }
     return getDefaultSettings();
   }
 }
@@ -190,6 +201,11 @@ function saveSettings(settings) {
  */
 function validateSettings(settings) {
   const errors = [];
+
+  // Top-level validation
+  if (!settings || typeof settings !== "object") {
+    return { valid: false, errors: ["Settings must be a valid object"] };
+  }
 
   // Business validations
   if (!settings.business) {
@@ -303,10 +319,18 @@ function validateSettings(settings) {
  * @param {string} template - Template string with placeholders
  * @param {Object} data - Object containing placeholder values
  * @returns {string} Processed template with placeholders replaced
+ * @throws {Error} If template is invalid (null, undefined, or not a string)
  */
 function processTemplate(template, data) {
   if (!template || typeof template !== "string") {
-    return "";
+    const errorMsg = `Invalid template: expected non-empty string, got ${typeof template}`;
+    Logger.log(`ERROR in processTemplate: ${errorMsg}`);
+    throw new Error(errorMsg);
+  }
+
+  if (!data || typeof data !== "object") {
+    Logger.log(`WARNING in processTemplate: Invalid data object, using empty object`);
+    data = {};
   }
 
   let result = template;
@@ -389,6 +413,16 @@ function migrateFromLegacyConfig() {
  * @returns {Object} Migrated settings object
  */
 function migrateSettingsVersion(oldSettings, mergedSettings) {
+  // Input validation
+  if (!oldSettings || typeof oldSettings !== "object") {
+    Logger.log("migrateSettingsVersion: Invalid oldSettings, returning mergedSettings");
+    return mergedSettings || getDefaultSettings();
+  }
+  if (!mergedSettings || typeof mergedSettings !== "object") {
+    Logger.log("migrateSettingsVersion: Invalid mergedSettings, using defaults");
+    return getDefaultSettings();
+  }
+
   const result = { ...mergedSettings };
 
   // Migration from v1 to v2: Convert single billMessage to billMessages object
@@ -490,15 +524,33 @@ function isValidHexColor(color) {
 /**
  * Deep merges two objects, with source values overriding target values.
  * Handles nested objects recursively.
+ * Includes protection against prototype pollution attacks.
  *
  * @param {Object} target - Target object (defaults)
  * @param {Object} source - Source object (stored values)
  * @returns {Object} Merged object
  */
 function deepMerge(target, source) {
+  // Input validation - handle null/undefined gracefully
+  if (!target || typeof target !== "object") {
+    target = {};
+  }
+  if (!source || typeof source !== "object") {
+    return { ...target };
+  }
+
   const result = { ...target };
 
+  // Dangerous keys that could lead to prototype pollution
+  const dangerousKeys = ["__proto__", "constructor", "prototype"];
+
   for (const key in source) {
+    // Skip dangerous keys to prevent prototype pollution
+    if (dangerousKeys.includes(key)) {
+      Logger.log(`deepMerge: Skipping dangerous key "${key}" to prevent prototype pollution`);
+      continue;
+    }
+
     if (source.hasOwnProperty(key)) {
       if (source[key] && typeof source[key] === "object" && !Array.isArray(source[key])) {
         // Recursive merge for nested objects
@@ -541,15 +593,25 @@ function getSampleDataForPreview() {
  * @returns {Object} Template data object
  */
 function buildBillTemplateData(rowData, settings) {
+  // Input validation
+  if (!rowData || typeof rowData !== "object") {
+    Logger.log("buildBillTemplateData: Invalid rowData provided");
+    rowData = {};
+  }
+  if (!settings || typeof settings !== "object" || !settings.business) {
+    Logger.log("buildBillTemplateData: Invalid settings, using defaults");
+    settings = getDefaultSettings();
+  }
+
   return {
-    businessName: settings.business.name,
-    etransferEmail: settings.business.etransferEmail,
-    phoneNumber: settings.business.phoneNumber,
-    whatsappLink: settings.business.whatsappLink,
-    customerName: rowData.customerName,
-    balance: rowData.formattedBalance,
-    numTiffins: rowData.numTiffins,
-    month: rowData.month
+    businessName: settings.business.name || "",
+    etransferEmail: settings.business.etransferEmail || "",
+    phoneNumber: settings.business.phoneNumber || "",
+    whatsappLink: settings.business.whatsappLink || "",
+    customerName: rowData.customerName || "",
+    balance: rowData.formattedBalance || "$0.00",
+    numTiffins: rowData.numTiffins || "0",
+    month: rowData.month || "Unknown"
   };
 }
 
@@ -561,10 +623,20 @@ function buildBillTemplateData(rowData, settings) {
  * @returns {Object} Template data object
  */
 function buildThankYouTemplateData(rowData, settings) {
+  // Input validation
+  if (!rowData || typeof rowData !== "object") {
+    Logger.log("buildThankYouTemplateData: Invalid rowData provided");
+    rowData = {};
+  }
+  if (!settings || typeof settings !== "object" || !settings.business) {
+    Logger.log("buildThankYouTemplateData: Invalid settings, using defaults");
+    settings = getDefaultSettings();
+  }
+
   return {
-    businessName: settings.business.name,
-    customerName: rowData.customerName,
-    orderId: rowData.orderId
+    businessName: settings.business.name || "",
+    customerName: rowData.customerName || "",
+    orderId: rowData.orderId || ""
   };
 }
 
@@ -574,14 +646,22 @@ function buildThankYouTemplateData(rowData, settings) {
  * @param {string} templateType - Template type: "firstNotice", "followUp", or "finalNotice"
  * @param {Object} [settings] - Optional settings object (will be fetched if not provided)
  * @returns {Object} Template object with name and message properties
+ * @throws {Error} If templateType is invalid
  */
 function getBillTemplate(templateType, settings) {
-  const s = settings || getSettings();
+  // Input validation for settings
+  const s = (settings && typeof settings === "object" && settings.templates && settings.templates.billMessages)
+    ? settings
+    : getSettings();
+
   const validTypes = ["firstNotice", "followUp", "finalNotice"];
 
+  if (!templateType || typeof templateType !== "string") {
+    throw new Error(`Invalid template type: expected string, got ${typeof templateType}`);
+  }
+
   if (!validTypes.includes(templateType)) {
-    Logger.log(`Invalid template type: ${templateType}. Using firstNotice.`);
-    templateType = "firstNotice";
+    throw new Error(`Invalid template type: "${templateType}". Valid types are: ${validTypes.join(", ")}`);
   }
 
   return s.templates.billMessages[templateType];
@@ -594,12 +674,16 @@ function getBillTemplate(templateType, settings) {
  * @returns {Array} Array of {id, name} objects
  */
 function getBillTemplateTypes(settings) {
-  const s = settings || getSettings();
+  // Input validation for settings
+  const s = (settings && typeof settings === "object" && settings.templates && settings.templates.billMessages)
+    ? settings
+    : getSettings();
+
   const templates = s.templates.billMessages;
 
   return [
-    { id: "firstNotice", name: templates.firstNotice.name },
-    { id: "followUp", name: templates.followUp.name },
-    { id: "finalNotice", name: templates.finalNotice.name }
+    { id: "firstNotice", name: templates.firstNotice?.name || "First Notice" },
+    { id: "followUp", name: templates.followUp?.name || "Follow-up Reminder" },
+    { id: "finalNotice", name: templates.finalNotice?.name || "Final Notice" }
   ];
 }

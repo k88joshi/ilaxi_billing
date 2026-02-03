@@ -1,0 +1,14 @@
+# Ignore files that shouldn't be pushed to Apps Script
+.git/**
+.gitignore
+.claude/**
+.clasp.json
+CLAUDE.md
+README.md
+*.md
+node_modules/**
+package.json
+package-lock.json
+
+# Test files (comment out if you want tests in Apps Script)
+# *.test.gs
