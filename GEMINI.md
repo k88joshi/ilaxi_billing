@@ -1,125 +1,63 @@
-# GEMINI.md: AI Development Guide for Ilaxi's Gujarati Tiffin Billing System
+# Ilaxi's Gujarati Tiffin - Billing System
 
-This document guides the use of gemini-cli (or other AI tools) for developing and managing this Google Apps Script project. Its purpose is to provide context, establish rules, and store common "prompt recipes" to ensure consistent, high-quality, and maintainable code.
+## Project Overview
 
-## 1. Project Overview
+This is a **Google Apps Script (GAS)** project designed to automate the billing process for "Ilaxi's Gujarati Tiffin" service. It integrates **Google Sheets** with the **Twilio API** to send SMS bills, reminders, and payment confirmations to customers.
 
-**Project Goal:** To automate the billing process for Ilaxi's Gujarati Tiffin. The script reads customer data from a Google Sheet, sends SMS bills and payment reminders via the Twilio API, and logs the message status back to the sheet.
+**Key Features:**
+*   **Automated SMS Billing:** Sends bills based on payment status in Google Sheets.
+*   **Template System:** Supports First Notice, Follow-up, Final Notice, and Thank You messages.
+*   **Settings UI:** A custom sidebar allows non-technical users to configure messages, business details, and behavior without editing code.
+*   **Twilio Integration:** Uses `UrlFetchApp` to communicate with the Twilio API for sending SMS.
+*   **Dry Run Mode:** Allows testing the logic without sending actual messages.
 
-**Core Services Used:** `SpreadsheetApp` (UI, data read/write), `UrlFetchApp` (Twilio API calls), `PropertiesService` (storing API credentials), `Utilities` (Base64 encoding, sleep), and simple/installable triggers (`onOpen`, `onEdit`).
+## Tech Stack
 
-**Key Functionality:**
+*   **Platform:** Google Apps Script (JavaScript/V8 Runtime)
+*   **Database/UI:** Google Sheets
+*   **External API:** Twilio (SMS)
+*   **Frontend (Settings):** HTML, CSS, client-side JavaScript (served via `HtmlService`)
 
-- Creates a custom menu (`onOpen`) to manage Twilio credentials ("Set/Delete SID", "Set/Delete Token", etc.).
-- Adds a "Send Bills" menu for various bulk-sending operations ("Send to All UNPAID", "Send by Due Date", "Send by Order ID").
-- Includes a test function ("Test with First Unpaid Row") and a utility to clear message statuses.
-- Automatically triggers a "Thank You" SMS when a customer's 'Payment' column is marked as "Paid" (`onEdit`).
-- Securely stores and retrieves Twilio credentials using `PropertiesService.getUserProperties()`.
-- Includes a `DRY_RUN_MODE` toggle for safe testing.
-- Performs data validation and formatting for phone numbers (to E.164), currency, and dates.
-- Provides a summary report (`showSendSummary`) after bulk-sending operations.
+## Directory Structure
 
-## 2. Core System Prompt
+*   `main.gs`: **Entry Point**. Contains `onOpen` (menu creation) and `onEdit` (auto-reply triggers).
+*   `twilio.gs`: **API Integration**. Functions for formatting phone numbers and sending SMS via Twilio.
+*   `settings-manager.gs`: **Configuration**. Manages loading/saving settings from `PropertiesService` and processing message templates.
+*   `spreadsheet.gs`: **Data Access**. Utilities for reading/writing to the active Google Sheet.
+*   `ui.gs`: **User Interface**. Functions to open the sidebar and handle alerts.
+*   `config.gs`: **Legacy**. Deprecated constants file. Kept for reference or backward compatibility.
+*   `settings.html`: **Frontend**. The HTML/CSS/JS for the Settings Sidebar.
+*   `README.md`: Comprehensive user guide and installation instructions.
 
-Paste this into your gemini-cli session to set the persona.
+## Setup & Deployment
 
-### System Prompt:
+This project is deployed manually to the Google Apps Script environment attached to a specific Google Sheet.
 
-Act as an expert Google Apps Script developer with deep, specialized knowledge of the V8 runtime, `SpreadsheetApp`, `UrlFetchApp`, and related Google Workspace services. You are working on a billing system for a tiffin service.
+**Installation:**
+1.  Open the target Google Sheet.
+2.  Navigate to **Extensions > Apps Script**.
+3.  Create `.gs` files corresponding to the local files (e.g., `main.gs`, `twilio.gs`).
+4.  Create an `.html` file for `settings.html`.
+5.  Copy-paste the local content into the respective GAS files.
+6.  Save the project.
 
-### Your Core Directives:
+**Configuration:**
+1.  **Twilio Credentials:** Set via the custom **Credentials** menu in the Sheet (stored in User Properties).
+2.  **App Settings:** Configured via **Settings > Open Settings** sidebar (stored in Script Properties).
 
-- **Prioritize Performance:** Always write code that minimizes calls to Google services. Use batch operations (`getValues()`, `setValues()`, `setBackgroundColors()`, etc.) instead of operating on single cells inside loops.
-- **Modern JavaScript:** Use `const` and `let` exclusively. Never use `var`. Use modern features like arrow functions, destructuring, and template literals where appropriate.
-- **Strict Mode:** All `.gs` files must begin with `"use strict";`.
-- **Full JSDoc:** All top-level functions must have complete JSDoc comments (`@param`, `@returns`, `@customfunction` if applicable).
-- **Clarity and Readability:** Write clean, well-commented, and maintainable code.
-- **Environment Awareness:** Remember this is Apps Script, not Node.js or a browser. There is no `window`, `document`, or `require`. Use built-in services like `UrlFetchApp` (for HTTP) and `Logger.log` (for logging).
-- **Security:** Never hard-code API keys or secrets. Use `PropertiesService.getUserProperties()` or `PropertiesService.getScriptProperties()` (as this script already does).
+## Development Conventions
 
-## 3. Style Guide & Best Practices
+*   **Triggers:**
+    *   `onOpen`: Simple trigger to create custom menus.
+    *   `onEdit`: Installable trigger (conceptually) used to detect "Paid" status changes for auto-replies.
+*   **Error Handling:** Most functions return a result object `{ success: boolean, status: string, color: string }` to update the Sheet's status column visually.
+*   **Properties:**
+    *   `UserProperties`: Used for sensitive secrets (Twilio SID/Token).
+    *   `ScriptProperties`: Used for shared application settings (Business name, templates).
+*   **Naming:** Private helper functions often end with an underscore (e.g., `sendBill_`, `sendThankYouMessage_`).
 
-| Rule | Description |
-|------|-------------|
-| **Batch Operations** | CRITICAL: Never call `getValue()`, `setValue()`, or `getRange()` inside a `for` or `while` loop. Read all data into a 2D array, process the array, and write all data back in one call. (Note: This script correctly reads all data first, but writes status updates one by one inside the loop. This is acceptable for this use case to provide real-time feedback and avoid data loss on timeout, but for pure data processing, batch writes are preferred.) |
-| **Error Handling** | Use `try...catch` blocks for all external API calls (`UrlFetchApp`) and major `SpreadsheetApp` operations. Log errors clearly with `Logger.log()`. |
-| **Logging** | Use `Logger.log()` for debugging. This is viewable in the Apps Script editor's Execution Log. |
-| **Globals** | Avoid global variables where possible, but `const` for configuration (like `PHONE_NUMBER_HEADER`) is excellent practice. |
-| **Custom Functions** | If a function is for the Sheet UI (e.g., `=MY_FUNCTION()`), it must be marked with `@customfunction` and can only return values (no service calls that require permissions). |
-| **Manifest** | Remind me to check `appsscript.json` if we need to add scopes (like `https://api.twilio.com`) or advanced services. |
-| **Rate Limiting** | Use `Utilities.sleep()` between API calls in a loop to avoid rate-limiting errors (as this script correctly does with `Utilities.sleep(1000)`). |
+## Key Commands (Manual)
 
-## 4. gemini-cli Prompt Recipes
-
-Use these as templates for common tasks.
-
-### Recipe: Create a New Function
-
-**Your Prompt:**
-
-```
-"Write a new Google Apps Script function named `[functionName]` for the tiffin billing system that does the following:
-
-1.  [Requirement 1, e.g., "Accepts a sheet name as a string."]
-2.  [Requirement 2, e.g., "Gets all data from that sheet using getRange() and getValues()."]
-3.  [Requirement 3, e.g., "Filters the 2D array to find rows where column 3 (index 2) is 'Pending'."]
-4.  [Requirement 4, e.g., "Returns a new 2D array with only the 'Pending' rows."]
-
-Remember to include "use strict";, full JSDoc, and follow the project's style guide (use the getHeaderColumnMap() utility, etc.)."
-```
-
-### Recipe: Refactor for Performance
-
-**Your Prompt:**
-
-*(Pipe the file using cat or paste the code after the prompt)*
-
-```
-"The following Apps Script code is slow because it calls `getValue` inside a loop. Please refactor it for maximum performance, following the style of the existing billing script (read all data at once, use getHeaderColumnMap(), process the array, and write results back).
-
-[Paste code here or use cat file.gs | gemini-cli ...]"
-```
-
-### Recipe: Explain This Code
-
-**Your Prompt:**
-
-*(Pipe the file using cat or paste the code after the prompt)*
-
-```
-"Explain this Apps Script code in the context of the Tiffin Billing System. Focus on:
-1.  What is its primary purpose?
-2.  How does it interact with the Google Sheet and Twilio?
-3.  Are there any performance or security issues?
-4.  Does it follow the existing project style?
-
-[Paste code here or use cat file.gs | gemini-cli ...]"
-```
-
-### Recipe: Debug an Error
-
-**Your Prompt:**
-
-```
-"I'm getting this error in the Tiffin Billing script:
-[Paste the full error message, e.g., "Exception: The parameters (number,number) don't match the method signature for SpreadsheetApp.Spreadsheet.getRange..."]
-
-This is the function that's causing it:
-[Paste the function code]
-
-The column headers are: [List any relevant headers, e.g., PAYMENT_STATUS_HEADER, MESSAGE_STATUS_HEADER]
-
-What is the most likely cause of this error and how do I fix it?"
-```
-
-### Recipe: Write JSDoc / Comments
-
-**Your Prompt:**
-
-*(Pipe the file using cat or paste the code after the prompt)*
-
-```
-"Write complete JSDoc comments for the following function(s), matching the style of the existing `code.gs` file. Make sure to identify all parameters and the return value.
-
-[Paste code here or use cat file.gs | gemini-cli ...]"
-```
+Since this is a GAS project, there are no CLI build commands.
+*   **Run/Test:** Functions are executed from the Google Sheets menu or the GAS editor.
+*   **Logs:** `Logger.log()` is used for debugging. View logs in the GAS editor.

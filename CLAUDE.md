@@ -14,10 +14,11 @@ Google Apps Script automation for a tiffin (Indian lunch box delivery) service b
 - `main.gs` - Entry points (`onOpen`, `onEdit` triggers) and menu handlers
 - `config.gs` - Legacy constants (deprecated, kept for migration compatibility)
 - `settings-manager.gs` - Settings management, template processing, validation
-- `settings.html` - Sidebar UI for user configuration
+- `settings-manager.test.gs` - Unit tests for settings management
+- `settings.html` - Modal dialog UI for user configuration
 - `spreadsheet.gs` - Sheet utilities and data processing functions
-- `twilio.gs` - Twilio API integration and SMS sending
-- `ui.gs` - UI dialogs, credential management, settings sidebar functions
+- `twilio.gs` - Twilio API integration and SMS sending with retry logic
+- `ui.gs` - UI dialogs, credential management, settings dialog functions
 
 **Settings System:**
 All configuration is stored in `PropertiesService.getUserProperties()` as JSON under key `APP_SETTINGS`. The `getSettings()` function auto-migrates from legacy `config.gs` constants on first call.
@@ -41,18 +42,13 @@ Settings structure:
 }
 ```
 
-**Message Types:** When sending bills, users are prompted to choose between:
-1. **First Notice** - Initial payment request
-2. **Follow-up Reminder** - For customers who haven't paid
-3. **Final Notice** - Last reminder before service interruption
-
 **Template Placeholders:** `{{businessName}}`, `{{etransferEmail}}`, `{{phoneNumber}}`, `{{whatsappLink}}`, `{{customerName}}`, `{{balance}}`, `{{numTiffins}}`, `{{month}}`, `{{orderId}}`
 
 **Core Google Services:**
-- `SpreadsheetApp` - Data read/write, UI menus, sidebar
+- `SpreadsheetApp` - Data read/write, UI menus, modal dialogs
 - `UrlFetchApp` - HTTP requests to Twilio
 - `PropertiesService.getUserProperties()` - Credential and settings storage
-- `HtmlService` - Settings sidebar UI
+- `HtmlService` - Settings modal dialog UI
 - `Utilities` - Base64 encoding, sleep delays
 
 **Data Flow:**
@@ -67,22 +63,32 @@ Settings structure:
 
 **Triggers:**
 - `onOpen()` - Simple trigger, creates Credentials/Send Bills/Settings menus
-- `onEdit()` - Installable trigger, auto-sends "Thank You" when Payment="Paid"
+- `onEdit()` - Simple trigger, auto-sends "Thank You" when Payment="Paid" (has 30-second timeout limitation)
 
 ## Development
 
-**No build step** - Copy `.gs` and `.html` files directly to Apps Script editor (Extensions > Apps Script in Google Sheets)
+**Deployment with clasp:**
+```bash
+clasp push              # Push local changes to Apps Script
+clasp push -f           # Force push (overwrites remote)
+clasp pull              # Pull remote changes to local
+clasp open-script       # Open project in browser
+clasp logs              # View execution logs
+```
 
-**Testing:**
-- Enable Dry Run Mode via Settings > Open Settings > Behavior tab (or set in code)
+**Running Unit Tests:**
+1. Push code to Apps Script: `clasp push`
+2. Open Apps Script editor: `clasp open-script`
+3. Select `runAllSettingsManagerTests` from the function dropdown
+4. Click Run and view results in the Execution Log
+
+**Manual Testing:**
+- Enable Dry Run Mode via Settings > Open Settings > Behavior tab
 - Use "Test with First Unpaid Row" menu option for quick validation
 - View logs in Apps Script editor's Execution Log (`Logger.log()`)
 
 **Credential Setup:**
 Use the "Credentials" menu to set Twilio Account SID, Auth Token, and Phone Number (stored in UserProperties)
-
-**Configuration:**
-Use Settings > Open Settings to modify business info, message templates, behavior, colors, and column mappings without editing code.
 
 ## Code Style Requirements
 

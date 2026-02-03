@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Clasp credentials (contains script ID - may want to keep private)
+# .clasp.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+
+# Logs
+*.log

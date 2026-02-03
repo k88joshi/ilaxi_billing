@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  lint:
+    name: Lint & Syntax Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install ESLint
+        run: npm install eslint @eslint/js --save-dev
+
+      - name: Create ESLint config
+        run: |
+          cat > eslint.config.mjs << 'EOF'
+          export default [
+            {
+              files: ["**/*.gs"],
+              languageOptions: {
+                ecmaVersion: 2020,
+                sourceType: "script",
+                globals: {
+                  // Google Apps Script globals
+                  SpreadsheetApp: "readonly",
+                  PropertiesService: "readonly",
+                  UrlFetchApp: "readonly",
+                  HtmlService: "readonly",
+                  Utilities: "readonly",
+                  Logger: "readonly",
+                  console: "readonly",
+                }
+              },
+              rules: {
+                // Only check for common syntax issues
+                "no-undef": "off",  // GAS has cross-file globals
+                "no-unused-vars": "off",  // GAS functions are called by triggers/menus
+                "semi": ["error", "always"],
+                "no-extra-semi": "error",
+                "no-unreachable": "error",
+                "no-dupe-keys": "error",
+                "no-duplicate-case": "error",
+                "no-empty": ["error", { "allowEmptyCatch": true }],
+                "no-irregular-whitespace": "error",
+                "valid-typeof": "error",
+              }
+            },
+          ];
+          EOF
+
+      - name: Run ESLint
+        run: npx eslint "*.gs" --max-warnings 0
+
+  deploy:
+    name: Deploy to Apps Script
+    runs-on: ubuntu-latest
+    needs: lint
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install clasp
+        run: npm install -g @google/clasp
+
+      - name: Setup clasp credentials
+        env:
+          CLASP_TOKEN: ${{ secrets.CLASP_TOKEN }}
+        run: |
+          if [ -n "$CLASP_TOKEN" ]; then
+            echo "$CLASP_TOKEN" > ~/.clasprc.json
+            clasp push -f
+            echo "Deployed to Apps Script"
+          else
+            echo "CLASP_TOKEN secret not configured - skipping deploy"
+            echo "To enable auto-deploy, add your ~/.clasprc.json contents as a repository secret named CLASP_TOKEN"
+          fi
