@@ -13,7 +13,7 @@ Google Apps Script automation for a tiffin (Indian lunch box delivery) service b
 **File Organization:**
 - `main.gs` - Entry points (`onOpen`, `onEdit` triggers) and menu handlers
 - `config.gs` - Legacy constants (deprecated, kept for migration compatibility)
-- `settings.gs` - Settings management, template processing, validation
+- `settings-manager.gs` - Settings management, template processing, validation
 - `settings.html` - Sidebar UI for user configuration
 - `spreadsheet.gs` - Sheet utilities and data processing functions
 - `twilio.gs` - Twilio API integration and SMS sending
