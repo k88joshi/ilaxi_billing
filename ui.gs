@@ -1,8 +1,11 @@
 /**
- * Global variable for the Google Sheets UI.
- * @type {GoogleAppsScript.Base.Ui}
+ * Lazily gets the Google Sheets UI.
+ * This avoids errors when running tests outside of a spreadsheet context.
+ * @returns {GoogleAppsScript.Base.Ui}
  */
-const ui = SpreadsheetApp.getUi();
+function getUi_() {
+  return SpreadsheetApp.getUi();
+}
 
 /**
  * Prompts user to enter a credential value and saves it to User Properties.
@@ -12,10 +15,10 @@ const ui = SpreadsheetApp.getUi();
  * @param {string} successMessage - The message to display on success
  */
 function setCredential_(propertyKey, promptMessage, successMessage) {
-  const result = ui.prompt(promptMessage);
-  if (result.getSelectedButton() === ui.Button.OK) {
-    userProperties.setProperty(propertyKey, result.getResponseText().trim());
-    ui.alert(successMessage);
+  const result = getUi_().prompt(promptMessage);
+  if (result.getSelectedButton() === getUi_().Button.OK) {
+    scriptProperties.setProperty(propertyKey, result.getResponseText().trim());
+    getUi_().alert(successMessage);
   }
 }
 
@@ -26,8 +29,8 @@ function setCredential_(propertyKey, promptMessage, successMessage) {
  * @param {string} successMessage - The message to display on success
  */
 function deleteCredential_(propertyKey, successMessage) {
-  userProperties.deleteProperty(propertyKey);
-  ui.alert(successMessage);
+  scriptProperties.deleteProperty(propertyKey);
+  getUi_().alert(successMessage);
 }
 
 /** Prompts user to enter their Twilio Account SID and saves it securely. */
@@ -87,15 +90,210 @@ function showSettingsSidebar() {
  * Retrieves settings and sheet headers for the sidebar UI.
  * Called from settings.html via google.script.run.
  *
- * @returns {Object} Object containing settings and headers
+ * @returns {Object} Object containing settings, headers, and first-time setup status
  */
 function getSettingsForUI() {
   const settings = getSettings();
   const headers = getSheetHeaders();
+  const firstTimeCheck = isFirstTimeSetup();
   return {
     settings: settings,
-    headers: headers
+    headers: headers,
+    isFirstTime: firstTimeCheck.isFirstTime  // Extract boolean from object
   };
+}
+
+/**
+ * Checks if this is a first-time setup (no credentials and no setup completed flag).
+ *
+ * @returns {Object} Object with isFirstTime boolean
+ */
+function isFirstTimeSetup() {
+  const props = PropertiesService.getScriptProperties();
+  const setupCompleted = props.getProperty("SETUP_COMPLETED");
+  const hasAccountSid = props.getProperty("TWILIO_ACCOUNT_SID");
+
+  return {
+    isFirstTime: !setupCompleted && !hasAccountSid
+  };
+}
+
+/**
+ * Marks the setup wizard as skipped so it doesn't show again.
+ */
+function markSetupSkipped() {
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty("SETUP_COMPLETED", "skipped");
+}
+
+/**
+ * Tests Twilio credentials by calling the Twilio API account lookup endpoint.
+ * This verifies credentials without sending an SMS.
+ *
+ * @param {string} accountSid - Twilio Account SID
+ * @param {string} authToken - Twilio Auth Token
+ * @param {string} twilioPhone - Twilio phone number (optional, for validation)
+ * @returns {Object} Result with success boolean, accountName, and error details
+ */
+function testTwilioCredentials(accountSid, authToken, twilioPhone) {
+  // Input validation
+  if (!accountSid || typeof accountSid !== "string") {
+    return { success: false, error: "Account SID is required", errorCode: "INVALID_CREDENTIALS" };
+  }
+  if (!authToken || typeof authToken !== "string") {
+    return { success: false, error: "Auth Token is required", errorCode: "INVALID_CREDENTIALS" };
+  }
+
+  // Validate Account SID format
+  if (!/^AC[a-f0-9]{32}$/i.test(accountSid)) {
+    return {
+      success: false,
+      error: "Account SID format is invalid. It should start with 'AC' and be 34 characters.",
+      errorCode: "INVALID_CREDENTIALS"
+    };
+  }
+
+  try {
+    const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}.json`;
+    const options = {
+      method: "get",
+      headers: {
+        "Authorization": "Basic " + Utilities.base64Encode(accountSid + ":" + authToken)
+      },
+      muteHttpExceptions: true
+    };
+
+    const response = UrlFetchApp.fetch(url, options);
+    const responseCode = response.getResponseCode();
+
+    if (responseCode === 200) {
+      const accountInfo = JSON.parse(response.getContentText());
+      return {
+        success: true,
+        accountName: accountInfo.friendly_name || "Twilio Account",
+        accountStatus: accountInfo.status
+      };
+    } else if (responseCode === 401) {
+      return {
+        success: false,
+        error: "Authentication failed. Please check your Account SID and Auth Token.",
+        errorCode: "AUTH_FAILED"
+      };
+    } else if (responseCode === 404) {
+      return {
+        success: false,
+        error: "Account not found. Please verify your Account SID.",
+        errorCode: "INVALID_CREDENTIALS"
+      };
+    } else {
+      const errorData = JSON.parse(response.getContentText());
+      return {
+        success: false,
+        error: errorData.message || `Request failed with status ${responseCode}`,
+        errorCode: "UNKNOWN"
+      };
+    }
+  } catch (e) {
+    Logger.log(`testTwilioCredentials error: ${e.message}`);
+    return {
+      success: false,
+      error: `Connection error: ${e.message}`,
+      errorCode: "UNKNOWN"
+    };
+  }
+}
+
+/**
+ * Tests Twilio credentials using credentials already stored in UserProperties.
+ * Called from the Settings UI to verify existing credentials.
+ *
+ * @returns {Object} Result with success boolean and details
+ */
+function testTwilioCredentialsFromSettings() {
+  const props = PropertiesService.getScriptProperties();
+  const accountSid = props.getProperty("TWILIO_ACCOUNT_SID");
+  const authToken = props.getProperty("TWILIO_AUTH_TOKEN");
+  const twilioPhone = props.getProperty("TWILIO_PHONE_NUMBER");
+
+  if (!accountSid || !authToken) {
+    return {
+      success: false,
+      error: "Twilio credentials not set. Use the Credentials menu to configure them.",
+      errorCode: "INVALID_CREDENTIALS"
+    };
+  }
+
+  return testTwilioCredentials(accountSid, authToken, twilioPhone);
+}
+
+/**
+ * Completes the first-time setup wizard by saving credentials and settings.
+ *
+ * @param {Object} setupData - Data collected from the wizard
+ * @returns {Object} Result with success boolean and optional error
+ */
+function completeFirstTimeSetup(setupData) {
+  // Validate input
+  if (!setupData || typeof setupData !== "object") {
+    return { success: false, error: "Invalid setup data" };
+  }
+
+  try {
+    const props = PropertiesService.getScriptProperties();
+
+    // Save Twilio credentials
+    if (setupData.credentials) {
+      if (setupData.credentials.accountSid) {
+        props.setProperty("TWILIO_ACCOUNT_SID", setupData.credentials.accountSid);
+      }
+      if (setupData.credentials.authToken) {
+        props.setProperty("TWILIO_AUTH_TOKEN", setupData.credentials.authToken);
+      }
+      if (setupData.credentials.twilioPhone) {
+        props.setProperty("TWILIO_PHONE_NUMBER", setupData.credentials.twilioPhone);
+      }
+    }
+
+    // Get current settings and update with wizard data
+    const settings = getSettings();
+
+    // Update business info
+    if (setupData.business) {
+      settings.business.name = setupData.business.name || settings.business.name;
+      settings.business.etransferEmail = setupData.business.etransferEmail || settings.business.etransferEmail;
+      settings.business.phoneNumber = setupData.business.phoneNumber || settings.business.phoneNumber;
+      settings.business.whatsappLink = setupData.business.whatsappLink || settings.business.whatsappLink;
+    }
+
+    // Update column mappings
+    if (setupData.columns) {
+      Object.keys(setupData.columns).forEach(key => {
+        if (setupData.columns[key] && settings.columns[key] !== undefined) {
+          settings.columns[key] = setupData.columns[key];
+        }
+      });
+    }
+
+    // Set dry run mode
+    if (setupData.dryRunMode !== undefined) {
+      settings.behavior.dryRunMode = setupData.dryRunMode;
+    }
+
+    // Save settings
+    const saveResult = saveSettings(settings);
+    if (!saveResult.success) {
+      return { success: false, error: saveResult.error };
+    }
+
+    // Mark setup as completed
+    props.setProperty("SETUP_COMPLETED", new Date().toISOString());
+
+    Logger.log("First-time setup completed successfully");
+    return { success: true };
+  } catch (e) {
+    Logger.log(`completeFirstTimeSetup error: ${e.message}`);
+    return { success: false, error: e.message };
+  }
 }
 
 /**
@@ -136,15 +334,20 @@ function previewTemplate(template) {
  * @returns {Array<string>} Array of header names
  */
 function getSheetHeaders() {
-  const sheet = SpreadsheetApp.getActiveSheet();
-  const settings = getSettings();
-  const headerRow = settings.behavior.headerRowIndex || 1;
+  try {
+    const sheet = getTargetSheet_();
+    const settings = getSettings();
+    const headerRow = settings.behavior.headerRowIndex || 1;
 
-  const lastCol = sheet.getLastColumn();
-  if (lastCol === 0) return [];
+    const lastCol = sheet.getLastColumn();
+    if (lastCol === 0) return [];
 
-  const headers = sheet.getRange(headerRow, 1, 1, lastCol).getValues()[0];
-  return headers.filter(h => h && String(h).trim() !== "").map(h => String(h).trim());
+    const headers = sheet.getRange(headerRow, 1, 1, lastCol).getValues()[0];
+    return headers.filter(h => h && String(h).trim() !== "").map(h => String(h).trim());
+  } catch (e) {
+    Logger.log(`getSheetHeaders error: ${e.message}`);
+    return [];
+  }
 }
 
 /**
@@ -168,33 +371,33 @@ function exportSettingsToFile() {
  * Prompts user to paste JSON settings for import.
  */
 function importSettingsFromPrompt() {
-  const result = ui.prompt("Import Settings", "Paste the JSON settings content below:", ui.ButtonSet.OK_CANCEL);
-  if (result.getSelectedButton() !== ui.Button.OK) return;
+  const result = getUi_().prompt("Import Settings", "Paste the JSON settings content below:", getUi_().ButtonSet.OK_CANCEL);
+  if (result.getSelectedButton() !== getUi_().Button.OK) return;
 
   const jsonString = result.getResponseText().trim();
   if (!jsonString) {
-    ui.alert("Import cancelled: No content provided.");
+    getUi_().alert("Import cancelled: No content provided.");
     return;
   }
 
   const importResult = importSettings(jsonString);
-  ui.alert(importResult.success ? "Settings imported successfully!" : "Import failed: " + importResult.error);
+  getUi_().alert(importResult.success ? "Settings imported successfully!" : "Import failed: " + importResult.error);
 }
 
 /**
  * Shows confirmation dialog before resetting settings to defaults.
  */
 function confirmResetSettings() {
-  const response = ui.alert(
+  const response = getUi_().alert(
     "Reset Settings",
     "This will reset ALL settings to their default values. This cannot be undone.\n\nAre you sure?",
-    ui.ButtonSet.YES_NO
+    getUi_().ButtonSet.YES_NO
   );
 
-  if (response !== ui.Button.YES) return;
+  if (response !== getUi_().Button.YES) return;
 
   const result = resetToDefaults();
-  ui.alert(result.success ? "Settings have been reset to defaults." : "Reset failed: " + result.error);
+  getUi_().alert(result.success ? "Settings have been reset to defaults." : "Reset failed: " + result.error);
 }
 
 // ========================================
@@ -245,7 +448,7 @@ function showSendSummary(sentCount, errorCount, skippedCount, errorDetails, filt
   }
   
   // Display the summary in a dialog box
-  ui.alert("Send Complete", summary, ui.ButtonSet.OK);
+  getUi_().alert("Send Complete", summary, getUi_().ButtonSet.OK);
   
   // Also log to Apps Script logger for debugging
   Logger.log(summary);

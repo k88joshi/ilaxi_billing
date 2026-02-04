@@ -1,8 +1,9 @@
 /**
  * Global variable for storing/retrieving secure credentials.
+ * Uses ScriptProperties for web app compatibility.
  * @type {GoogleAppsScript.Properties.Properties}
  */
-const userProperties = PropertiesService.getUserProperties();
+const scriptProperties = PropertiesService.getScriptProperties();
 
 /**
  * Twilio credentials. These are populated by checkCredentials().
@@ -19,9 +20,9 @@ let TWILIO_PHONE_NUMBER = "";
  * @returns {boolean} True if all credentials are set, false otherwise.
  */
 function checkCredentials(silent = false) {
-  TWILIO_ACCOUNT_SID = userProperties.getProperty("TWILIO_ACCOUNT_SID");
-  TWILIO_AUTH_TOKEN = userProperties.getProperty("TWILIO_AUTH_TOKEN");
-  TWILIO_PHONE_NUMBER = userProperties.getProperty("TWILIO_PHONE_NUMBER");
+  TWILIO_ACCOUNT_SID = scriptProperties.getProperty("TWILIO_ACCOUNT_SID");
+  TWILIO_AUTH_TOKEN = scriptProperties.getProperty("TWILIO_AUTH_TOKEN");
+  TWILIO_PHONE_NUMBER = scriptProperties.getProperty("TWILIO_PHONE_NUMBER");
 
   const missingCredentials = [];
   if (!TWILIO_ACCOUNT_SID || TWILIO_ACCOUNT_SID === "placeholder") {
@@ -36,7 +37,7 @@ function checkCredentials(silent = false) {
 
   if (missingCredentials.length > 0) {
     if (!silent) {
-      ui.alert(`Error: Twilio ${missingCredentials.join(", ")} not set. Please set via the 'Credentials' menu.`);
+      getUi_().alert(`Error: Twilio ${missingCredentials.join(", ")} not set. Please set via the 'Credentials' menu.`);
     }
     return false;
   }

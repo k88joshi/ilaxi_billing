@@ -1,3 +1,247 @@
+// ========================================
+// SPREADSHEET ACCESS CONFIGURATION
+// ========================================
+
+/**
+ * Spreadsheet ID for web app mode.
+ * Set this to your Google Sheet's ID (found in the URL after /d/).
+ * Example: https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID_HERE/edit
+ * @const {string}
+ */
+const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE';
+
+/**
+ * Gets the target sheet for operations.
+ * In add-on mode: returns the active sheet
+ * In web app mode: opens the sheet by SPREADSHEET_ID
+ *
+ * @returns {GoogleAppsScript.Spreadsheet.Sheet} The target sheet
+ * @throws {Error} If no sheet can be accessed
+ */
+function getTargetSheet_() {
+  // Try add-on mode first (active sheet)
+  try {
+    const activeSheet = SpreadsheetApp.getActiveSheet();
+    if (activeSheet) {
+      return activeSheet;
+    }
+  } catch (e) {
+    // Not in add-on context, fall through to web app mode
+    Logger.log('getTargetSheet_: Not in add-on context, using SPREADSHEET_ID');
+  }
+
+  // Web app mode: open by ID
+  if (!SPREADSHEET_ID || SPREADSHEET_ID === 'YOUR_SPREADSHEET_ID_HERE') {
+    throw new Error('SPREADSHEET_ID not configured. Please set it in spreadsheet.gs');
+  }
+
+  try {
+    const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = spreadsheet.getSheets()[0]; // Get first sheet
+    if (!sheet) {
+      throw new Error('No sheets found in the spreadsheet');
+    }
+    return sheet;
+  } catch (e) {
+    Logger.log(`getTargetSheet_ error opening spreadsheet: ${e.message}`);
+    throw new Error(`Failed to open spreadsheet: ${e.message}`);
+  }
+}
+
+/**
+ * Gets the target spreadsheet for operations.
+ * In add-on mode: returns the active spreadsheet
+ * In web app mode: opens the spreadsheet by SPREADSHEET_ID
+ *
+ * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet} The target spreadsheet
+ * @throws {Error} If no spreadsheet can be accessed
+ */
+function getTargetSpreadsheet_() {
+  // Try add-on mode first
+  try {
+    const active = SpreadsheetApp.getActive();
+    if (active) {
+      return active;
+    }
+  } catch (e) {
+    // Not in add-on context
+  }
+
+  // Web app mode
+  if (!SPREADSHEET_ID || SPREADSHEET_ID === 'YOUR_SPREADSHEET_ID_HERE') {
+    throw new Error('SPREADSHEET_ID not configured. Please set it in spreadsheet.gs');
+  }
+
+  return SpreadsheetApp.openById(SPREADSHEET_ID);
+}
+
+// ========================================
+// COLUMN DETECTION
+// ========================================
+
+/**
+ * Synonyms for column name matching in auto-detection.
+ * Each key maps to an array of possible column name variations.
+ * @const {Object<string, string[]>}
+ */
+const COLUMN_SYNONYMS = {
+  phoneNumber: ["phone", "mobile", "cell", "telephone", "contact", "phone number", "phone no", "mobile number", "cell number", "contact number", "tel"],
+  customerName: ["name", "customer", "client", "full name", "customer name", "client name", "customer_name", "fullname"],
+  balance: ["balance", "amount", "total", "due", "owing", "amount due", "total due", "balance due", "amount owing", "price", "cost"],
+  numTiffins: ["tiffins", "tiffin", "quantity", "qty", "count", "number", "no. of tiffins", "no of tiffins", "num tiffins", "tiffin count", "items"],
+  dueDate: ["date", "due date", "due", "month", "billing date", "invoice date", "period", "billing month", "billing period"],
+  messageStatus: ["status", "message status", "msg status", "sms status", "delivery status", "message", "sent"],
+  orderId: ["order", "order id", "order number", "order no", "invoice", "invoice id", "invoice number", "invoice no", "id", "ref", "reference"],
+  paymentStatus: ["payment", "payment status", "paid", "payment state", "pay status", "paid status", "payment_status"]
+};
+
+/**
+ * Auto-detects column mappings by matching header names against known synonyms.
+ * Returns headers and detection results with confidence scores.
+ *
+ * @returns {Object} Object with headers array and detections object
+ */
+function autoDetectColumns() {
+  try {
+    const sheet = getTargetSheet_();
+    if (!sheet) {
+      return { headers: [], detections: {} };
+    }
+
+    const settings = getSettings();
+    const headerRowIndex = settings.behavior.headerRowIndex || 1;
+    const lastCol = sheet.getLastColumn();
+
+    if (lastCol === 0) {
+      return { headers: [], detections: {} };
+    }
+
+    const headers = sheet.getRange(headerRowIndex, 1, 1, lastCol).getValues()[0]
+      .filter(h => h && String(h).trim() !== "")
+      .map(h => String(h).trim());
+
+    if (headers.length === 0) {
+      return { headers: [], detections: {} };
+    }
+
+    // Auto-detect mappings
+    const detections = {};
+
+    Object.keys(COLUMN_SYNONYMS).forEach(columnKey => {
+      const synonyms = COLUMN_SYNONYMS[columnKey];
+      let bestMatch = null;
+      let bestScore = 0;
+
+      headers.forEach(header => {
+        const score = calculateMatchScore(header, synonyms);
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = header;
+        }
+      });
+
+      if (bestMatch && bestScore >= 50) {
+        detections[columnKey] = {
+          match: bestMatch,
+          confidence: bestScore
+        };
+      }
+    });
+
+    return {
+      headers: headers,
+      detections: detections
+    };
+  } catch (e) {
+    Logger.log(`autoDetectColumns error: ${e.message}`);
+    return { headers: [], detections: {} };
+  }
+}
+
+/**
+ * Calculates a match score between a header and a list of synonyms.
+ * Uses exact match, starts-with, contains, and fuzzy matching strategies.
+ *
+ * @param {string} header - The header name to match
+ * @param {string[]} synonyms - Array of possible synonym strings
+ * @returns {number} Match score from 0-100
+ */
+function calculateMatchScore(header, synonyms) {
+  if (!header || !synonyms || !Array.isArray(synonyms)) {
+    return 0;
+  }
+
+  const normalizedHeader = normalizeHeader(header);
+  let maxScore = 0;
+
+  synonyms.forEach(synonym => {
+    const normalizedSynonym = normalizeHeader(synonym);
+    let score = 0;
+
+    // Exact match = 100%
+    if (normalizedHeader === normalizedSynonym) {
+      score = 100;
+    }
+    // Header starts with synonym = 90%
+    else if (normalizedHeader.startsWith(normalizedSynonym)) {
+      score = 90;
+    }
+    // Synonym starts with header = 85%
+    else if (normalizedSynonym.startsWith(normalizedHeader)) {
+      score = 85;
+    }
+    // Header contains synonym = 80%
+    else if (normalizedHeader.includes(normalizedSynonym)) {
+      score = 80;
+    }
+    // Synonym contains header = 75%
+    else if (normalizedSynonym.includes(normalizedHeader)) {
+      score = 75;
+    }
+    // Word boundary match (e.g., "Customer Name" contains "name" as word)
+    else {
+      const headerWords = normalizedHeader.split(/[\s_-]+/);
+      const synonymWords = normalizedSynonym.split(/[\s_-]+/);
+
+      // Check if any synonym word matches any header word exactly
+      let wordMatch = false;
+      synonymWords.forEach(sWord => {
+        if (headerWords.includes(sWord)) {
+          wordMatch = true;
+        }
+      });
+
+      if (wordMatch) {
+        score = 70;
+      }
+    }
+
+    if (score > maxScore) {
+      maxScore = score;
+    }
+  });
+
+  return maxScore;
+}
+
+/**
+ * Normalizes a header string for comparison by lowercasing and removing special characters.
+ *
+ * @param {string} header - Header string to normalize
+ * @returns {string} Normalized header string
+ */
+function normalizeHeader(header) {
+  if (!header || typeof header !== "string") {
+    return "";
+  }
+
+  return header
+    .toLowerCase()
+    .replace(/[^\w\s]/g, "") // Remove special characters except word chars and spaces
+    .replace(/\s+/g, " ")    // Normalize whitespace
+    .trim();
+}
+
 /**
  * Reads the header row and creates a mapping of column names to their 0-based column index.
  * Uses dynamic header row index from settings.
@@ -11,9 +255,9 @@
  */
 function getHeaderColumnMap() {
   try {
-    const sheet = SpreadsheetApp.getActiveSheet();
+    const sheet = getTargetSheet_();
     if (!sheet) {
-      throw new Error("No active sheet found");
+      throw new Error("No sheet found");
     }
 
     const settings = getSettings();
@@ -166,19 +410,19 @@ function promptForMessageType() {
   const templateTypes = getBillTemplateTypes();
   const options = templateTypes.map((t, i) => `${i + 1}. ${t.name}`).join("\n");
 
-  const result = ui.prompt(
+  const result = getUi_().prompt(
     "Select Message Type",
     `Which message would you like to send?\n\n${options}\n\nEnter the number (1-${templateTypes.length}):`,
-    ui.ButtonSet.OK_CANCEL
+    getUi_().ButtonSet.OK_CANCEL
   );
 
-  if (result.getSelectedButton() !== ui.Button.OK) {
+  if (result.getSelectedButton() !== getUi_().Button.OK) {
     return null;
   }
 
   const choice = parseInt(result.getResponseText().trim(), 10);
   if (isNaN(choice) || choice < 1 || choice > templateTypes.length) {
-    ui.alert(`Invalid selection. Please enter a number between 1 and ${templateTypes.length}`);
+    getUi_().alert(`Invalid selection. Please enter a number between 1 and ${templateTypes.length}`);
     return null;
   }
 
@@ -290,17 +534,17 @@ function sendBillsToUnpaid() {
 
   const settings = getSettings();
   const cols = settings.columns;
-  const sheet = SpreadsheetApp.getActiveSheet();
+  const sheet = getTargetSheet_();
   const columns = getHeaderColumnMap();
   const data = sheet.getDataRange().getValues();
 
   const missingHeaders = validateRequiredColumns(columns, cols);
   if (missingHeaders.length > 0) {
-    ui.alert(`Error: The following required columns are missing: ${missingHeaders.join(", ")}.`);
+    getUi_().alert(`Error: The following required columns are missing: ${missingHeaders.join(", ")}.`);
     return;
   }
   if (data.length <= settings.behavior.headerRowIndex) {
-    ui.alert("No customer data found.");
+    getUi_().alert("No customer data found.");
     return;
   }
 
@@ -400,8 +644,8 @@ function processRowsForSending(rowsToProcess, columns, cols, settings, templateT
  * Prompts user to enter a date or month to filter by (e.g., "October" or "2025-10-31").
  */
 function sendUnpaidByDueDate() {
-  const dateResult = ui.prompt("Enter the due date or month to filter for (e.g., October or 2025-10-31):");
-  if (dateResult.getSelectedButton() !== ui.Button.OK || !dateResult.getResponseText()) {
+  const dateResult = getUi_().prompt("Enter the due date or month to filter for (e.g., October or 2025-10-31):");
+  if (dateResult.getSelectedButton() !== getUi_().Button.OK || !dateResult.getResponseText()) {
     return;
   }
   const targetDate = dateResult.getResponseText().trim().toLowerCase();
@@ -413,17 +657,17 @@ function sendUnpaidByDueDate() {
 
   const settings = getSettings();
   const cols = settings.columns;
-  const sheet = SpreadsheetApp.getActiveSheet();
+  const sheet = getTargetSheet_();
   const columns = getHeaderColumnMap();
   const data = sheet.getDataRange().getValues();
 
   const missingHeaders = validateRequiredColumns(columns, cols);
   if (missingHeaders.length > 0) {
-    ui.alert(`Error: The following required columns are missing: ${missingHeaders.join(", ")}.`);
+    getUi_().alert(`Error: The following required columns are missing: ${missingHeaders.join(", ")}.`);
     return;
   }
   if (data.length <= settings.behavior.headerRowIndex) {
-    ui.alert("No customer data found.");
+    getUi_().alert("No customer data found.");
     return;
   }
 
@@ -463,8 +707,8 @@ function sendUnpaidByDueDate() {
  * Useful for resending a single bill or testing a specific row.
  */
 function sendBillByOrderID() {
-  const result = ui.prompt("Enter the exact Order ID to send the bill for:");
-  if (result.getSelectedButton() !== ui.Button.OK || !result.getResponseText()) {
+  const result = getUi_().prompt("Enter the exact Order ID to send the bill for:");
+  if (result.getSelectedButton() !== getUi_().Button.OK || !result.getResponseText()) {
     return;
   }
   const targetOrderID = result.getResponseText().trim();
@@ -476,13 +720,13 @@ function sendBillByOrderID() {
 
   const settings = getSettings();
   const cols = settings.columns;
-  const sheet = SpreadsheetApp.getActiveSheet();
+  const sheet = getTargetSheet_();
   const columns = getHeaderColumnMap();
   const data = sheet.getDataRange().getValues();
 
   const orderIdCol = columns[cols.orderId];
   if (orderIdCol === undefined) {
-    ui.alert(`Error: The column "${cols.orderId}" was not found.`);
+    getUi_().alert(`Error: The column "${cols.orderId}" was not found.`);
     return;
   }
 
@@ -496,7 +740,7 @@ function sendBillByOrderID() {
   }
 
   if (foundRow === -1) {
-    ui.alert(`Error: Could not find any row with Order ID "${targetOrderID}".`);
+    getUi_().alert(`Error: Could not find any row with Order ID "${targetOrderID}".`);
     return;
   }
 
@@ -511,21 +755,21 @@ function sendBillByOrderID() {
   const statusCol = columns[cols.messageStatus];
 
   if (!phone || !name || !balance || !tiffins) {
-    ui.alert(`Found Order ID ${targetOrderID} at row ${currentRow}, but it is missing required data (Phone, Name, Balance, or Tiffins).`);
+    getUi_().alert(`Found Order ID ${targetOrderID} at row ${currentRow}, but it is missing required data (Phone, Name, Balance, or Tiffins).`);
     return;
   }
 
   // Show preview and confirm
   const templateName = getBillTemplate(templateType, settings).name;
   const dryRunNote = settings.behavior.dryRunMode ? "\n\n[DRY RUN MODE - No actual SMS will be sent]" : "";
-  const confirmResult = ui.alert(
+  const confirmResult = getUi_().alert(
     "Confirm Send by Order ID",
     `Found Order ID ${targetOrderID}:\n\nName: ${name}\nPhone: ${phone}\nBalance: ${formatBalance(balance)}\nMessage Type: ${templateName}\n\nContinue?${dryRunNote}`,
-    ui.ButtonSet.YES_NO
+    getUi_().ButtonSet.YES_NO
   );
 
-  if (confirmResult !== ui.Button.YES) {
-    ui.alert("Operation cancelled.");
+  if (confirmResult !== getUi_().Button.YES) {
+    getUi_().alert("Operation cancelled.");
     return;
   }
 
@@ -538,9 +782,9 @@ function sendBillByOrderID() {
   // Notify user
   const dryRunPrefix = settings.behavior.dryRunMode ? "[DRY RUN] " : "";
   if (sendResult.success) {
-    ui.alert(`${templateName} ${dryRunPrefix}sent successfully to ${name} for Order ${targetOrderID}!`);
+    getUi_().alert(`${templateName} ${dryRunPrefix}sent successfully to ${name} for Order ${targetOrderID}!`);
   } else {
-    ui.alert(`${templateName} failed to send. Check the Message Status column for details on row ${currentRow}.`);
+    getUi_().alert(`${templateName} failed to send. Check the Message Status column for details on row ${currentRow}.`);
   }
 }
 
@@ -557,18 +801,18 @@ function testSingleMessage() {
 
   const settings = getSettings();
   const cols = settings.columns;
-  const sheet = SpreadsheetApp.getActiveSheet();
+  const sheet = getTargetSheet_();
   const columns = getHeaderColumnMap();
   const data = sheet.getDataRange().getValues();
 
   const paymentCol = columns[cols.paymentStatus];
   const statusCol = columns[cols.messageStatus];
   if (paymentCol === undefined || statusCol === undefined) {
-    ui.alert(`Error: Missing required columns: "${cols.paymentStatus}" or "${cols.messageStatus}".`);
+    getUi_().alert(`Error: Missing required columns: "${cols.paymentStatus}" or "${cols.messageStatus}".`);
     return;
   }
   if (data.length <= settings.behavior.headerRowIndex) {
-    ui.alert("No customer data found.");
+    getUi_().alert("No customer data found.");
     return;
   }
 
@@ -582,7 +826,7 @@ function testSingleMessage() {
   }
 
   if (testRow === -1) {
-    ui.alert("No UNPAID customers found to test.");
+    getUi_().alert("No UNPAID customers found to test.");
     return;
   }
 
@@ -596,21 +840,21 @@ function testSingleMessage() {
   const dueDate = rowData[columns[cols.dueDate]];
 
   if (!phone || !name || !balance || !tiffins) {
-    ui.alert(`The first unpaid row (row ${currentRow}) is missing required data (Phone, Name, Balance, or Tiffins).`);
+    getUi_().alert(`The first unpaid row (row ${currentRow}) is missing required data (Phone, Name, Balance, or Tiffins).`);
     return;
   }
 
   // Show preview and confirm
   const templateName = getBillTemplate(templateType, settings).name;
   const dryRunNote = settings.behavior.dryRunMode ? "\n\n[DRY RUN MODE - No actual SMS will be sent]" : "";
-  const confirmResult = ui.alert(
+  const confirmResult = getUi_().alert(
     "Test Message Preview",
     `About to send a test "${templateName}" to the first UNPAID customer (row ${currentRow}):\n\nName: ${name}\nPhone: ${phone}\nBalance: ${formatBalance(balance)}\n\nContinue?${dryRunNote}`,
-    ui.ButtonSet.YES_NO
+    getUi_().ButtonSet.YES_NO
   );
 
-  if (confirmResult !== ui.Button.YES) {
-    ui.alert("Test cancelled.");
+  if (confirmResult !== getUi_().Button.YES) {
+    getUi_().alert("Test cancelled.");
     return;
   }
 
@@ -623,9 +867,9 @@ function testSingleMessage() {
   // Notify user
   const dryRunPrefix = settings.behavior.dryRunMode ? "[DRY RUN] " : "";
   if (sendResult.success) {
-    ui.alert(`Test "${templateName}" ${dryRunPrefix}sent successfully to ${name}!`);
+    getUi_().alert(`Test "${templateName}" ${dryRunPrefix}sent successfully to ${name}!`);
   } else {
-    ui.alert(`Test "${templateName}" failed. Check the Message Status column on row ${currentRow} for details.`);
+    getUi_().alert(`Test "${templateName}" failed. Check the Message Status column on row ${currentRow} for details.`);
   }
 }
 
@@ -634,22 +878,22 @@ function testSingleMessage() {
  * Asks for confirmation before clearing.
  */
 function clearAllStatuses() {
-  const response = ui.alert(
+  const response = getUi_().alert(
     "Clear Message Statuses",
     "This will clear all message status entries in the 'Message Status' column. Are you sure?",
-    ui.ButtonSet.YES_NO
+    getUi_().ButtonSet.YES_NO
   );
 
-  if (response !== ui.Button.YES) return;
+  if (response !== getUi_().Button.YES) return;
 
   const settings = getSettings();
   const cols = settings.columns;
-  const sheet = SpreadsheetApp.getActiveSheet();
+  const sheet = getTargetSheet_();
   const columns = getHeaderColumnMap();
   const statusColIndex = columns[cols.messageStatus];
 
   if (statusColIndex === undefined) {
-    ui.alert(`Error: Could not find the '${cols.messageStatus}' column header. Please ensure it exists in row ${settings.behavior.headerRowIndex}.`);
+    getUi_().alert(`Error: Could not find the '${cols.messageStatus}' column header. Please ensure it exists in row ${settings.behavior.headerRowIndex}.`);
     return;
   }
 
@@ -667,5 +911,5 @@ function clearAllStatuses() {
     range.setBackgrounds(clearBackgrounds);
   }
 
-  ui.alert("All message statuses cleared!");
+  getUi_().alert("All message statuses cleared!");
 }

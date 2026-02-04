@@ -4,7 +4,8 @@
 // ========================================
 
 /**
- * Property key for storing app settings in UserProperties.
+ * Property key for storing app settings in ScriptProperties.
+ * Using ScriptProperties allows settings to persist across web app requests.
  * @const {string}
  */
 const SETTINGS_PROPERTY_KEY = "APP_SETTINGS";
@@ -115,13 +116,14 @@ We appreciate your business!
 }
 
 /**
- * Retrieves settings from UserProperties, merging with defaults.
+ * Retrieves settings from ScriptProperties, merging with defaults.
  * Automatically migrates from legacy config.gs constants on first call.
+ * Uses ScriptProperties for web app compatibility.
  *
  * @returns {Object} Current settings object
  */
 function getSettings() {
-  const props = PropertiesService.getUserProperties();
+  const props = PropertiesService.getScriptProperties();
   const stored = props.getProperty(SETTINGS_PROPERTY_KEY);
 
   if (!stored) {
@@ -170,7 +172,8 @@ function getSettings() {
 }
 
 /**
- * Saves settings to UserProperties after validation.
+ * Saves settings to ScriptProperties after validation.
+ * Uses ScriptProperties for web app compatibility.
  *
  * @param {Object} settings - Settings object to save
  * @returns {Object} Result with success boolean and optional error message
@@ -178,12 +181,16 @@ function getSettings() {
 function saveSettings(settings) {
   const validation = validateSettings(settings);
   if (!validation.valid) {
-    Logger.log(`Settings validation failed: ${validation.errors.join(", ")}`);
-    return { success: false, error: validation.errors.join(", ") };
+    // Format errors for display - extract message from error objects
+    const errorMessages = validation.errors.map(err =>
+      typeof err === "string" ? err : err.message
+    );
+    Logger.log(`Settings validation failed: ${errorMessages.join(", ")}`);
+    return { success: false, error: errorMessages.join(", "), errors: validation.errors };
   }
 
   try {
-    const props = PropertiesService.getUserProperties();
+    const props = PropertiesService.getScriptProperties();
     props.setProperty(SETTINGS_PROPERTY_KEY, JSON.stringify(settings));
     Logger.log("Settings saved successfully.");
     return { success: true };
@@ -195,36 +202,49 @@ function saveSettings(settings) {
 
 /**
  * Validates a settings object for required fields and value constraints.
+ * Returns detailed error information including field names and guidance.
  *
  * @param {Object} settings - Settings object to validate
- * @returns {Object} Validation result with valid boolean and errors array
+ * @returns {Object} Validation result with valid boolean and errors array (with field/tab/message details)
  */
 function validateSettings(settings) {
   const errors = [];
 
   // Top-level validation
   if (!settings || typeof settings !== "object") {
-    return { valid: false, errors: ["Settings must be a valid object"] };
+    return { valid: false, errors: [{ field: null, tab: null, message: "Settings must be a valid object" }] };
   }
 
   // Business validations
   if (!settings.business) {
-    errors.push("Missing business section");
+    errors.push({ field: null, tab: "business", message: "Missing business section" });
   } else {
     if (!settings.business.name || settings.business.name.length > 100) {
-      errors.push("Business name is required and must be <= 100 characters");
+      errors.push({
+        field: "businessName",
+        tab: "business",
+        message: "Business name is required and must be <= 100 characters"
+      });
     }
     if (!settings.business.etransferEmail || !isValidEmail(settings.business.etransferEmail)) {
-      errors.push("Valid e-transfer email is required");
+      errors.push({
+        field: "etransferEmail",
+        tab: "business",
+        message: "Valid e-transfer email is required"
+      });
     }
     if (!settings.business.phoneNumber || settings.business.phoneNumber.length > 20) {
-      errors.push("Phone number is required and must be <= 20 characters");
+      errors.push({
+        field: "phoneNumber",
+        tab: "business",
+        message: "Phone number is required and must be <= 20 characters"
+      });
     }
   }
 
   // Template validations
   if (!settings.templates) {
-    errors.push("Missing templates section");
+    errors.push({ field: null, tab: "templates", message: "Missing templates section" });
   } else {
     // Validate bill message templates (new structure)
     if (settings.templates.billMessages) {
@@ -232,15 +252,23 @@ function validateSettings(settings) {
       templateTypes.forEach(type => {
         const template = settings.templates.billMessages[type];
         if (!template) {
-          errors.push(`Missing bill template: ${type}`);
+          errors.push({ field: `${type}Message`, tab: "templates", message: `Missing bill template: ${type}` });
         } else {
           if (!template.name || template.name.length > 50) {
-            errors.push(`${type} template name must be <= 50 characters`);
+            errors.push({
+              field: `${type}Name`,
+              tab: "templates",
+              message: `${type} template name must be <= 50 characters`
+            });
           }
           if (!template.message ||
               template.message.length < 50 ||
               template.message.length > 1600) {
-            errors.push(`${type} message must be between 50-1600 characters`);
+            errors.push({
+              field: `${type}Message`,
+              tab: "templates",
+              message: `${type} message must be between 50-1600 characters`
+            });
           }
         }
       });
@@ -248,60 +276,84 @@ function validateSettings(settings) {
       // Legacy single template validation (for migration)
       if (settings.templates.billMessage.length < 50 ||
           settings.templates.billMessage.length > 1600) {
-        errors.push("Bill message template must be between 50-1600 characters");
+        errors.push({ field: null, tab: "templates", message: "Bill message template must be between 50-1600 characters" });
       }
     } else {
-      errors.push("Missing bill message templates");
+      errors.push({ field: null, tab: "templates", message: "Missing bill message templates" });
     }
 
     if (!settings.templates.thankYouMessage ||
         settings.templates.thankYouMessage.length < 50 ||
         settings.templates.thankYouMessage.length > 1600) {
-      errors.push("Thank you message template must be between 50-1600 characters");
+      errors.push({
+        field: "thankYouMessage",
+        tab: "templates",
+        message: "Thank you message must be between 50-1600 characters"
+      });
     }
   }
 
   // Behavior validations
   if (!settings.behavior) {
-    errors.push("Missing behavior section");
+    errors.push({ field: null, tab: "behavior", message: "Missing behavior section" });
   } else {
     if (typeof settings.behavior.batchSize !== "number" ||
         settings.behavior.batchSize < 1 ||
         settings.behavior.batchSize > 200) {
-      errors.push("Batch size must be a number between 1-200");
+      errors.push({
+        field: "batchSize",
+        tab: "behavior",
+        message: "Batch size must be a number between 1-200"
+      });
     }
     if (typeof settings.behavior.messageDelayMs !== "number" ||
         settings.behavior.messageDelayMs < 500 ||
         settings.behavior.messageDelayMs > 5000) {
-      errors.push("Message delay must be between 500-5000ms");
+      errors.push({
+        field: "messageDelayMs",
+        tab: "behavior",
+        message: "Message delay must be between 500-5000ms"
+      });
     }
     if (typeof settings.behavior.headerRowIndex !== "number" ||
         settings.behavior.headerRowIndex < 1) {
-      errors.push("Header row index must be >= 1");
+      errors.push({
+        field: "headerRowIndex",
+        tab: "behavior",
+        message: "Header row index must be >= 1"
+      });
     }
   }
 
   // Color validations
   if (!settings.colors) {
-    errors.push("Missing colors section");
+    errors.push({ field: null, tab: "behavior", message: "Missing colors section" });
   } else {
     const colorFields = ["success", "error", "dryRun"];
     colorFields.forEach(field => {
       if (!settings.colors[field] || !isValidHexColor(settings.colors[field])) {
-        errors.push(`Invalid hex color for ${field}`);
+        errors.push({
+          field: `color${field.charAt(0).toUpperCase() + field.slice(1)}`,
+          tab: "behavior",
+          message: `Invalid hex color for ${field}`
+        });
       }
     });
   }
 
   // Column validations
   if (!settings.columns) {
-    errors.push("Missing columns section");
+    errors.push({ field: null, tab: "columns", message: "Missing columns section" });
   } else {
     const requiredColumns = ["phoneNumber", "customerName", "balance", "numTiffins",
                             "dueDate", "messageStatus", "orderId", "paymentStatus"];
     requiredColumns.forEach(col => {
       if (!settings.columns[col] || typeof settings.columns[col] !== "string") {
-        errors.push(`Missing or invalid column mapping for ${col}`);
+        errors.push({
+          field: `col${col.charAt(0).toUpperCase() + col.slice(1)}`,
+          tab: "columns",
+          message: `Missing or invalid column mapping for ${col}`
+        });
       }
     });
   }

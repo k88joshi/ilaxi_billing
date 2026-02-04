@@ -15,10 +15,10 @@ Google Apps Script automation for a tiffin (Indian lunch box delivery) service b
 - `config.gs` - Legacy constants (deprecated, kept for migration compatibility)
 - `settings-manager.gs` - Settings management, template processing, validation
 - `settings-manager.test.gs` - Unit tests for settings management
-- `settings.html` - Modal dialog UI for user configuration
-- `spreadsheet.gs` - Sheet utilities and data processing functions
+- `settings.html` - Modal dialog UI with first-time setup wizard and inline validation
+- `spreadsheet.gs` - Sheet utilities, data processing, and column auto-detection
 - `twilio.gs` - Twilio API integration and SMS sending with retry logic
-- `ui.gs` - UI dialogs, credential management, settings dialog functions
+- `ui.gs` - UI dialogs, credential management, settings dialog, and credential testing
 
 **Settings System:**
 All configuration is stored in `PropertiesService.getUserProperties()` as JSON under key `APP_SETTINGS`. The `getSettings()` function auto-migrates from legacy `config.gs` constants on first call.
@@ -51,6 +51,9 @@ Settings structure:
 - `HtmlService` - Settings modal dialog UI
 - `Utilities` - Base64 encoding, sleep delays
 
+**UI Context Pattern:**
+Use `getUi_()` (lazy-loaded function in ui.gs) instead of global `SpreadsheetApp.getUi()` to avoid errors when running tests outside spreadsheet context.
+
 **Data Flow:**
 1. Menu action triggers function in `main.gs`
 2. `getSettings()` loads configuration from UserProperties
@@ -82,6 +85,11 @@ clasp logs              # View execution logs
 3. Select `runAllSettingsManagerTests` from the function dropdown
 4. Click Run and view results in the Execution Log
 
+**Test Utilities (in settings-manager.test.gs):**
+- `TestIsolation.setup()/teardown()` - Backup/restore UserProperties to prevent test pollution
+- `TestRunner.assertEqual/assertTrue/assertNotNull` - Simple assertion framework
+- Tests cover: settings CRUD, template processing, validation, column auto-detection, credential testing
+
 **Manual Testing:**
 - Enable Dry Run Mode via Settings > Open Settings > Behavior tab
 - Use "Test with First Unpaid Row" menu option for quick validation
@@ -100,6 +108,7 @@ Use the "Credentials" menu to set Twilio Account SID, Auth Token, and Phone Numb
 - Use `getSettings()` for all configuration values, not legacy constants
 - Use `processTemplate()` for message construction with `{{placeholder}}` syntax
 - Use `getHeaderColumnMap()` for column lookups (supports column reordering)
+- Use `getUi_()` instead of `SpreadsheetApp.getUi()` to support test execution outside spreadsheet context
 
 ## Constraints
 
@@ -113,3 +122,17 @@ Default column names (configurable via Settings > Columns):
 `Phone Number`, `Customer Name`, `Balance`, `No. of Tiffins`, `Due Date`, `Message Status`, `Order ID`, `Payment`
 
 Column order is flexible - script uses header names to find columns.
+
+## Key Backend Functions
+
+**Credential Testing (ui.gs):**
+- `testTwilioCredentials(sid, token, phone)` - Validates credentials via Twilio account lookup API (doesn't send SMS)
+- `testTwilioCredentialsFromSettings()` - Tests credentials stored in UserProperties
+
+**Column Auto-Detection (spreadsheet.gs):**
+- `autoDetectColumns()` - Fuzzy matches sheet headers to expected columns using `COLUMN_SYNONYMS`
+- Returns confidence scores: high (≥90%), medium (70-89%), low (<70%)
+
+**First-Time Setup (ui.gs):**
+- `isFirstTimeSetup()` - Returns `{isFirstTime: true}` when no `SETUP_COMPLETED` flag and no credentials
+- `completeFirstTimeSetup(setupData)` - Saves wizard data and marks setup complete

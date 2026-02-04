@@ -1,63 +1,78 @@
-# Ilaxi's Gujarati Tiffin - Billing System
+# Gemini Context for Ilaxi's Billing System
+
+This file provides context and instructions for Gemini when working on this project.
 
 ## Project Overview
 
-This is a **Google Apps Script (GAS)** project designed to automate the billing process for "Ilaxi's Gujarati Tiffin" service. It integrates **Google Sheets** with the **Twilio API** to send SMS bills, reminders, and payment confirmations to customers.
+**Ilaxi's Billing System** is a Google Apps Script automation tool designed for a tiffin (lunch box) delivery service. It streamlines the billing process by:
+*   Reading customer data and payment status from a Google Sheet.
+*   Sending automated SMS bills and reminders using the Twilio API.
+*   Logging message delivery status back to the sheet.
+*   Providing a user-friendly Sidebar UI for configuration (no code editing required).
 
-**Key Features:**
-*   **Automated SMS Billing:** Sends bills based on payment status in Google Sheets.
-*   **Template System:** Supports First Notice, Follow-up, Final Notice, and Thank You messages.
-*   **Settings UI:** A custom sidebar allows non-technical users to configure messages, business details, and behavior without editing code.
-*   **Twilio Integration:** Uses `UrlFetchApp` to communicate with the Twilio API for sending SMS.
-*   **Dry Run Mode:** Allows testing the logic without sending actual messages.
+## Key Technologies
 
-## Tech Stack
+*   **Runtime:** Google Apps Script V8.
+*   **Database:** Google Sheets.
+*   **SMS Gateway:** Twilio API.
+*   **Development Tool:** CLASP (Command Line Apps Script Projects).
+*   **UI:** HTML Service (for the settings sidebar and modal dialogs).
 
-*   **Platform:** Google Apps Script (JavaScript/V8 Runtime)
-*   **Database/UI:** Google Sheets
-*   **External API:** Twilio (SMS)
-*   **Frontend (Settings):** HTML, CSS, client-side JavaScript (served via `HtmlService`)
+## Architecture & Key Files
 
-## Directory Structure
+The project follows a modular structure. **Do not use `require` or Node.js modules**; this runs in the Apps Script environment.
 
-*   `main.gs`: **Entry Point**. Contains `onOpen` (menu creation) and `onEdit` (auto-reply triggers).
-*   `twilio.gs`: **API Integration**. Functions for formatting phone numbers and sending SMS via Twilio.
-*   `settings-manager.gs`: **Configuration**. Manages loading/saving settings from `PropertiesService` and processing message templates.
-*   `spreadsheet.gs`: **Data Access**. Utilities for reading/writing to the active Google Sheet.
-*   `ui.gs`: **User Interface**. Functions to open the sidebar and handle alerts.
-*   `config.gs`: **Legacy**. Deprecated constants file. Kept for reference or backward compatibility.
-*   `settings.html`: **Frontend**. The HTML/CSS/JS for the Settings Sidebar.
-*   `README.md`: Comprehensive user guide and installation instructions.
+*   **`main.gs`**: The entry point. Handles `onOpen` (menu creation) and `onEdit` triggers.
+*   **`settings-manager.gs`**: Manages application settings, stored in `PropertiesService.getUserProperties()`. Handles template processing and migration from legacy config.
+*   **`twilio.gs`**: Wraps the Twilio REST API. Handles SMS sending, error handling, and retry logic.
+*   **`spreadsheet.gs`**: Contains utilities for interacting with the Google Sheet. **Crucially**, it implements batch reading (`getValues`) and writing to avoid API quotas.
+*   **`ui.gs`**: Manages the custom menu, sidebar display, and credential management dialogs.
+*   **`settings.html`**: The HTML/CSS/JS for the configuration sidebar.
+*   **`settings-manager.test.gs`**: Unit tests for the settings logic.
 
-## Setup & Deployment
+## Development Workflow
 
-This project is deployed manually to the Google Apps Script environment attached to a specific Google Sheet.
+### CLI Commands (CLASP)
 
-**Installation:**
-1.  Open the target Google Sheet.
-2.  Navigate to **Extensions > Apps Script**.
-3.  Create `.gs` files corresponding to the local files (e.g., `main.gs`, `twilio.gs`).
-4.  Create an `.html` file for `settings.html`.
-5.  Copy-paste the local content into the respective GAS files.
-6.  Save the project.
+This project uses `clasp` for local development.
 
-**Configuration:**
-1.  **Twilio Credentials:** Set via the custom **Credentials** menu in the Sheet (stored in User Properties).
-2.  **App Settings:** Configured via **Settings > Open Settings** sidebar (stored in Script Properties).
+*   `clasp push`: Pushes local changes to the Apps Script project.
+*   `clasp push -f`: Force push (overwrite remote).
+*   `clasp pull`: Pulls remote changes to your local machine.
+*   `clasp open-script`: Opens the project in the Apps Script editor.
+*   `clasp logs`: View execution logs.
 
-## Development Conventions
+### Testing
 
-*   **Triggers:**
-    *   `onOpen`: Simple trigger to create custom menus.
-    *   `onEdit`: Installable trigger (conceptually) used to detect "Paid" status changes for auto-replies.
-*   **Error Handling:** Most functions return a result object `{ success: boolean, status: string, color: string }` to update the Sheet's status column visually.
-*   **Properties:**
-    *   `UserProperties`: Used for sensitive secrets (Twilio SID/Token).
-    *   `ScriptProperties`: Used for shared application settings (Business name, templates).
-*   **Naming:** Private helper functions often end with an underscore (e.g., `sendBill_`, `sendThankYouMessage_`).
+*   **Unit Tests:** Run `runAllSettingsManagerTests` in the Apps Script editor (found in `settings-manager.test.gs`).
+*   **Manual Testing:**
+    1.  Enable **Dry Run Mode** in the Settings Sidebar (`Behavior` tab).
+    2.  Use the **Test with First Unpaid Row** menu option.
+    3.  Check the `Execution Log` and the `Message Status` column (entries will be prefixed with `[DRY RUN]`).
 
-## Key Commands (Manual)
+## Coding Conventions & Best Practices
 
-Since this is a GAS project, there are no CLI build commands.
-*   **Run/Test:** Functions are executed from the Google Sheets menu or the GAS editor.
-*   **Logs:** `Logger.log()` is used for debugging. View logs in the GAS editor.
+1.  **Variable Declaration:** Use `const` and `let`. Avoid `var`.
+2.  **Batch Operations:** **NEVER** call `range.getValue()` or `range.setValue()` inside a loop.
+    *   **Read:** Get the entire data range into a 2D array: `const data = sheet.getDataRange().getValues();`
+    *   **Process:** Iterate over the array in memory.
+    *   **Write:** Prepare a 2D array of results and write it back in one operation: `columnRange.setValues(results);`
+3.  **Settings Access:** Do not hardcode configuration. Use `SettingsManager.getSettings()` to retrieve values from `UserProperties`.
+4.  **UI Interaction:** Use `getUi_()` (lazy-loaded in `ui.gs`) instead of `SpreadsheetApp.getUi()` to ensure tests can run outside the spreadsheet context.
+5.  **Documentation:** Add JSDoc comments to all top-level functions.
+6.  **Error Handling:** Wrap external API calls (Twilio) in `try...catch` blocks.
+7.  **Delays:** Use `Utilities.sleep()` between API calls to respect rate limits (controlled by `settings.behavior.messageDelayMs`).
+
+## Data Structure (Google Sheet)
+
+The script relies on specific column headers to map data. The default expected headers are:
+*   `Phone Number` (E.164 format, e.g., `+15551234567`)
+*   `Customer Name`
+*   `Balance`
+*   `No. of Tiffins`
+*   `Due Date`
+*   `Message Status` (Script writes here)
+*   `Order ID`
+*   `Payment` ("Paid" or "Unpaid")
+
+*Note: Column mapping is configurable in the Settings Sidebar if headers differ.*
