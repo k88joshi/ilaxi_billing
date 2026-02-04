@@ -4,135 +4,106 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Google Apps Script automation for a tiffin (Indian lunch box delivery) service billing system. Reads customer data from Google Sheets, sends SMS bills via Twilio API, and logs delivery status back to the spreadsheet.
+Google Apps Script automation for a tiffin delivery service. Sends SMS bills via Twilio, reads/writes customer data in Google Sheets, supports both spreadsheet add-on and standalone web app modes.
+
+**Runtime**: Google Apps Script V8 (ES6 JavaScript, NOT Node.js - no `require()` or npm modules)
+
+## Commands
+
+### CLASP (deployment)
+```bash
+clasp push          # Push local changes to Apps Script
+clasp push -f       # Force push (overwrite remote)
+clasp pull          # Pull remote changes
+clasp logs          # View execution logs
+clasp open-script   # Open in Apps Script editor
+```
+
+### Linting (matches CI)
+```bash
+npm install eslint @eslint/js --save-dev
+npx eslint "*.gs" --max-warnings 0
+```
+
+### Testing
+Run `runAllSettingsManagerTests()` in Apps Script editor (defined in `settings-manager.test.gs`). For manual testing, enable Dry Run Mode in Settings > Behavior tab.
 
 ## Architecture
 
-**Runtime:** Google Apps Script V8 (not Node.js - no `require`, `window`, or `document`)
+### Dual-Mode Operation
+- **Add-on mode**: Runs in active Google Sheet via `SpreadsheetApp.getActive()`
+- **Web app mode**: Uses `SPREADSHEET_ID` constant in `spreadsheet.gs` for `SpreadsheetApp.openById()`
 
-**File Organization:**
-- `main.gs` - Entry points (`onOpen`, `onEdit` triggers) and menu handlers
-- `config.gs` - Legacy constants (deprecated, kept for migration compatibility)
-- `settings-manager.gs` - Settings management, template processing, validation
-- `settings-manager.test.gs` - Unit tests for settings management
-- `settings.html` - Modal dialog UI with first-time setup wizard and inline validation
-- `spreadsheet.gs` - Sheet utilities, data processing, and column auto-detection
-- `twilio.gs` - Twilio API integration and SMS sending with retry logic
-- `ui.gs` - UI dialogs, credential management, settings dialog, and credential testing
+### Key Files
+| File | Purpose |
+|------|---------|
+| `main.gs` | Entry points: `onOpen()` menus, `onEdit()` auto-thank-you trigger |
+| `settings-manager.gs` | Settings via `PropertiesService`, template processing, validation |
+| `api.gs` | Web app API router - routes POST requests to handlers |
+| `webapp.gs` | Web app auth (`doGet`/`doPost`), password validation (SHA-256) |
+| `twilio.gs` | Twilio SMS with exponential backoff retry (max 4 attempts) |
+| `spreadsheet.gs` | Sheet utilities, column mapping via `getHeaderColumnMap()` |
+| `ui.gs` | Menu dialogs, credential management |
+| `settings.html` | Settings modal UI (tabbed interface) |
 
-**Settings System:**
-All configuration is stored in `PropertiesService.getUserProperties()` as JSON under key `APP_SETTINGS`. The `getSettings()` function auto-migrates from legacy `config.gs` constants on first call.
+### Data Flow
+```
+Sheet Data → getHeaderColumnMap() → Settings/Templates → Twilio API → Status written back
+```
 
-Settings structure:
+### Storage
+- **ScriptProperties**: Project-wide settings (web app mode, shared config)
+- **UserProperties**: User-specific settings (add-on mode)
+
+## Critical Patterns
+
+### Batch Operations (REQUIRED)
+Never use `getValue()`/`setValue()` in loops. Always batch:
 ```javascript
-{
-  version: 2,
-  business: { name, etransferEmail, phoneNumber, whatsappLink },
-  templates: {
-    billMessages: {
-      firstNotice: { name, message },   // First payment request
-      followUp: { name, message },      // Follow-up reminder
-      finalNotice: { name, message }    // Final notice
-    },
-    thankYouMessage  // Auto-sent when payment marked as Paid
-  },
-  behavior: { dryRunMode, batchSize, messageDelayMs, headerRowIndex },
-  colors: { success, error, dryRun },
-  columns: { phoneNumber, customerName, balance, numTiffins, dueDate, messageStatus, orderId, paymentStatus }
-}
+// Read all at once
+const data = sheet.getDataRange().getValues();
+// Process in memory
+// Write all at once
+columnRange.setValues(results);
 ```
 
-**Template Placeholders:** `{{businessName}}`, `{{etransferEmail}}`, `{{phoneNumber}}`, `{{whatsappLink}}`, `{{customerName}}`, `{{balance}}`, `{{numTiffins}}`, `{{month}}`, `{{orderId}}`
+### Cross-File Globals
+All `.gs` files compile into one namespace. Functions defined in any file are globally accessible.
 
-**Core Google Services:**
-- `SpreadsheetApp` - Data read/write, UI menus, modal dialogs
-- `UrlFetchApp` - HTTP requests to Twilio
-- `PropertiesService.getUserProperties()` - Credential and settings storage
-- `HtmlService` - Settings modal dialog UI
-- `Utilities` - Base64 encoding, sleep delays
+### Template Placeholders
+Use `processTemplate()` for: `{{businessName}}`, `{{customerName}}`, `{{balance}}`, `{{numTiffins}}`, `{{month}}`, `{{orderId}}`, `{{etransferEmail}}`, `{{phoneNumber}}`, `{{whatsappLink}}`
 
-**UI Context Pattern:**
-Use `getUi_()` (lazy-loaded function in ui.gs) instead of global `SpreadsheetApp.getUi()` to avoid errors when running tests outside spreadsheet context.
-
-**Data Flow:**
-1. Menu action triggers function in `main.gs`
-2. `getSettings()` loads configuration from UserProperties
-3. `getHeaderColumnMap()` maps column names to indices (resilient to column reordering)
-4. Batch read via `getDataRange().getValues()`
-5. Filter/process rows in memory
-6. `sendBill_()` uses `processTemplate()` to build SMS, calls Twilio API with delays
-7. Batch update status column + colors from settings
-8. Show summary dialog
-
-**Triggers:**
-- `onOpen()` - Simple trigger, creates Credentials/Send Bills/Settings menus
-- `onEdit()` - Simple trigger, auto-sends "Thank You" when Payment="Paid" (has 30-second timeout limitation)
-
-## Development
-
-**Deployment with clasp:**
-```bash
-clasp push              # Push local changes to Apps Script
-clasp push -f           # Force push (overwrites remote)
-clasp pull              # Pull remote changes to local
-clasp open-script       # Open project in browser
-clasp logs              # View execution logs
+### Return Objects
+```javascript
+return { success: true, data: result };
+return { success: false, error: "Error message" };
 ```
 
-**Running Unit Tests:**
-1. Push code to Apps Script: `clasp push`
-2. Open Apps Script editor: `clasp open-script`
-3. Select `runAllSettingsManagerTests` from the function dropdown
-4. Click Run and view results in the Execution Log
+## CI/CD
 
-**Test Utilities (in settings-manager.test.gs):**
-- `TestIsolation.setup()/teardown()` - Backup/restore UserProperties to prevent test pollution
-- `TestRunner.assertEqual/assertTrue/assertNotNull` - Simple assertion framework
-- Tests cover: settings CRUD, template processing, validation, column auto-detection, credential testing
+GitHub Actions on push to master:
+1. **Lint**: ESLint syntax check on all `.gs` files
+2. **Deploy**: Auto-push via CLASP (requires `CLASP_TOKEN` secret)
 
-**Manual Testing:**
-- Enable Dry Run Mode via Settings > Open Settings > Behavior tab
-- Use "Test with First Unpaid Row" menu option for quick validation
-- View logs in Apps Script editor's Execution Log (`Logger.log()`)
+## Web App Password Setup
 
-**Credential Setup:**
-Use the "Credentials" menu to set Twilio Account SID, Auth Token, and Phone Number (stored in UserProperties)
+To set the password for web app login (one-time setup):
 
-## Code Style Requirements
+1. Open Apps Script editor: `clasp open-script`
+2. Add this temporary function to any `.gs` file:
+   ```javascript
+   function setupPassword() {
+     setAppPassword("your-password-here");
+   }
+   ```
+3. Select `setupPassword` from the function dropdown and click **Run**
+4. Check execution log for "App password set successfully"
+5. Delete the `setupPassword` function (don't leave password in code)
 
-- Use `const`/`let` exclusively (never `var`)
-- Full JSDoc on all top-level functions
-- **CRITICAL: Never call `getValue()`/`setValue()`/`getRange()` inside loops** - batch read all data, process array, batch write results
-- Use `Utilities.sleep()` between API calls (configurable via `settings.behavior.messageDelayMs`)
-- `try...catch` on all `UrlFetchApp` calls
-- Use `getSettings()` for all configuration values, not legacy constants
-- Use `processTemplate()` for message construction with `{{placeholder}}` syntax
-- Use `getHeaderColumnMap()` for column lookups (supports column reordering)
-- Use `getUi_()` instead of `SpreadsheetApp.getUi()` to support test execution outside spreadsheet context
+Related functions in `webapp.gs`: `hasAppPassword()`, `clearAppPassword()`
 
 ## Constraints
 
-- 6-minute execution limit (hence default `batchSize = 75`)
-- Twilio rate limiting (hence default `messageDelayMs = 1000`)
-- No external dependencies beyond Google Services and Twilio REST API
-
-## Required Sheet Headers
-
-Default column names (configurable via Settings > Columns):
-`Phone Number`, `Customer Name`, `Balance`, `No. of Tiffins`, `Due Date`, `Message Status`, `Order ID`, `Payment`
-
-Column order is flexible - script uses header names to find columns.
-
-## Key Backend Functions
-
-**Credential Testing (ui.gs):**
-- `testTwilioCredentials(sid, token, phone)` - Validates credentials via Twilio account lookup API (doesn't send SMS)
-- `testTwilioCredentialsFromSettings()` - Tests credentials stored in UserProperties
-
-**Column Auto-Detection (spreadsheet.gs):**
-- `autoDetectColumns()` - Fuzzy matches sheet headers to expected columns using `COLUMN_SYNONYMS`
-- Returns confidence scores: high (≥90%), medium (70-89%), low (<70%)
-
-**First-Time Setup (ui.gs):**
-- `isFirstTimeSetup()` - Returns `{isFirstTime: true}` when no `SETUP_COMPLETED` flag and no credentials
-- `completeFirstTimeSetup(setupData)` - Saves wizard data and marks setup complete
+- 6-minute Google Apps Script execution timeout
+- Twilio rate limiting (default 1s delay between messages)
+- Trial Twilio accounts require verified recipient numbers
