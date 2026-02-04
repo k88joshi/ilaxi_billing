@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    /* ============================================
+       CSS Custom Properties - Design Tokens
+       ============================================ */
+    :root {
+      --color-primary: #6366f1;
+      --color-primary-hover: #4f46e5;
+      --color-primary-light: #eef2ff;
+      --color-primary-ghost: rgba(99, 102, 241, 0.1);
+
+      --color-success: #10b981;
+      --color-success-light: #d1fae5;
+      --color-error: #ef4444;
+      --color-error-light: #fee2e2;
+      --color-warning: #f59e0b;
+      --color-warning-light: #fef3c7;
+      --color-info: #3b82f6;
+      --color-info-light: #dbeafe;
+
+      --color-bg: #f8fafc;
+      --color-surface: #ffffff;
+      --color-border: #e2e8f0;
+      --color-border-light: #f1f5f9;
+
+      --color-text: #1e293b;
+      --color-text-secondary: #64748b;
+      --color-text-muted: #94a3b8;
+
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 20px;
+      --space-6: 24px;
+      --space-8: 32px;
+
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      --font-mono: 'SF Mono', 'Fira Code', Menlo, monospace;
+
+      --text-xs: 11px;
+      --text-sm: 13px;
+      --text-base: 14px;
+      --text-lg: 16px;
+      --text-xl: 18px;
+      --text-2xl: 22px;
+
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-xl: 16px;
+      --radius-full: 9999px;
+
+      --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+      --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      font-size: var(--text-base);
+      line-height: 1.5;
+      color: var(--color-text);
+      background: var(--color-bg);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .header {
+      background: linear-gradient(135deg, var(--color-primary) 0%, #8b5cf6 100%);
+      padding: var(--space-5) var(--space-6);
+      position: relative;
+    }
+
+    .header-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .header h1 {
+      color: white;
+      font-size: var(--text-xl);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: var(--space-2);
+    }
+
+    .btn-logout {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      border: none;
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-md);
+      font-size: var(--text-sm);
+      cursor: pointer;
+      transition: var(--transition-fast);
+    }
+
+    .btn-logout:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .tabs {
+      display: flex;
+      background: var(--color-surface);
+      border-bottom: 1px solid var(--color-border);
+      padding: 0 var(--space-6);
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .tab {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-4);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: var(--transition-fast);
+      background: none;
+      border-top: none;
+      border-left: none;
+      border-right: none;
+    }
+
+    .tab:hover {
+      color: var(--color-text);
+      background: var(--color-border-light);
+    }
+
+    .tab.active {
+      color: var(--color-primary);
+      border-bottom-color: var(--color-primary);
+    }
+
+    .tab-icon {
+      width: 18px;
+      height: 18px;
+    }
+
+    .content {
+      padding: var(--space-6);
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .tab-panel {
+      display: none;
+      animation: fadeIn var(--transition-base);
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .card {
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--color-border);
+      margin-bottom: var(--space-5);
+    }
+
+    .card-header {
+      padding: var(--space-4) var(--space-5);
+      border-bottom: 1px solid var(--color-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-title {
+      font-size: var(--text-lg);
+      font-weight: 600;
+    }
+
+    .card-body {
+      padding: var(--space-5);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: var(--space-4);
+      margin-bottom: var(--space-5);
+    }
+
+    .stat-card {
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      padding: var(--space-5);
+      border: 1px solid var(--color-border);
+    }
+
+    .stat-label {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+      margin-bottom: var(--space-1);
+    }
+
+    .stat-value {
+      font-size: var(--text-2xl);
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .stat-value.success { color: var(--color-success); }
+    .stat-value.warning { color: var(--color-warning); }
+    .stat-value.error { color: var(--color-error); }
+
+    .table-container {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: var(--space-3) var(--space-4);
+      text-align: left;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    th {
+      font-weight: 600;
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+      background: var(--color-border-light);
+    }
+
+    tr:hover {
+      background: var(--color-border-light);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: var(--space-1) var(--space-2);
+      border-radius: var(--radius-full);
+      font-size: var(--text-xs);
+      font-weight: 500;
+    }
+
+    .status-badge.unpaid { background: var(--color-warning-light); color: #b45309; }
+    .status-badge.paid { background: var(--color-success-light); color: #047857; }
+    .status-badge.sent { background: var(--color-info-light); color: #1d4ed8; }
+    .status-badge.error { background: var(--color-error-light); color: var(--color-error); }
+
+    .form-group {
+      margin-bottom: var(--space-4);
+    }
+
+    .form-group label {
+      display: block;
+      font-size: var(--text-sm);
+      font-weight: 500;
+      margin-bottom: var(--space-2);
+      color: var(--color-text);
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: var(--space-3);
+      font-size: var(--text-base);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      outline: none;
+      transition: var(--transition-fast);
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px var(--color-primary-ghost);
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: var(--space-4);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-2);
+      padding: var(--space-3) var(--space-4);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: var(--transition-fast);
+      border: none;
+    }
+
+    .btn-primary { background: var(--color-primary); color: white; }
+    .btn-primary:hover { background: var(--color-primary-hover); }
+    .btn-secondary { background: var(--color-border-light); color: var(--color-text); border: 1px solid var(--color-border); }
+    .btn-secondary:hover { background: var(--color-border); }
+    .btn-danger { background: var(--color-error); color: white; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .btn-icon {
+      width: 16px;
+      height: 16px;
+    }
+
+    .alert {
+      padding: var(--space-4);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-4);
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-3);
+    }
+
+    .alert-success { background: var(--color-success-light); border: 1px solid var(--color-success); color: #047857; }
+    .alert-error { background: var(--color-error-light); border: 1px solid var(--color-error); color: var(--color-error); }
+    .alert-warning { background: var(--color-warning-light); border: 1px solid var(--color-warning); color: #b45309; }
+    .alert-info { background: var(--color-info-light); border: 1px solid var(--color-info); color: #1d4ed8; }
+
+    .alert svg {
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+    }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-8);
+      color: var(--color-text-secondary);
+    }
+
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid var(--color-border);
+      border-top-color: var(--color-primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: var(--space-3);
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-overlay.visible {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      max-width: 500px;
+      width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal-header {
+      padding: var(--space-4) var(--space-5);
+      border-bottom: 1px solid var(--color-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-title {
+      font-weight: 600;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--color-text-secondary);
+      padding: var(--space-1);
+    }
+
+    .modal-body {
+      padding: var(--space-5);
+    }
+
+    .modal-footer {
+      padding: var(--space-4) var(--space-5);
+      border-top: 1px solid var(--color-border);
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--space-2);
+    }
+
+    @media (max-width: 768px) {
+      .tabs { overflow-x: auto; padding: 0 var(--space-3); }
+      .tab { padding: var(--space-3); white-space: nowrap; }
+      .content { padding: var(--space-4); }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+      .form-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-content">
+      <h1>
+        <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        Ilaxi Billing
+      </h1>
+      <div class="header-actions">
+        <button class="btn-logout" onclick="logout()">Sign Out</button>
+      </div>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="dashboard" onclick="switchTab('dashboard')">
+      <svg class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+      Dashboard
+    </button>
+    <button class="tab" data-tab="send" onclick="switchTab('send')">
+      <svg class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+      Send Bills
+    </button>
+    <button class="tab" data-tab="credentials" onclick="switchTab('credentials')">
+      <svg class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+      Credentials
+    </button>
+    <button class="tab" data-tab="settings" onclick="switchTab('settings')">
+      <svg class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+      Settings
+    </button>
+  </nav>
+
+  <main class="content">
+    <!-- Dashboard Tab -->
+    <div class="tab-panel active" id="panel-dashboard">
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card"><div class="stat-label">Total Customers</div><div class="stat-value" id="statTotal">-</div></div>
+        <div class="stat-card"><div class="stat-label">Unpaid</div><div class="stat-value warning" id="statUnpaid">-</div></div>
+        <div class="stat-card"><div class="stat-label">Paid</div><div class="stat-value success" id="statPaid">-</div></div>
+        <div class="stat-card"><div class="stat-label">Outstanding Balance</div><div class="stat-value" id="statBalance">-</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Customers</h2>
+          <button class="btn btn-secondary" onclick="refreshCustomers()">
+            <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            Refresh
+          </button>
+        </div>
+        <div class="card-body">
+          <div class="table-container" id="customersTable">
+            <div class="loading"><div class="spinner"></div>Loading customers...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Send Bills Tab -->
+    <div class="tab-panel" id="panel-send">
+      <div class="card">
+        <div class="card-header"><h2 class="card-title">Send Billing Messages</h2></div>
+        <div class="card-body">
+          <div id="sendAlert"></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="sendFilter">Send To</label>
+              <select id="sendFilter" onchange="toggleDateInput()">
+                <option value="unpaid">All Unpaid Customers</option>
+                <option value="byDate">Unpaid by Due Date</option>
+              </select>
+            </div>
+            <div class="form-group" id="dueDateGroup" style="display: none;">
+              <label for="dueDate">Due Date/Month</label>
+              <input type="text" id="dueDate" placeholder="e.g., October or 2024-10-31">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="templateType">Message Template</label>
+            <select id="templateType">
+              <option value="firstNotice">First Notice</option>
+              <option value="followUp">Follow-up Reminder</option>
+              <option value="finalNotice">Final Notice</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label><input type="checkbox" id="dryRunCheckbox"> Dry Run Mode (no actual messages sent)</label>
+          </div>
+          <button class="btn btn-primary" id="sendBillsBtn" onclick="sendBills()">
+            <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+            Send Bills
+          </button>
+          <hr style="margin: var(--space-5) 0; border: none; border-top: 1px solid var(--color-border);">
+          <h3 style="margin-bottom: var(--space-4);">Other Actions</h3>
+          <button class="btn btn-secondary" onclick="clearStatuses()">Clear All Message Statuses</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Credentials Tab -->
+    <div class="tab-panel" id="panel-credentials">
+      <div class="card">
+        <div class="card-header"><h2 class="card-title">Twilio Credentials</h2></div>
+        <div class="card-body">
+          <div id="credentialAlert"></div>
+          <div id="credentialStatus" class="alert alert-info" style="display: none;"></div>
+          <div class="form-group"><label for="accountSid">Account SID</label><input type="text" id="accountSid" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"></div>
+          <div class="form-group"><label for="authToken">Auth Token</label><input type="password" id="authToken" placeholder="Enter your Auth Token"></div>
+          <div class="form-group"><label for="twilioPhone">Twilio Phone Number</label><input type="text" id="twilioPhone" placeholder="+1XXXXXXXXXX"></div>
+          <div style="display: flex; gap: var(--space-2); flex-wrap: wrap;">
+            <button class="btn btn-primary" onclick="saveCredentials()">Save Credentials</button>
+            <button class="btn btn-secondary" onclick="testCredentials()">Test Connection</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Tab -->
+    <div class="tab-panel" id="panel-settings">
+      <div class="card">
+        <div class="card-header"><h2 class="card-title">Business Settings</h2></div>
+        <div class="card-body">
+          <div id="settingsAlert"></div>
+          <div class="form-group"><label for="businessName">Business Name</label><input type="text" id="businessName" placeholder="Your Business Name"></div>
+          <div class="form-group"><label for="etransferEmail">E-Transfer Email</label><input type="email" id="etransferEmail" placeholder="payments@example.com"></div>
+          <div class="form-row">
+            <div class="form-group"><label for="businessPhone">Phone Number</label><input type="text" id="businessPhone" placeholder="+1 (XXX) XXX-XXXX"></div>
+            <div class="form-group"><label for="whatsappLink">WhatsApp Link</label><input type="url" id="whatsappLink" placeholder="https://..."></div>
+          </div>
+          <hr style="margin: var(--space-5) 0; border: none; border-top: 1px solid var(--color-border);">
+          <h3 style="margin-bottom: var(--space-4);">Behavior Settings</h3>
+          <div class="form-row">
+            <div class="form-group"><label for="batchSize">Batch Size</label><input type="number" id="batchSize" min="1" max="200" value="75"></div>
+            <div class="form-group"><label for="messageDelay">Message Delay (ms)</label><input type="number" id="messageDelay" min="500" max="5000" value="1000"></div>
+            <div class="form-group"><label for="headerRow">Header Row Index</label><input type="number" id="headerRow" min="1" value="1"></div>
+          </div>
+          <div class="form-group"><label><input type="checkbox" id="dryRunMode"> Enable Dry Run Mode (for testing)</label></div>
+          <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Send Bill Modal -->
+  <div class="modal-overlay" id="sendSingleModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Send Bill</h3>
+        <button class="modal-close" onclick="closeSendModal()">
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p><strong>Customer:</strong> <span id="modalCustomerName"></span></p>
+        <p><strong>Balance:</strong> <span id="modalBalance"></span></p>
+        <div class="form-group" style="margin-top: var(--space-4);">
+          <label for="modalTemplate">Template</label>
+          <select id="modalTemplate">
+            <option value="firstNotice">First Notice</option>
+            <option value="followUp">Follow-up Reminder</option>
+            <option value="finalNotice">Final Notice</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeSendModal()">Cancel</button>
+        <button class="btn btn-primary" id="modalSendBtn" onclick="sendSingleBill()">Send Bill</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Store password for API calls
+    var APP_PASSWORD = '<?!= password ?>';
+    var currentSettings = null;
+    var currentCustomers = [];
+    var selectedCustomerRow = null;
+
+    // Initialize on load
+    document.addEventListener('DOMContentLoaded', function() {
+      loadDashboard();
+      loadSettings();
+      loadCredentialStatus();
+    });
+
+    // XSS-safe text escaping function
+    function escapeHtml(text) {
+      if (!text) return '';
+      var div = document.createElement('div');
+      div.textContent = String(text);
+      return div.textContent;
+    }
+
+    // Safe DOM manipulation helper - sets text content only
+    function setTextContent(elementId, text) {
+      var el = document.getElementById(elementId);
+      if (el) el.textContent = text;
+    }
+
+    // Server call helper
+    function serverCall(action, payload) {
+      return new Promise(function(resolve, reject) {
+        var handlers = {
+          'getCustomers': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getCustomersForWeb_(); },
+          'getCustomerStats': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getCustomerStatsForWeb_(); },
+          'getSettings': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getSettingsForUI(); },
+          'saveSettings': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).saveSettingsFromUI(payload); },
+          'sendBills': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).sendBillsForWeb_(payload); },
+          'sendSingleBill': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).sendSingleBillForWeb_(payload); },
+          'clearStatuses': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).clearAllStatusesForWeb_(); },
+          'saveCredentials': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).saveCredentialsForWeb_(payload); },
+          'testCredentials': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).testTwilioCredentialsFromSettings(); },
+          'getCredentialStatus': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getCredentialStatusForWeb_(); }
+        };
+        if (handlers[action]) handlers[action]();
+        else reject(new Error('Unknown action: ' + action));
+      });
+    }
+
+    // Tab Navigation
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab').forEach(function(tab) {
+        tab.classList.toggle('active', tab.dataset.tab === tabName);
+      });
+      document.querySelectorAll('.tab-panel').forEach(function(panel) {
+        panel.classList.remove('active');
+      });
+      document.getElementById('panel-' + tabName).classList.add('active');
+    }
+
+    // Dashboard
+    function loadDashboard() {
+      loadStats();
+      loadCustomers();
+    }
+
+    function loadStats() {
+      serverCall('getCustomerStats').then(function(result) {
+        if (result.success) {
+          var stats = result.data;
+          setTextContent('statTotal', stats.total);
+          setTextContent('statUnpaid', stats.unpaid);
+          setTextContent('statPaid', stats.paid);
+          setTextContent('statBalance', '$' + stats.unpaidBalance.toFixed(2));
+        }
+      }).catch(function(err) { console.error('Failed to load stats:', err); });
+    }
+
+    function loadCustomers() {
+      var container = document.getElementById('customersTable');
+      // Clear and show loading - safe DOM manipulation
+      while (container.firstChild) container.removeChild(container.firstChild);
+      var loadingDiv = document.createElement('div');
+      loadingDiv.className = 'loading';
+      var spinner = document.createElement('div');
+      spinner.className = 'spinner';
+      loadingDiv.appendChild(spinner);
+      loadingDiv.appendChild(document.createTextNode('Loading customers...'));
+      container.appendChild(loadingDiv);
+
+      serverCall('getCustomers').then(function(result) {
+        if (result.success) {
+          currentCustomers = result.data;
+          renderCustomersTable(result.data);
+        } else {
+          showTableError(container, result.error || 'Failed to load customers');
+        }
+      }).catch(function(err) {
+        showTableError(container, 'Error: ' + err.message);
+      });
+    }
+
+    function showTableError(container, message) {
+      while (container.firstChild) container.removeChild(container.firstChild);
+      var alertDiv = document.createElement('div');
+      alertDiv.className = 'alert alert-error';
+      alertDiv.textContent = message;
+      container.appendChild(alertDiv);
+    }
+
+    function refreshCustomers() { loadDashboard(); }
+
+    function renderCustomersTable(customers) {
+      var container = document.getElementById('customersTable');
+      while (container.firstChild) container.removeChild(container.firstChild);
+
+      if (!customers || customers.length === 0) {
+        var p = document.createElement('p');
+        p.style.color = 'var(--color-text-secondary)';
+        p.textContent = 'No customers found.';
+        container.appendChild(p);
+        return;
+      }
+
+      var table = document.createElement('table');
+      var thead = document.createElement('thead');
+      var headerRow = document.createElement('tr');
+      ['Name', 'Phone', 'Balance', 'Due Date', 'Payment', 'Status', 'Actions'].forEach(function(h) {
+        var th = document.createElement('th');
+        th.textContent = h;
+        headerRow.appendChild(th);
+      });
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      var tbody = document.createElement('tbody');
+      customers.forEach(function(c) {
+        var tr = document.createElement('tr');
+
+        var tdName = document.createElement('td');
+        tdName.textContent = c.name;
+        tr.appendChild(tdName);
+
+        var tdPhone = document.createElement('td');
+        tdPhone.textContent = c.phone;
+        tr.appendChild(tdPhone);
+
+        var tdBalance = document.createElement('td');
+        tdBalance.textContent = c.formattedBalance;
+        tr.appendChild(tdBalance);
+
+        var tdDate = document.createElement('td');
+        tdDate.textContent = c.month || c.dueDate;
+        tr.appendChild(tdDate);
+
+        var tdPayment = document.createElement('td');
+        var paymentBadge = document.createElement('span');
+        paymentBadge.className = 'status-badge ' + (String(c.paymentStatus).toLowerCase() === 'paid' ? 'paid' : 'unpaid');
+        paymentBadge.textContent = c.paymentStatus || 'Unknown';
+        tdPayment.appendChild(paymentBadge);
+        tr.appendChild(tdPayment);
+
+        var tdStatus = document.createElement('td');
+        var statusText = c.messageStatus || '-';
+        if (statusText.toLowerCase().includes('sent') || statusText.toLowerCase().includes('error')) {
+          var statusBadge = document.createElement('span');
+          statusBadge.className = 'status-badge ' + (statusText.toLowerCase().includes('error') ? 'error' : 'sent');
+          statusBadge.textContent = statusText.substring(0, 30);
+          tdStatus.appendChild(statusBadge);
+        } else {
+          tdStatus.textContent = statusText.substring(0, 30);
+        }
+        tr.appendChild(tdStatus);
+
+        var tdActions = document.createElement('td');
+        var btn = document.createElement('button');
+        btn.className = 'btn btn-secondary';
+        btn.style.cssText = 'padding: 4px 8px; font-size: 12px;';
+        btn.textContent = 'Send';
+        btn.onclick = (function(rowIndex) { return function() { openSendModal(rowIndex); }; })(c.rowIndex);
+        tdActions.appendChild(btn);
+        tr.appendChild(tdActions);
+
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      container.appendChild(table);
+    }
+
+    // Send Bills
+    function toggleDateInput() {
+      var filter = document.getElementById('sendFilter').value;
+      document.getElementById('dueDateGroup').style.display = filter === 'byDate' ? 'block' : 'none';
+    }
+
+    function showAlert(containerId, type, message) {
+      var container = document.getElementById(containerId);
+      while (container.firstChild) container.removeChild(container.firstChild);
+      var alertDiv = document.createElement('div');
+      alertDiv.className = 'alert alert-' + type;
+      alertDiv.textContent = message;
+      container.appendChild(alertDiv);
+    }
+
+    function sendBills() {
+      var btn = document.getElementById('sendBillsBtn');
+      var filter = document.getElementById('sendFilter').value;
+      var dueDate = document.getElementById('dueDate').value;
+      var templateType = document.getElementById('templateType').value;
+      var dryRun = document.getElementById('dryRunCheckbox').checked;
+
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+      document.getElementById('sendAlert').textContent = '';
+
+      serverCall('sendBills', { filter: filter, dueDate: dueDate, templateType: templateType, dryRunMode: dryRun })
+        .then(function(result) {
+          btn.disabled = false;
+          btn.textContent = 'Send Bills';
+          if (result.success) {
+            var data = result.data;
+            var msg = 'Sent: ' + data.sentCount + ', Errors: ' + data.errorCount;
+            if (data.skippedCount > 0) msg += ', Skipped: ' + data.skippedCount;
+            if (data.dryRunMode) msg += ' (DRY RUN)';
+            showAlert('sendAlert', 'success', msg);
+            refreshCustomers();
+          } else {
+            showAlert('sendAlert', 'error', result.error || 'Failed to send bills');
+          }
+        })
+        .catch(function(err) {
+          btn.disabled = false;
+          btn.textContent = 'Send Bills';
+          showAlert('sendAlert', 'error', 'Error: ' + err.message);
+        });
+    }
+
+    function clearStatuses() {
+      if (!confirm('Are you sure you want to clear all message statuses?')) return;
+      serverCall('clearStatuses').then(function(result) {
+        if (result.success) {
+          alert('Cleared ' + result.data.clearedCount + ' statuses');
+          refreshCustomers();
+        } else {
+          alert('Error: ' + (result.error || 'Failed to clear statuses'));
+        }
+      }).catch(function(err) { alert('Error: ' + err.message); });
+    }
+
+    // Single Bill Modal
+    function openSendModal(rowIndex) {
+      selectedCustomerRow = rowIndex;
+      var customer = currentCustomers.find(function(c) { return c.rowIndex === rowIndex; });
+      if (customer) {
+        setTextContent('modalCustomerName', customer.name);
+        setTextContent('modalBalance', customer.formattedBalance);
+        document.getElementById('sendSingleModal').classList.add('visible');
+      }
+    }
+
+    function closeSendModal() {
+      document.getElementById('sendSingleModal').classList.remove('visible');
+      selectedCustomerRow = null;
+    }
+
+    function sendSingleBill() {
+      if (!selectedCustomerRow) return;
+      var btn = document.getElementById('modalSendBtn');
+      var templateType = document.getElementById('modalTemplate').value;
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+
+      serverCall('sendSingleBill', { rowIndex: selectedCustomerRow, templateType: templateType })
+        .then(function(result) {
+          btn.disabled = false;
+          btn.textContent = 'Send Bill';
+          closeSendModal();
+          if (result.success) {
+            var msg = 'Bill sent to ' + result.data.customerName;
+            if (result.data.dryRunMode) msg += ' (DRY RUN)';
+            alert(msg);
+            refreshCustomers();
+          } else {
+            alert('Error: ' + (result.error || 'Failed to send bill'));
+          }
+        })
+        .catch(function(err) {
+          btn.disabled = false;
+          btn.textContent = 'Send Bill';
+          alert('Error: ' + err.message);
+        });
+    }
+
+    // Credentials
+    function loadCredentialStatus() {
+      serverCall('getCredentialStatus').then(function(result) {
+        if (result.success) {
+          var data = result.data;
+          var statusDiv = document.getElementById('credentialStatus');
+          while (statusDiv.firstChild) statusDiv.removeChild(statusDiv.firstChild);
+          if (data.allSet) {
+            statusDiv.className = 'alert alert-success';
+            statusDiv.textContent = 'Credentials configured. SID: ' + data.maskedSid + ', Phone: ' + data.maskedPhone;
+          } else {
+            statusDiv.className = 'alert alert-warning';
+            statusDiv.textContent = 'Some credentials are not set. Please configure all fields.';
+          }
+          statusDiv.style.display = 'flex';
+        }
+      }).catch(function(err) { console.error('Failed to load credential status:', err); });
+    }
+
+    function saveCredentials() {
+      var sid = document.getElementById('accountSid').value.trim();
+      var token = document.getElementById('authToken').value.trim();
+      var phone = document.getElementById('twilioPhone').value.trim();
+
+      if (!sid && !token && !phone) {
+        showAlert('credentialAlert', 'warning', 'Please enter at least one credential to save.');
+        return;
+      }
+
+      serverCall('saveCredentials', { accountSid: sid || undefined, authToken: token || undefined, twilioPhone: phone || undefined })
+        .then(function(result) {
+          if (result.success) {
+            showAlert('credentialAlert', 'success', 'Credentials saved successfully!');
+            document.getElementById('accountSid').value = '';
+            document.getElementById('authToken').value = '';
+            document.getElementById('twilioPhone').value = '';
+            loadCredentialStatus();
+          } else {
+            showAlert('credentialAlert', 'error', result.error || 'Failed to save');
+          }
+        })
+        .catch(function(err) { showAlert('credentialAlert', 'error', 'Error: ' + err.message); });
+    }
+
+    function testCredentials() {
+      showAlert('credentialAlert', 'info', 'Testing connection...');
+      serverCall('testCredentials').then(function(result) {
+        if (result.success) {
+          showAlert('credentialAlert', 'success', 'Connection successful! Account: ' + result.accountName);
+        } else {
+          showAlert('credentialAlert', 'error', result.error || 'Connection failed');
+        }
+      }).catch(function(err) { showAlert('credentialAlert', 'error', 'Error: ' + err.message); });
+    }
+
+    // Settings
+    function loadSettings() {
+      serverCall('getSettings').then(function(result) {
+        if (result.settings) {
+          currentSettings = result.settings;
+          populateSettingsForm(result.settings);
+        }
+      }).catch(function(err) { console.error('Failed to load settings:', err); });
+    }
+
+    function populateSettingsForm(settings) {
+      document.getElementById('businessName').value = settings.business.name || '';
+      document.getElementById('etransferEmail').value = settings.business.etransferEmail || '';
+      document.getElementById('businessPhone').value = settings.business.phoneNumber || '';
+      document.getElementById('whatsappLink').value = settings.business.whatsappLink || '';
+      document.getElementById('batchSize').value = settings.behavior.batchSize || 75;
+      document.getElementById('messageDelay').value = settings.behavior.messageDelayMs || 1000;
+      document.getElementById('headerRow').value = settings.behavior.headerRowIndex || 1;
+      document.getElementById('dryRunMode').checked = settings.behavior.dryRunMode || false;
+      document.getElementById('dryRunCheckbox').checked = settings.behavior.dryRunMode || false;
+    }
+
+    function saveSettings() {
+      if (!currentSettings) {
+        showAlert('settingsAlert', 'error', 'Settings not loaded. Please refresh.');
+        return;
+      }
+      currentSettings.business.name = document.getElementById('businessName').value;
+      currentSettings.business.etransferEmail = document.getElementById('etransferEmail').value;
+      currentSettings.business.phoneNumber = document.getElementById('businessPhone').value;
+      currentSettings.business.whatsappLink = document.getElementById('whatsappLink').value;
+      currentSettings.behavior.batchSize = parseInt(document.getElementById('batchSize').value) || 75;
+      currentSettings.behavior.messageDelayMs = parseInt(document.getElementById('messageDelay').value) || 1000;
+      currentSettings.behavior.headerRowIndex = parseInt(document.getElementById('headerRow').value) || 1;
+      currentSettings.behavior.dryRunMode = document.getElementById('dryRunMode').checked;
+
+      serverCall('saveSettings', currentSettings).then(function(result) {
+        if (result.success) {
+          showAlert('settingsAlert', 'success', 'Settings saved successfully!');
+          document.getElementById('dryRunCheckbox').checked = currentSettings.behavior.dryRunMode;
+        } else {
+          showAlert('settingsAlert', 'error', result.error || 'Failed to save');
+        }
+      }).catch(function(err) { showAlert('settingsAlert', 'error', 'Error: ' + err.message); });
+    }
+
+    // Auth
+    function logout() {
+      var currentUrl = window.location.href.split('?')[0];
+      window.location.href = currentUrl;
+    }
+  </script>
+</body>
+</html>

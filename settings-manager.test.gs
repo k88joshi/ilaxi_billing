@@ -429,7 +429,7 @@ function test_validateSettings_missingBusiness() {
   const result = validateSettings(settings);
 
   TestRunner.assertFalse(result.valid, "Missing business should be invalid");
-  TestRunner.assertTrue(result.errors.some(e => e.includes("business")), "Should report business error");
+  TestRunner.assertTrue(result.errors.some(e => e.message && e.message.toLowerCase().includes("business")), "Should report business error");
 }
 
 function test_validateSettings_invalidEmail() {
@@ -438,7 +438,7 @@ function test_validateSettings_invalidEmail() {
   const result = validateSettings(settings);
 
   TestRunner.assertFalse(result.valid, "Invalid email should be invalid");
-  TestRunner.assertTrue(result.errors.some(e => e.includes("email")), "Should report email error");
+  TestRunner.assertTrue(result.errors.some(e => e.message && e.message.toLowerCase().includes("email")), "Should report email error");
 }
 
 function test_validateSettings_businessNameTooLong() {
@@ -907,6 +907,162 @@ function test_integration_thankYouTemplateProcessing() {
 }
 
 // ========================================
+// AUTO-DETECT COLUMNS TESTS
+// ========================================
+
+function test_normalizeHeader_basicNormalization() {
+  Logger.log("Testing normalizeHeader - basic normalization...");
+
+  TestRunner.assertEqual(normalizeHeader("Phone Number"), "phone number", "Should lowercase and preserve spaces");
+  TestRunner.assertEqual(normalizeHeader("  Customer Name  "), "customer name", "Should trim whitespace");
+  TestRunner.assertEqual(normalizeHeader("Order_ID"), "orderid", "Should remove underscores");
+  TestRunner.assertEqual(normalizeHeader("Phone #"), "phone", "Should remove special characters");
+  TestRunner.assertEqual(normalizeHeader(""), "", "Should handle empty string");
+  TestRunner.assertEqual(normalizeHeader(null), "", "Should handle null");
+}
+
+function test_calculateMatchScore_exactMatch() {
+  Logger.log("Testing calculateMatchScore - exact match...");
+
+  const synonyms = ["phone", "mobile", "cell"];
+  TestRunner.assertEqual(calculateMatchScore("Phone", synonyms), 100, "Exact match (case insensitive) should be 100");
+  TestRunner.assertEqual(calculateMatchScore("phone", synonyms), 100, "Exact match should be 100");
+}
+
+function test_calculateMatchScore_startsWithMatch() {
+  Logger.log("Testing calculateMatchScore - starts with match...");
+
+  const synonyms = ["phone"];
+  TestRunner.assertEqual(calculateMatchScore("Phone Number", synonyms), 90, "Header starting with synonym should be 90");
+}
+
+function test_calculateMatchScore_containsMatch() {
+  Logger.log("Testing calculateMatchScore - contains match...");
+
+  const synonyms = ["phone"];
+  TestRunner.assertEqual(calculateMatchScore("Customer Phone", synonyms), 80, "Header containing synonym should be 80");
+}
+
+function test_calculateMatchScore_wordMatch() {
+  Logger.log("Testing calculateMatchScore - word boundary match...");
+
+  const synonyms = ["name"];
+  const score = calculateMatchScore("Customer Name", synonyms);
+  TestRunner.assertTrue(score >= 70, "Word boundary match should be at least 70");
+}
+
+function test_calculateMatchScore_noMatch() {
+  Logger.log("Testing calculateMatchScore - no match...");
+
+  const synonyms = ["phone", "mobile"];
+  TestRunner.assertEqual(calculateMatchScore("Customer Name", synonyms), 0, "Non-matching header should be 0");
+}
+
+function test_validateSettings_errorsHaveFieldAndTab() {
+  Logger.log("Testing validateSettings - errors include field and tab info...");
+
+  const settings = getDefaultSettings();
+  settings.business.etransferEmail = "invalid-email";
+
+  const result = validateSettings(settings);
+
+  TestRunner.assertFalse(result.valid, "Should be invalid with bad email");
+  TestRunner.assertTrue(result.errors.length > 0, "Should have errors");
+
+  // Check that errors have the new structure
+  const emailError = result.errors.find(e => e.field === "etransferEmail");
+  TestRunner.assertTrue(emailError !== undefined, "Should have an error for etransferEmail field");
+  TestRunner.assertEqual(emailError.tab, "business", "Error should include tab information");
+}
+
+// ========================================
+// TWILIO CREDENTIAL TESTS (mocked)
+// ========================================
+
+function test_testTwilioCredentials_invalidAccountSidFormat() {
+  Logger.log("Testing testTwilioCredentials - invalid Account SID format...");
+
+  const result = testTwilioCredentials("INVALID_SID", "token123", "+15551234567");
+
+  TestRunner.assertFalse(result.success, "Should fail with invalid SID format");
+  TestRunner.assertEqual(result.errorCode, "INVALID_CREDENTIALS", "Should return INVALID_CREDENTIALS error code");
+}
+
+function test_testTwilioCredentials_missingCredentials() {
+  Logger.log("Testing testTwilioCredentials - missing credentials...");
+
+  const result1 = testTwilioCredentials("", "token", "+15551234567");
+  TestRunner.assertFalse(result1.success, "Should fail without Account SID");
+
+  const result2 = testTwilioCredentials("ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX", "", "+15551234567");
+  TestRunner.assertFalse(result2.success, "Should fail without Auth Token");
+}
+
+// ========================================
+// FIRST-TIME SETUP TESTS
+// ========================================
+
+function test_isFirstTimeSetup_noCredentials() {
+  Logger.log("Testing isFirstTimeSetup - no credentials...");
+
+  // Backup and clear properties for test
+  const props = PropertiesService.getUserProperties();
+  const backupSid = props.getProperty("TWILIO_ACCOUNT_SID");
+  const backupSetup = props.getProperty("SETUP_COMPLETED");
+
+  props.deleteProperty("TWILIO_ACCOUNT_SID");
+  props.deleteProperty("SETUP_COMPLETED");
+
+  const result = isFirstTimeSetup();
+  TestRunner.assertTrue(result.isFirstTime, "Should be first time when no credentials and no setup flag");
+
+  // Restore
+  if (backupSid) props.setProperty("TWILIO_ACCOUNT_SID", backupSid);
+  if (backupSetup) props.setProperty("SETUP_COMPLETED", backupSetup);
+}
+
+function test_isFirstTimeSetup_hasCredentials() {
+  Logger.log("Testing isFirstTimeSetup - has credentials...");
+
+  const props = PropertiesService.getUserProperties();
+  const backupSid = props.getProperty("TWILIO_ACCOUNT_SID");
+
+  props.setProperty("TWILIO_ACCOUNT_SID", "ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
+
+  const result = isFirstTimeSetup();
+  TestRunner.assertFalse(result.isFirstTime, "Should not be first time when credentials exist");
+
+  // Restore
+  if (backupSid) {
+    props.setProperty("TWILIO_ACCOUNT_SID", backupSid);
+  } else {
+    props.deleteProperty("TWILIO_ACCOUNT_SID");
+  }
+}
+
+function test_isFirstTimeSetup_setupCompleted() {
+  Logger.log("Testing isFirstTimeSetup - setup completed flag...");
+
+  const props = PropertiesService.getUserProperties();
+  const backupSetup = props.getProperty("SETUP_COMPLETED");
+  const backupSid = props.getProperty("TWILIO_ACCOUNT_SID");
+
+  props.deleteProperty("TWILIO_ACCOUNT_SID");
+  props.setProperty("SETUP_COMPLETED", "2024-01-01T00:00:00.000Z");
+
+  const result = isFirstTimeSetup();
+  TestRunner.assertFalse(result.isFirstTime, "Should not be first time when setup completed flag exists");
+
+  // Restore
+  if (backupSetup) {
+    props.setProperty("SETUP_COMPLETED", backupSetup);
+  } else {
+    props.deleteProperty("SETUP_COMPLETED");
+  }
+  if (backupSid) props.setProperty("TWILIO_ACCOUNT_SID", backupSid);
+}
+
+// ========================================
 // MAIN TEST RUNNER
 // ========================================
 
@@ -1018,6 +1174,26 @@ function runAllSettingsManagerTests() {
     // Integration tests
     test_integration_fullTemplateProcessing();
     test_integration_thankYouTemplateProcessing();
+
+    // Auto-detect columns tests
+    test_normalizeHeader_basicNormalization();
+    test_calculateMatchScore_exactMatch();
+    test_calculateMatchScore_startsWithMatch();
+    test_calculateMatchScore_containsMatch();
+    test_calculateMatchScore_wordMatch();
+    test_calculateMatchScore_noMatch();
+
+    // Validation error structure tests
+    test_validateSettings_errorsHaveFieldAndTab();
+
+    // Twilio credential tests
+    test_testTwilioCredentials_invalidAccountSidFormat();
+    test_testTwilioCredentials_missingCredentials();
+
+    // First-time setup tests
+    test_isFirstTimeSetup_noCredentials();
+    test_isFirstTimeSetup_hasCredentials();
+    test_isFirstTimeSetup_setupCompleted();
   } finally {
     // Teardown - always restore settings even if tests fail
     TestIsolation.teardown();
