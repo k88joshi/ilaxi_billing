@@ -17,20 +17,14 @@ function doGet(e) {
     // Password valid - serve main app
     const template = HtmlService.createTemplateFromFile('webapp-main');
     template.password = password; // Pass password for API calls
-    return template.evaluate()
-      .setTitle('Ilaxi Billing')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY)
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    return createHtmlOutput_(template, 'Ilaxi Billing');
   }
 
   // No valid password - serve login page
   const errorParam = e?.parameter?.error;
   const template = HtmlService.createTemplateFromFile('login');
   template.errorMessage = errorParam === '1' ? 'Invalid password. Please try again.' : '';
-  return template.evaluate()
-    .setTitle('Login - Ilaxi Billing')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  return createHtmlOutput_(template, 'Login - Ilaxi Billing');
 }
 
 /**
@@ -153,6 +147,28 @@ function getWebAppUrl() {
   } catch (e) {
     return 'Web app not deployed yet. Deploy via Publish > Deploy as web app.';
   }
+}
+
+/**
+ * Creates the HTML output with standard settings.
+ * Safely handles XFrameOptionsMode to avoid null errors.
+ *
+ * @param {HtmlTemplate} template - The template to evaluate
+ * @param {string} title - The page title
+ * @returns {HtmlOutput} The configured HTML output
+ * @private
+ */
+function createHtmlOutput_(template, title) {
+  const output = template.evaluate()
+    .setTitle(title)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+
+  // Safely set XFrameOptionsMode if available
+  if (HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.DENY != null) {
+    output.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+  }
+
+  return output;
 }
 
 /**
