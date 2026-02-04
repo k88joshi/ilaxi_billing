@@ -12,6 +12,105 @@
  */
 function doGet(e) {
   try {
+    // Debug mode: add ?debug=1 to URL to test basic server response
+    if (e?.parameter?.debug === '1') {
+      const debugInfo = {
+        timestamp: new Date().toISOString(),
+        hasPassword: !!PropertiesService.getScriptProperties().getProperty(APP_PASSWORD_KEY),
+        spreadsheetId: SPREADSHEET_ID,
+        spreadsheetConfigured: SPREADSHEET_ID !== 'YOUR_SPREADSHEET_ID_HERE'
+      };
+      return HtmlService.createHtmlOutput(
+        '<html><body style="font-family:monospace;padding:20px;">' +
+        '<h1>Debug Info</h1>' +
+        '<pre>' + JSON.stringify(debugInfo, null, 2) + '</pre>' +
+        '<p>If you see this, server-side is working!</p>' +
+        '</body></html>'
+      ).setTitle('Debug');
+    }
+
+    // Debug mode 2: test template evaluation with a fake password
+    if (e?.parameter?.debug === '2') {
+      try {
+        const template = HtmlService.createTemplateFromFile('webapp-main');
+        template.password = 'test123'; // Safe test password
+        const evaluated = template.evaluate();
+        const content = evaluated.getContent();
+        return HtmlService.createHtmlOutput(
+          '<html><body style="font-family:monospace;padding:20px;">' +
+          '<h1>Template Evaluation: SUCCESS</h1>' +
+          '<p>Template evaluated successfully. Length: ' + content.length + ' chars</p>' +
+          '<p>First 500 chars:</p>' +
+          '<pre style="background:#f0f0f0;padding:10px;overflow:auto;">' +
+          content.substring(0, 500).replace(/</g, '&lt;').replace(/>/g, '&gt;') +
+          '</pre>' +
+          '</body></html>'
+        ).setTitle('Debug 2');
+      } catch (err) {
+        return HtmlService.createHtmlOutput(
+          '<html><body style="font-family:monospace;padding:20px;color:red;">' +
+          '<h1>Template Evaluation: FAILED</h1>' +
+          '<p><strong>Error:</strong> ' + err.toString() + '</p>' +
+          '<p><strong>Stack:</strong></p><pre>' + err.stack + '</pre>' +
+          '</body></html>'
+        ).setTitle('Debug 2 - Error');
+      }
+    }
+
+    // Debug mode 4: exact same code path as normal login - serves actual webapp-main
+    if (e?.parameter?.debug === '4' && e?.parameter?.p) {
+      if (validatePassword_(e.parameter.p)) {
+        const template = HtmlService.createTemplateFromFile('webapp-main');
+        template.password = e.parameter.p;
+        return createHtmlOutput_(template, 'Ilaxi Billing - Debug 4');
+      } else {
+        return HtmlService.createHtmlOutput('<h1>Invalid password for debug=4</h1>');
+      }
+    }
+
+    // Debug mode 5: serve webapp-main WITHOUT going through createHtmlOutput_
+    if (e?.parameter?.debug === '5' && e?.parameter?.p) {
+      if (validatePassword_(e.parameter.p)) {
+        const template = HtmlService.createTemplateFromFile('webapp-main');
+        template.password = e.parameter.p;
+        // Direct evaluate without the helper function
+        return template.evaluate().setTitle('Ilaxi Billing - Debug 5');
+      } else {
+        return HtmlService.createHtmlOutput('<h1>Invalid password for debug=5</h1>');
+      }
+    }
+
+    // Debug mode 3: test with actual password from URL
+    if (e?.parameter?.debug === '3' && e?.parameter?.p) {
+      try {
+        const template = HtmlService.createTemplateFromFile('webapp-main');
+        template.password = e.parameter.p;
+        const evaluated = template.evaluate();
+        const content = evaluated.getContent();
+        // Show the part around APP_PASSWORD to check for issues
+        const pwIndex = content.indexOf('APP_PASSWORD');
+        const snippet = pwIndex > -1 ? content.substring(Math.max(0, pwIndex - 50), pwIndex + 200) : 'APP_PASSWORD not found';
+        return HtmlService.createHtmlOutput(
+          '<html><body style="font-family:monospace;padding:20px;">' +
+          '<h1>Template with Real Password: SUCCESS</h1>' +
+          '<p>Length: ' + content.length + ' chars</p>' +
+          '<p>APP_PASSWORD section:</p>' +
+          '<pre style="background:#f0f0f0;padding:10px;overflow:auto;">' +
+          snippet.replace(/</g, '&lt;').replace(/>/g, '&gt;') +
+          '</pre>' +
+          '</body></html>'
+        ).setTitle('Debug 3');
+      } catch (err) {
+        return HtmlService.createHtmlOutput(
+          '<html><body style="font-family:monospace;padding:20px;color:red;">' +
+          '<h1>Template with Real Password: FAILED</h1>' +
+          '<p><strong>Error:</strong> ' + err.toString() + '</p>' +
+          '<p><strong>Stack:</strong></p><pre>' + err.stack + '</pre>' +
+          '</body></html>'
+        ).setTitle('Debug 3 - Error');
+      }
+    }
+
     const password = e?.parameter?.p;
 
     if (validatePassword_(password)) {
