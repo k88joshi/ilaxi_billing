@@ -11,20 +11,24 @@
  * @returns {HtmlOutput} HTML page to display
  */
 function doGet(e) {
-  const password = e?.parameter?.p;
+  try {
+    const password = e?.parameter?.p;
 
-  if (validatePassword_(password)) {
-    // Password valid - serve main app
-    const template = HtmlService.createTemplateFromFile('webapp-main');
-    template.password = password; // Pass password for API calls
-    return createHtmlOutput_(template, 'Ilaxi Billing');
+    if (validatePassword_(password)) {
+      // Password valid - serve main app
+      const template = HtmlService.createTemplateFromFile('webapp-main');
+      template.password = password; // Pass password for API calls
+      return createHtmlOutput_(template, 'Ilaxi Billing');
+    }
+
+    // No valid password - serve login page
+    // Show error if password was provided but invalid
+    const template = HtmlService.createTemplateFromFile('login');
+    template.errorMessage = password ? 'Invalid password. Please try again.' : '';
+    return createHtmlOutput_(template, 'Login - Ilaxi Billing');
+  } catch (error) {
+    return ContentService.createTextOutput('Server Error: ' + error.toString() + '\nStack: ' + error.stack);
   }
-
-  // No valid password - serve login page
-  // Show error if password was provided but invalid
-  const template = HtmlService.createTemplateFromFile('login');
-  template.errorMessage = password ? 'Invalid password. Please try again.' : '';
-  return createHtmlOutput_(template, 'Login - Ilaxi Billing');
 }
 
 /**

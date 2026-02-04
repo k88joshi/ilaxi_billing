@@ -4,6 +4,17 @@
   <base target="_top">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>
+    window.onerror = function(msg, url, line, col, error) {
+      document.body.innerHTML = '<div style="color:red; padding:20px; font-family:monospace; background:#fee;">' +
+        '<h1>Startup Error</h1>' +
+        '<p><strong>Message:</strong> ' + msg + '</p>' +
+        '<p><strong>Line:</strong> ' + line + '</p>' +
+        '<p><strong>Error:</strong> ' + (error ? error.stack : 'N/A') + '</p>' +
+        '</div>';
+      return false;
+    };
+  </script>
   <style>
     /* ============================================
        CSS Custom Properties - Design Tokens
