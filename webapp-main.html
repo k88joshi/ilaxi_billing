@@ -656,16 +656,16 @@
     function serverCall(action, payload) {
       return new Promise(function(resolve, reject) {
         var handlers = {
-          'getCustomers': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getCustomersForWeb_(); },
-          'getCustomerStats': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getCustomerStatsForWeb_(); },
+          'getCustomers': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getCustomersForWeb(); },
+          'getCustomerStats': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getCustomerStatsForWeb(); },
           'getSettings': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getSettingsForUI(); },
           'saveSettings': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).saveSettingsFromUI(payload); },
-          'sendBills': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).sendBillsForWeb_(payload); },
-          'sendSingleBill': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).sendSingleBillForWeb_(payload); },
-          'clearStatuses': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).clearAllStatusesForWeb_(); },
-          'saveCredentials': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).saveCredentialsForWeb_(payload); },
+          'sendBills': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).sendBillsForWeb(payload); },
+          'sendSingleBill': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).sendSingleBillForWeb(payload); },
+          'clearStatuses': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).clearAllStatusesForWeb(); },
+          'saveCredentials': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).saveCredentialsForWeb(payload); },
           'testCredentials': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).testTwilioCredentialsFromSettings(); },
-          'getCredentialStatus': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getCredentialStatusForWeb_(); }
+          'getCredentialStatus': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getCredentialStatusForWeb(); }
         };
         if (handlers[action]) handlers[action]();
         else reject(new Error('Unknown action: ' + action));
