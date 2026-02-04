@@ -50,6 +50,23 @@ This project uses `clasp` for local development.
     2.  Use the **Test with First Unpaid Row** menu option.
     3.  Check the `Execution Log` and the `Message Status` column (entries will be prefixed with `[DRY RUN]`).
 
+### Web App Password Setup
+
+To set the password for web app login (one-time setup):
+
+1.  Open Apps Script editor (`clasp open-script` or Extensions > Apps Script).
+2.  Add a temporary function to any `.gs` file:
+    ```javascript
+    function setupPassword() {
+      setAppPassword("your-password-here");
+    }
+    ```
+3.  Select `setupPassword` from the function dropdown and click **Run**.
+4.  Check the execution log for "App password set successfully".
+5.  Delete the `setupPassword` function (don't leave password in code).
+
+Related functions in `webapp.gs`: `hasAppPassword()`, `clearAppPassword()`.
+
 ## Coding Conventions & Best Practices
 
 1.  **Variable Declaration:** Use `const` and `let`. Avoid `var`.
