@@ -216,7 +216,7 @@
       <p>Enter your password to continue</p>
     </div>
 
-    <form class="login-form" id="loginForm" onsubmit="handleLogin(event)">
+    <form class="login-form" id="loginForm" method="GET" onsubmit="return handleLogin(event)">
       <div class="error-message" id="errorMessage">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -230,7 +230,7 @@
           <input
             type="password"
             id="password"
-            name="password"
+            name="p"
             placeholder="Enter your password"
             autocomplete="current-password"
             required
@@ -296,35 +296,23 @@
     }
 
     function handleLogin(event) {
-      event.preventDefault();
-
       var password = document.getElementById('password').value;
       var submitBtn = document.getElementById('submitBtn');
 
       if (!password) {
+        event.preventDefault();
         showError('Please enter a password');
-        return;
+        return false;
       }
 
       hideError();
       submitBtn.disabled = true;
       submitBtn.textContent = 'Signing in...';
 
-      // Get the current URL base and redirect with password parameter
-      var currentUrl = window.location.href.split('?')[0];
-      var redirectUrl = currentUrl + '?p=' + encodeURIComponent(password);
-
-      // Redirect to the same page with password parameter
-      // The doGet function will validate and serve the main app or show error
-      window.location.href = redirectUrl;
+      // Let the form submit naturally with GET method
+      // Form will submit to same URL with ?p=PASSWORD
+      return true;
     }
-
-    // Handle form submission on Enter key
-    document.getElementById('password').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') {
-        handleLogin(e);
-      }
-    });
   </script>
 </body>
 </html>
