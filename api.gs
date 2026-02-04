@@ -27,20 +27,20 @@ function handleApiRequest_(action, payload, password) {
 
       // Customer data
       case 'getCustomers':
-        return getCustomersForWeb_();
+        return getCustomersForWeb();
 
       case 'getCustomerStats':
-        return getCustomerStatsForWeb_();
+        return getCustomerStatsForWeb();
 
       // Billing actions
       case 'sendBills':
-        return sendBillsForWeb_(payload);
+        return sendBillsForWeb(payload);
 
       case 'sendSingleBill':
-        return sendSingleBillForWeb_(payload);
+        return sendSingleBillForWeb(payload);
 
       case 'clearStatuses':
-        return clearAllStatusesForWeb_();
+        return clearAllStatusesForWeb();
 
       // Settings
       case 'getSettings':
@@ -57,10 +57,10 @@ function handleApiRequest_(action, payload, password) {
         return testTwilioCredentialsFromSettings();
 
       case 'saveCredentials':
-        return saveCredentialsForWeb_(payload);
+        return saveCredentialsForWeb(payload);
 
       case 'getCredentialStatus':
-        return getCredentialStatusForWeb_();
+        return getCredentialStatusForWeb();
 
       // Template preview
       case 'previewTemplate':
@@ -89,7 +89,7 @@ function handleApiRequest_(action, payload, password) {
  * @returns {Object} Result with customers array
  * @private
  */
-function getCustomersForWeb_() {
+function getCustomersForWeb() {
   try {
     const sheet = getTargetSheet_();
     const settings = getSettings();
@@ -154,9 +154,9 @@ function getCustomersForWeb_() {
  * @returns {Object} Stats including counts and totals
  * @private
  */
-function getCustomerStatsForWeb_() {
+function getCustomerStatsForWeb() {
   try {
-    const result = getCustomersForWeb_();
+    const result = getCustomersForWeb();
     if (!result.success) return result;
 
     const customers = result.data;
@@ -209,7 +209,7 @@ function getCustomerStatsForWeb_() {
  * @returns {Object} Result with sent/error counts
  * @private
  */
-function sendBillsForWeb_(payload) {
+function sendBillsForWeb(payload) {
   try {
     // Ensure credentials are loaded
     if (!checkCredentials(true)) {
@@ -335,7 +335,7 @@ function sendBillsForWeb_(payload) {
  * @returns {Object} Result
  * @private
  */
-function sendSingleBillForWeb_(payload) {
+function sendSingleBillForWeb(payload) {
   try {
     if (!checkCredentials(true)) {
       return { success: false, error: 'Twilio credentials not configured' };
@@ -415,7 +415,7 @@ function sendSingleBillForWeb_(payload) {
  * @returns {Object} Result
  * @private
  */
-function clearAllStatusesForWeb_() {
+function clearAllStatusesForWeb() {
   try {
     const settings = getSettings();
     const cols = settings.columns;
@@ -464,7 +464,7 @@ function clearAllStatusesForWeb_() {
  * @returns {Object} Result
  * @private
  */
-function saveCredentialsForWeb_(payload) {
+function saveCredentialsForWeb(payload) {
   try {
     const props = PropertiesService.getScriptProperties();
 
@@ -492,7 +492,7 @@ function saveCredentialsForWeb_(payload) {
  * @returns {Object} Credential status
  * @private
  */
-function getCredentialStatusForWeb_() {
+function getCredentialStatusForWeb() {
   try {
     const props = PropertiesService.getScriptProperties();
     const sid = props.getProperty('TWILIO_ACCOUNT_SID');
