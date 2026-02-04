@@ -77,7 +77,18 @@ jobs:
       - name: Install clasp
         run: npm install -g @google/clasp
 
-      - name: Setup clasp credentials
+      - name: Inject spreadsheet ID
+        env:
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+        run: |
+          if [ -n "$SPREADSHEET_ID" ]; then
+            sed -i "s/YOUR_SPREADSHEET_ID_HERE/$SPREADSHEET_ID/g" spreadsheet.gs
+            echo "Injected SPREADSHEET_ID into spreadsheet.gs"
+          else
+            echo "Warning: SPREADSHEET_ID secret not configured - web app mode will not work"
+          fi
+
+      - name: Deploy to Apps Script
         env:
           CLASP_TOKEN: ${{ secrets.CLASP_TOKEN }}
         run: |

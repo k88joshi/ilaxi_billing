@@ -83,7 +83,14 @@ return { success: false, error: "Error message" };
 
 GitHub Actions on push to master:
 1. **Lint**: ESLint syntax check on all `.gs` files
-2. **Deploy**: Auto-push via CLASP (requires `CLASP_TOKEN` secret)
+2. **Inject secrets**: Replaces `SPREADSHEET_ID` placeholder before deploy
+3. **Deploy**: Auto-push via CLASP
+
+### Required GitHub Secrets
+| Secret | Purpose |
+|--------|---------|
+| `CLASP_TOKEN` | Contents of `~/.clasprc.json` for CLASP authentication |
+| `SPREADSHEET_ID` | Google Sheet ID for web app mode (from URL: `/d/{ID}/edit`) |
 
 ## Web App Password Setup
 
