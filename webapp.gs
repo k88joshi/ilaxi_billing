@@ -164,8 +164,8 @@ function createHtmlOutput_(template, title) {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 
   // Safely set XFrameOptionsMode if available
-  if (HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.DENY != null) {
-    output.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+  if (HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.ALLOWALL != null) {
+    output.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }
 
   return output;

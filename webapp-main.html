@@ -626,7 +626,7 @@
 
   <script>
     // Store password for API calls
-    var APP_PASSWORD = '<?!= password ?>';
+    var APP_PASSWORD = <?!= JSON.stringify(password) ?>;
     var currentSettings = null;
     var currentCustomers = [];
     var selectedCustomerRow = null;
