@@ -21,9 +21,9 @@ function doGet(e) {
   }
 
   // No valid password - serve login page
-  const errorParam = e?.parameter?.error;
+  // Show error if password was provided but invalid
   const template = HtmlService.createTemplateFromFile('login');
-  template.errorMessage = errorParam === '1' ? 'Invalid password. Please try again.' : '';
+  template.errorMessage = password ? 'Invalid password. Please try again.' : '';
   return createHtmlOutput_(template, 'Login - Ilaxi Billing');
 }
 
