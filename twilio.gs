@@ -219,27 +219,34 @@ function sendTwilioMessage_(formattedPhone, message, messageType, customerName, 
  * @param {Date|string} dueDate - The due date or month (raw from sheet).
  * @param {string} [templateType="firstNotice"] - Template type: "firstNotice", "followUp", or "finalNotice".
  * @param {boolean} [dryRunMode] - If defined, overrides settings.behavior.dryRunMode for this send.
+ * @param {Object} [settings] - Pre-loaded settings object. Fetched via getSettings() if not provided.
  * @returns {Object} Result object with success, status, and color properties.
  */
-function sendBill_(customerPhone, customerName, balance, numTiffins, dueDate, templateType, dryRunMode) {
-  const settings = getSettings();
-  if (dryRunMode !== undefined) {
-    settings.behavior.dryRunMode = dryRunMode;
+function sendBill_(customerPhone, customerName, balance, numTiffins, dueDate, templateType, dryRunMode, settings) {
+  if (!settings) {
+    settings = getSettings();
   }
 
-  // Ensure credentials are loaded (silent check since calling functions should have validated already)
-  if (!checkCredentials(true)) {
-    Logger.log(`ERROR: Cannot send bill to ${customerName}. Twilio credentials not set.`);
-    return { success: false, status: "Error: Twilio credentials not set", color: settings.colors.error };
+  // Use shallow copy of behavior if dryRunMode override differs, to avoid mutating shared settings
+  const effectiveSettings = (dryRunMode !== undefined && dryRunMode !== settings.behavior.dryRunMode)
+    ? { ...settings, behavior: { ...settings.behavior, dryRunMode: dryRunMode } }
+    : settings;
+
+  // Fast in-memory credential check; only call checkCredentials() if globals are empty
+  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
+    if (!checkCredentials(true)) {
+      Logger.log(`ERROR: Cannot send bill to ${customerName}. Twilio credentials not set.`);
+      return { success: false, status: "Error: Twilio credentials not set", color: effectiveSettings.colors.error };
+    }
   }
 
-  const template = getBillTemplate(templateType || "firstNotice", settings);
+  const template = getBillTemplate(templateType || "firstNotice", effectiveSettings);
 
   const formattedPhone = formatPhoneNumber(customerPhone);
   if (!formattedPhone) {
     const errorMsg = "Error: Invalid phone number format.";
     Logger.log(`✗ ${errorMsg} for ${customerName} (${customerPhone})`);
-    return { success: false, status: errorMsg, color: settings.colors.error };
+    return { success: false, status: errorMsg, color: effectiveSettings.colors.error };
   }
 
   const templateData = buildBillTemplateData({
@@ -247,10 +254,10 @@ function sendBill_(customerPhone, customerName, balance, numTiffins, dueDate, te
     formattedBalance: formatBalance(balance),
     numTiffins: numTiffins,
     month: getMonthFromValue(dueDate)
-  }, settings);
+  }, effectiveSettings);
 
   const message = processTemplate(template.message, templateData);
-  return sendTwilioMessage_(formattedPhone, message, template.name, customerName, settings);
+  return sendTwilioMessage_(formattedPhone, message, template.name, customerName, effectiveSettings);
 }
 
 /**
@@ -259,14 +266,20 @@ function sendBill_(customerPhone, customerName, balance, numTiffins, dueDate, te
  * @param {string} customerPhone - The customer's phone number (raw from sheet).
  * @param {string} customerName - The customer's name.
  * @param {string} orderId - The order ID for the payment.
+ * @param {Object} [settings] - Pre-loaded settings object. Fetched via getSettings() if not provided.
  * @returns {Object} Result object with success, status, and color properties.
  */
-function sendThankYouMessage_(customerPhone, customerName, orderId) {
-  const settings = getSettings();
+function sendThankYouMessage_(customerPhone, customerName, orderId, settings) {
+  if (!settings) {
+    settings = getSettings();
+  }
 
-  if (!checkCredentials(true)) {
-    Logger.log("ERROR: Cannot send 'Thank You' message. Twilio credentials not set.");
-    return { success: false, status: "Thank You Error: Credentials not set", color: settings.colors.error };
+  // Fast in-memory credential check; only call checkCredentials() if globals are empty
+  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
+    if (!checkCredentials(true)) {
+      Logger.log("ERROR: Cannot send 'Thank You' message. Twilio credentials not set.");
+      return { success: false, status: "Thank You Error: Credentials not set", color: settings.colors.error };
+    }
   }
 
   const formattedPhone = formatPhoneNumber(customerPhone);

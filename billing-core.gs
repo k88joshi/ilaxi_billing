@@ -209,7 +209,7 @@ function sendSingleBillCore_(params) {
       return { success: false, error: 'Customer is missing required data (phone, name, balance, or tiffins)' };
     }
 
-    const result = sendBill_(phone, name, balance, tiffins, dueDate, templateType, dryRunMode);
+    const result = sendBill_(phone, name, balance, tiffins, dueDate, templateType, dryRunMode, settings);
 
     // Update status in sheet
     const statusRange = sheet.getRange(targetRow + 1, statusCol + 1);

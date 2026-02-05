@@ -90,7 +90,7 @@ function getCurrentUserEmail_() {
  * @returns {string[]} Array of allowed email addresses
  */
 function getAllowedUsers() {
-  const stored = PropertiesService.getScriptProperties().getProperty(ALLOWED_USERS_KEY);
+  const stored = scriptProperties.getProperty(ALLOWED_USERS_KEY);
   if (!stored) {
     return [];
   }
@@ -128,7 +128,7 @@ function addAllowedUser(email) {
   }
 
   users.push(normalizedEmail);
-  PropertiesService.getScriptProperties().setProperty(ALLOWED_USERS_KEY, JSON.stringify(users));
+  scriptProperties.setProperty(ALLOWED_USERS_KEY, JSON.stringify(users));
   Logger.log(`addAllowedUser: Added ${normalizedEmail} to allowed users`);
   return { success: true, message: `Added ${normalizedEmail} to allowed users` };
 }
@@ -156,7 +156,7 @@ function removeAllowedUser(email) {
   }
 
   users.splice(index, 1);
-  PropertiesService.getScriptProperties().setProperty(ALLOWED_USERS_KEY, JSON.stringify(users));
+  scriptProperties.setProperty(ALLOWED_USERS_KEY, JSON.stringify(users));
   Logger.log(`removeAllowedUser: Removed ${normalizedEmail} from allowed users`);
   return { success: true, message: `Removed ${normalizedEmail} from allowed users` };
 }
@@ -187,6 +187,10 @@ function isUserAuthorized_(email) {
  * @private
  */
 function createUnauthorizedPage_(email, reason) {
+  // HTML-escape user-provided values to prevent XSS
+  const escapeHtml = (str) => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const safeEmail = escapeHtml(email);
+  const safeReason = escapeHtml(reason);
   const html = `
 <!DOCTYPE html>
 <html lang="en">
@@ -251,8 +255,8 @@ function createUnauthorizedPage_(email, reason) {
       </svg>
     </div>
     <h1>Access Denied</h1>
-    <p>${reason}</p>
-    ${email ? `<div class="email">${email}</div>` : ''}
+    <p>${safeReason}</p>
+    ${safeEmail ? `<div class="email">${safeEmail}</div>` : ''}
     <p class="help">If you believe you should have access, please contact the administrator.</p>
   </div>
 </body>

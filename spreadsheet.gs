@@ -623,7 +623,7 @@ function processRowsForSending(rowsToProcess, columns, cols, settings, templateT
       continue;
     }
 
-    const result = sendBill_(rowData[phoneCol], rowData[nameCol], rowData[balanceCol], rowData[tiffinsCol], rowData[dueDateCol], templateType, dryRunMode);
+    const result = sendBill_(rowData[phoneCol], rowData[nameCol], rowData[balanceCol], rowData[tiffinsCol], rowData[dueDateCol], templateType, dryRunMode, settings);
     statusUpdates.push({ row, status: result.status, color: result.color });
 
     if (result.success) {
@@ -835,7 +835,7 @@ function testSingleMessage() {
   }
 
   // Always dry run for test messages
-  const sendResult = sendBill_(phone, name, balance, tiffins, dueDate, templateType, true);
+  const sendResult = sendBill_(phone, name, balance, tiffins, dueDate, templateType, true, settings);
   const statusRange = sheet.getRange(currentRow, statusCol + 1);
   statusRange.setValue(sendResult.status);
   statusRange.setBackground(sendResult.color);

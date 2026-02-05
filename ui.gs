@@ -81,13 +81,6 @@ function showSettingsDialog() {
 }
 
 /**
- * @deprecated Use showSettingsDialog() instead. Kept for backwards compatibility.
- */
-function showSettingsSidebar() {
-  showSettingsDialog();
-}
-
-/**
  * Retrieves settings and sheet headers for the sidebar UI.
  * Called from settings.html via google.script.run.
  *
@@ -110,9 +103,8 @@ function getSettingsForUI() {
  * @returns {Object} Object with isFirstTime boolean
  */
 function isFirstTimeSetup() {
-  const props = PropertiesService.getScriptProperties();
-  const setupCompleted = props.getProperty("SETUP_COMPLETED");
-  const hasAccountSid = props.getProperty("TWILIO_ACCOUNT_SID");
+  const setupCompleted = scriptProperties.getProperty("SETUP_COMPLETED");
+  const hasAccountSid = scriptProperties.getProperty("TWILIO_ACCOUNT_SID");
 
   return {
     isFirstTime: !setupCompleted && !hasAccountSid
@@ -123,8 +115,7 @@ function isFirstTimeSetup() {
  * Marks the setup wizard as skipped so it doesn't show again.
  */
 function markSetupSkipped() {
-  const props = PropertiesService.getScriptProperties();
-  props.setProperty("SETUP_COMPLETED", "skipped");
+  scriptProperties.setProperty("SETUP_COMPLETED", "skipped");
 }
 
 /**
@@ -211,10 +202,9 @@ function testTwilioCredentials(accountSid, authToken, twilioPhone) {
  * @returns {Object} Result with success boolean and details
  */
 function testTwilioCredentialsFromSettings() {
-  const props = PropertiesService.getScriptProperties();
-  const accountSid = props.getProperty("TWILIO_ACCOUNT_SID");
-  const authToken = props.getProperty("TWILIO_AUTH_TOKEN");
-  const twilioPhone = props.getProperty("TWILIO_PHONE_NUMBER");
+  const accountSid = scriptProperties.getProperty("TWILIO_ACCOUNT_SID");
+  const authToken = scriptProperties.getProperty("TWILIO_AUTH_TOKEN");
+  const twilioPhone = scriptProperties.getProperty("TWILIO_PHONE_NUMBER");
 
   if (!accountSid || !authToken) {
     return {
@@ -240,18 +230,16 @@ function completeFirstTimeSetup(setupData) {
   }
 
   try {
-    const props = PropertiesService.getScriptProperties();
-
     // Save Twilio credentials
     if (setupData.credentials) {
       if (setupData.credentials.accountSid) {
-        props.setProperty("TWILIO_ACCOUNT_SID", setupData.credentials.accountSid);
+        scriptProperties.setProperty("TWILIO_ACCOUNT_SID", setupData.credentials.accountSid);
       }
       if (setupData.credentials.authToken) {
-        props.setProperty("TWILIO_AUTH_TOKEN", setupData.credentials.authToken);
+        scriptProperties.setProperty("TWILIO_AUTH_TOKEN", setupData.credentials.authToken);
       }
       if (setupData.credentials.twilioPhone) {
-        props.setProperty("TWILIO_PHONE_NUMBER", setupData.credentials.twilioPhone);
+        scriptProperties.setProperty("TWILIO_PHONE_NUMBER", setupData.credentials.twilioPhone);
       }
     }
 
@@ -282,7 +270,7 @@ function completeFirstTimeSetup(setupData) {
     }
 
     // Mark setup as completed
-    props.setProperty("SETUP_COMPLETED", new Date().toISOString());
+    scriptProperties.setProperty("SETUP_COMPLETED", new Date().toISOString());
 
     Logger.log("First-time setup completed successfully");
     return { success: true };

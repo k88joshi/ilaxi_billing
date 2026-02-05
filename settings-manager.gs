@@ -125,8 +125,7 @@ We appreciate your business!
  * @returns {Object} Current settings object
  */
 function getSettings() {
-  const props = PropertiesService.getScriptProperties();
-  const stored = props.getProperty(SETTINGS_PROPERTY_KEY);
+  const stored = scriptProperties.getProperty(SETTINGS_PROPERTY_KEY);
 
   if (!stored) {
     // No settings found - attempt migration from legacy config.gs
@@ -192,8 +191,7 @@ function saveSettings(settings) {
   }
 
   try {
-    const props = PropertiesService.getScriptProperties();
-    props.setProperty(SETTINGS_PROPERTY_KEY, JSON.stringify(settings));
+    scriptProperties.setProperty(SETTINGS_PROPERTY_KEY, JSON.stringify(settings));
     Logger.log("Settings saved successfully.");
     return { success: true };
   } catch (e) {
@@ -392,7 +390,7 @@ function processTemplate(template, data) {
   // Replace all {{placeholder}} patterns
   const placeholderRegex = /\{\{(\w+)\}\}/g;
   result = result.replace(placeholderRegex, (match, key) => {
-    if (data.hasOwnProperty(key) && data[key] !== undefined && data[key] !== null) {
+    if (Object.prototype.hasOwnProperty.call(data, key) && data[key] !== undefined && data[key] !== null) {
       return String(data[key]);
     }
     // Keep original placeholder if no value found
@@ -604,7 +602,7 @@ function deepMerge(target, source) {
       continue;
     }
 
-    if (source.hasOwnProperty(key)) {
+    if (Object.prototype.hasOwnProperty.call(source, key)) {
       if (source[key] && typeof source[key] === "object" && !Array.isArray(source[key])) {
         // Recursive merge for nested objects
         result[key] = deepMerge(target[key] || {}, source[key]);

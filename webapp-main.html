@@ -2176,11 +2176,99 @@
   <main class="content">
     <!-- Dashboard Tab -->
     <div class="tab-panel active" id="panel-dashboard">
+      <div class="tab-intro">
+        <div class="tab-intro-title">Dashboard</div>
+        <div class="tab-intro-desc">Your billing overview at a glance. Track payments, send reminders, and manage your customers all in one place.</div>
+      </div>
+
+      <!-- Setup Checklist (hidden when all done) -->
+      <div class="setup-checklist" id="setupChecklist" style="display: none;">
+        <div class="setup-checklist-header">
+          <div class="setup-checklist-title">Get Started</div>
+          <div class="setup-checklist-subtitle">Complete these steps to start sending bills</div>
+          <div class="setup-checklist-progress">
+            <div class="setup-checklist-fill" id="setupProgressFill" style="width: 0%;"></div>
+          </div>
+        </div>
+        <div class="setup-checklist-items">
+          <div class="setup-check-item" id="setupCredentials" onclick="switchTab('credentials')">
+            <div class="setup-check-dot" id="setupCredentialsDot">
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <div class="setup-check-label">Set up Twilio credentials<small>Connect your SMS provider to send messages</small></div>
+            <span class="setup-check-action">Configure</span>
+          </div>
+          <div class="setup-check-item" id="setupBusiness" onclick="switchTab('settings'); setTimeout(function(){ switchSettingsTab('business'); }, 100);">
+            <div class="setup-check-dot" id="setupBusinessDot">
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <div class="setup-check-label">Add business details<small>Your name and payment info appear in every message</small></div>
+            <span class="setup-check-action">Set up</span>
+          </div>
+          <div class="setup-check-item" id="setupColumns" onclick="switchTab('settings'); setTimeout(function(){ switchSettingsTab('spreadsheet'); }, 100);">
+            <div class="setup-check-dot" id="setupColumnsDot">
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <div class="setup-check-label">Map spreadsheet columns<small>Tell the app where to find customer data</small></div>
+            <span class="setup-check-action">Map columns</span>
+          </div>
+          <div class="setup-check-item" id="setupTemplates" onclick="switchTab('messages')">
+            <div class="setup-check-dot" id="setupTemplatesDot">
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <div class="setup-check-label">Customize message templates<small>Personalize the messages sent to customers</small></div>
+            <span class="setup-check-action">Edit templates</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions">
+        <div class="quick-action" onclick="switchTab('send')">
+          <div class="quick-action-icon" style="background: var(--color-primary-light); color: var(--color-primary);">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+          </div>
+          <div class="quick-action-text">Send Bills<small>Send reminders to unpaid customers</small></div>
+        </div>
+        <div class="quick-action" onclick="switchTab('messages')">
+          <div class="quick-action-icon" style="background: var(--color-success-light); color: var(--color-success);">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+          </div>
+          <div class="quick-action-text">Edit Templates<small>Customize your billing messages</small></div>
+        </div>
+        <div class="quick-action" onclick="refreshCustomers()">
+          <div class="quick-action-icon" style="background: var(--color-info-light); color: var(--color-info);">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+          </div>
+          <div class="quick-action-text">Refresh Data<small>Reload customers from spreadsheet</small></div>
+        </div>
+      </div>
+
       <div class="stats-grid" id="statsGrid">
-        <div class="stat-card"><div class="stat-label">Total Customers</div><div class="stat-value" id="statTotal">-</div></div>
-        <div class="stat-card"><div class="stat-label">Unpaid</div><div class="stat-value warning" id="statUnpaid">-</div></div>
-        <div class="stat-card"><div class="stat-label">Paid</div><div class="stat-value success" id="statPaid">-</div></div>
-        <div class="stat-card"><div class="stat-label">Outstanding Balance</div><div class="stat-value" id="statBalance">-</div></div>
+        <div class="stat-card">
+          <div class="stat-card-icon" style="background: var(--color-info-light); color: var(--color-info);">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          </div>
+          <div class="stat-label">Total Customers</div><div class="stat-value" id="statTotal">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon" style="background: var(--color-warning-light); color: var(--color-warning);">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <div class="stat-label">Unpaid</div><div class="stat-value warning" id="statUnpaid">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon" style="background: var(--color-success-light); color: var(--color-success);">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <div class="stat-label">Paid</div><div class="stat-value success" id="statPaid">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon" style="background: var(--color-error-light); color: var(--color-error);">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <div class="stat-label">Outstanding Balance</div><div class="stat-value" id="statBalance">-</div>
+        </div>
       </div>
 
       <div class="card">
@@ -2201,38 +2289,100 @@
 
     <!-- Send Bills Tab -->
     <div class="tab-panel" id="panel-send">
+      <div class="tab-intro">
+        <div class="tab-intro-title">Send Bills</div>
+        <div class="tab-intro-desc">Send SMS billing reminders to your customers in 3 easy steps.</div>
+      </div>
+
+      <div class="steps-bar" id="sendStepsBar">
+        <div class="step-item active" id="sendStep1">
+          <span class="step-num">1</span> Select Recipients
+        </div>
+        <div class="step-connector"></div>
+        <div class="step-item" id="sendStep2">
+          <span class="step-num">2</span> Choose Template
+        </div>
+        <div class="step-connector"></div>
+        <div class="step-item" id="sendStep3">
+          <span class="step-num">3</span> Review &amp; Send
+        </div>
+      </div>
+
       <div class="card">
-        <div class="card-header"><h2 class="card-title">Send Billing Messages</h2></div>
         <div class="card-body">
           <div id="sendAlert"></div>
-          <div class="form-row">
+
+          <!-- Step 1: Select Recipients -->
+          <div style="margin-bottom: var(--space-6);">
+            <h3 style="font-size: var(--text-base); font-weight: 600; color: var(--color-text); margin-bottom: var(--space-3); display: flex; align-items: center; gap: var(--space-2);">
+              <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--color-primary); color: white; display: inline-flex; align-items: center; justify-content: center; font-size: var(--text-xs); font-weight: 700;">1</span>
+              Select Recipients
+            </h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="sendFilter">Send To</label>
+                <select id="sendFilter" onchange="toggleDateInput(); updateRecipientCount();">
+                  <option value="unpaid">All Unpaid Customers</option>
+                  <option value="byDate">Unpaid by Due Date</option>
+                </select>
+              </div>
+              <div class="form-group" id="dueDateGroup" style="display: none;">
+                <label for="dueDate">Due Date/Month</label>
+                <input type="text" id="dueDate" placeholder="e.g., October or 2024-10-31" oninput="updateRecipientCount();">
+              </div>
+            </div>
+            <div id="recipientPreview" style="font-size: var(--text-sm); color: var(--color-text-secondary); margin-top: var(--space-2);"></div>
+          </div>
+
+          <!-- Step 2: Choose Template -->
+          <div style="margin-bottom: var(--space-6);">
+            <h3 style="font-size: var(--text-base); font-weight: 600; color: var(--color-text); margin-bottom: var(--space-3); display: flex; align-items: center; gap: var(--space-2);">
+              <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--color-primary); color: white; display: inline-flex; align-items: center; justify-content: center; font-size: var(--text-xs); font-weight: 700;">2</span>
+              Choose Template
+            </h3>
             <div class="form-group">
-              <label for="sendFilter">Send To</label>
-              <select id="sendFilter" onchange="toggleDateInput()">
-                <option value="unpaid">All Unpaid Customers</option>
-                <option value="byDate">Unpaid by Due Date</option>
+              <label for="templateType">Message Template</label>
+              <select id="templateType">
+                <option value="firstNotice">First Notice</option>
+                <option value="followUp">Follow-up Reminder</option>
+                <option value="finalNotice">Final Notice</option>
               </select>
             </div>
-            <div class="form-group" id="dueDateGroup" style="display: none;">
-              <label for="dueDate">Due Date/Month</label>
-              <input type="text" id="dueDate" placeholder="e.g., October or 2024-10-31">
+          </div>
+
+          <!-- Step 3: Review & Send -->
+          <div id="sendReviewSection" style="margin-bottom: var(--space-4);">
+            <h3 style="font-size: var(--text-base); font-weight: 600; color: var(--color-text); margin-bottom: var(--space-3); display: flex; align-items: center; gap: var(--space-2);">
+              <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--color-primary); color: white; display: inline-flex; align-items: center; justify-content: center; font-size: var(--text-xs); font-weight: 700;">3</span>
+              Review &amp; Send
+            </h3>
+
+            <!-- Dry Run Toggle -->
+            <div style="display: flex; align-items: flex-start; gap: var(--space-4); padding: var(--space-4); background: var(--color-border-light); border: 1px solid var(--color-border); border-radius: var(--radius-lg); margin-bottom: var(--space-4);">
+              <div style="padding-top: 2px;">
+                <input type="checkbox" id="dryRunCheckbox" onchange="updateSendReview();" style="width: 18px; height: 18px; accent-color: var(--color-warning); cursor: pointer;">
+              </div>
+              <div>
+                <label for="dryRunCheckbox" style="font-size: var(--text-sm); font-weight: 600; color: var(--color-text); cursor: pointer; display: block; margin-bottom: var(--space-1);">
+                  Dry Run Mode
+                </label>
+                <p style="font-size: var(--text-sm); color: var(--color-text-secondary); line-height: var(--line-height-relaxed); margin: 0;">
+                  Test your billing run without sending real SMS messages. The spreadsheet will be updated with status results marked as "[DRY RUN]" so you can review what would be sent.
+                </p>
+              </div>
             </div>
+
+            <div id="dryRunWarning" class="callout callout-warn" style="display: none;">
+              <svg class="callout-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+              <div class="callout-content"><strong>Test Mode Active</strong> No real messages will be sent. The status column will show "[DRY RUN]" results so you can verify everything looks correct before sending for real.</div>
+            </div>
+
+            <button class="btn btn-primary" id="sendBillsBtn" onclick="sendBills()" style="padding: var(--space-3) var(--space-6); font-size: var(--text-base);">
+              <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+              Send Bills
+            </button>
           </div>
-          <div class="form-group">
-            <label for="templateType">Message Template</label>
-            <select id="templateType">
-              <option value="firstNotice">First Notice</option>
-              <option value="followUp">Follow-up Reminder</option>
-              <option value="finalNotice">Final Notice</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label><input type="checkbox" id="dryRunCheckbox"> Dry Run Mode (no actual messages sent)</label>
-          </div>
-          <button class="btn btn-primary" id="sendBillsBtn" onclick="sendBills()">
-            <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
-            Send Bills
-          </button>
+
           <hr class="section-divider">
           <h3 class="section-heading">Other Actions</h3>
           <button class="btn btn-secondary" onclick="clearStatuses()">Clear All Message Statuses</button>
@@ -2414,19 +2564,55 @@
 
     <!-- Credentials Tab -->
     <div class="tab-panel" id="panel-credentials">
+      <div class="tab-intro">
+        <div class="tab-intro-title">Twilio Connection</div>
+        <div class="tab-intro-desc">Connect your Twilio account to send SMS messages to customers.</div>
+      </div>
+
+      <div class="callout callout-info">
+        <svg class="callout-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <div class="callout-content">You'll need your Twilio Account SID, Auth Token, and phone number. Find them at <strong>twilio.com/console</strong></div>
+      </div>
+
+      <!-- Connection Status Card -->
+      <div class="card" id="credStatusCard" style="margin-bottom: var(--space-4);">
+        <div class="card-header"><h2 class="card-title">Connection Status</h2></div>
+        <div class="card-body">
+          <div id="credentialStatus" class="alert alert-info" style="display: none;"></div>
+          <div id="credStatusLoading" style="font-size: var(--text-sm); color: var(--color-text-secondary);">Checking credentials...</div>
+        </div>
+      </div>
+
+      <!-- Credentials Form Card -->
       <div class="card">
         <div class="card-header"><h2 class="card-title">Twilio Credentials</h2></div>
         <div class="card-body">
           <div id="credentialAlert"></div>
-          <div id="credentialStatus" class="alert alert-info" style="display: none;"></div>
-          <div class="form-group"><label for="accountSid">Account SID</label><input type="text" id="accountSid" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"></div>
-          <div class="form-group"><label for="authToken">Auth Token</label><input type="password" id="authToken" placeholder="Enter your Auth Token"></div>
-          <div class="form-group"><label for="twilioPhone">Twilio Phone Number</label><input type="text" id="twilioPhone" placeholder="+1XXXXXXXXXX"></div>
+          <div class="form-group">
+            <label for="accountSid">Account SID</label>
+            <p style="font-size: var(--text-sm); color: var(--color-text-secondary); margin-bottom: var(--space-2);">Starts with AC, found on your Twilio dashboard</p>
+            <input type="text" id="accountSid" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+          </div>
+          <div class="form-group">
+            <label for="authToken">Auth Token</label>
+            <p style="font-size: var(--text-sm); color: var(--color-text-secondary); margin-bottom: var(--space-2);">Found under Account SID on your Twilio dashboard</p>
+            <input type="password" id="authToken" placeholder="Enter your Auth Token">
+          </div>
+          <div class="form-group">
+            <label for="twilioPhone">Twilio Phone Number</label>
+            <p style="font-size: var(--text-sm); color: var(--color-text-secondary); margin-bottom: var(--space-2);">Your Twilio phone number in +1XXXXXXXXXX format</p>
+            <input type="text" id="twilioPhone" placeholder="+1XXXXXXXXXX">
+          </div>
           <div class="btn-group">
             <button class="btn btn-primary" onclick="saveCredentials()">Save Credentials</button>
             <button class="btn btn-secondary" onclick="testCredentials()">Test Connection</button>
           </div>
         </div>
+      </div>
+
+      <div class="callout callout-tip" style="margin-top: var(--space-4);">
+        <svg class="callout-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+        <div class="callout-content"><strong>Tip</strong>After saving, click "Test Connection" to verify your credentials work correctly.</div>
       </div>
     </div>
 
@@ -2466,7 +2652,7 @@
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                 My Business
               </h2>
-              <p class="settings-section-desc">Add your business details. These will appear in the messages you send to customers.</p>
+              <p class="settings-section-desc">Fill in your business details below. This information appears in every billing message sent to your customers.</p>
             </div>
 
             <div id="settingsAlert"></div>
@@ -2867,9 +3053,11 @@
       });
       document.getElementById('panel-' + tabName).classList.add('active');
 
-      // Initialize Messages tab when switching to it
+      // Initialize tabs when switching to them
       if (tabName === 'messages') {
         initMessagesTab();
+      } else if (tabName === 'send') {
+        updateRecipientCount();
       }
     }
 
@@ -2924,6 +3112,7 @@
     function loadDashboard() {
       loadStats();
       loadCustomers();
+      updateSetupChecklist();
     }
 
     function loadStats() {
@@ -3066,6 +3255,89 @@
       document.getElementById('dueDateGroup').style.display = filter === 'byDate' ? 'block' : 'none';
     }
 
+    // Setup Checklist
+    function updateSetupChecklist() {
+      var checklist = document.getElementById('setupChecklist');
+      if (!checklist) return;
+
+      var hasCredentials = credentialsConfigured;
+      var hasBusiness = !!(currentSettings && currentSettings.business && currentSettings.business.name);
+      var hasColumns = !!(currentSettings && currentSettings.columns && Object.keys(currentSettings.columns).some(function(k) { return currentSettings.columns[k]; }));
+      var hasTemplates = !!(currentSettings && currentSettings.templates && currentSettings.templates.firstNotice && currentSettings.templates.firstNotice.content);
+
+      var items = [
+        { id: 'setupCredentials', done: hasCredentials },
+        { id: 'setupBusiness', done: hasBusiness },
+        { id: 'setupColumns', done: hasColumns },
+        { id: 'setupTemplates', done: hasTemplates }
+      ];
+
+      var doneCount = 0;
+      items.forEach(function(item) {
+        var el = document.getElementById(item.id);
+        if (el) {
+          if (item.done) {
+            el.classList.add('done');
+            doneCount++;
+          } else {
+            el.classList.remove('done');
+          }
+        }
+      });
+
+      var progressFill = document.getElementById('setupProgressFill');
+      if (progressFill) {
+        progressFill.style.width = (doneCount / items.length * 100) + '%';
+      }
+
+      // Hide checklist when all items are done
+      checklist.style.display = doneCount >= items.length ? 'none' : 'block';
+    }
+
+    // Recipient Count Preview (uses cached customer data)
+    function updateRecipientCount() {
+      var preview = document.getElementById('recipientPreview');
+      if (!preview) return;
+
+      if (!currentCustomers || currentCustomers.length === 0) {
+        preview.textContent = '';
+        return;
+      }
+
+      var filter = document.getElementById('sendFilter').value;
+      var count = 0;
+
+      if (filter === 'unpaid') {
+        count = currentCustomers.filter(function(c) {
+          return String(c.paymentStatus).toLowerCase() !== 'paid';
+        }).length;
+        preview.textContent = count + ' unpaid customer' + (count !== 1 ? 's' : '') + ' will receive messages';
+      } else if (filter === 'byDate') {
+        var dueDate = document.getElementById('dueDate').value.trim().toLowerCase();
+        if (!dueDate) {
+          preview.textContent = 'Enter a due date to see recipient count';
+          return;
+        }
+        count = currentCustomers.filter(function(c) {
+          if (String(c.paymentStatus).toLowerCase() === 'paid') return false;
+          var cDate = String(c.month || c.dueDate || '').toLowerCase();
+          return cDate.indexOf(dueDate) !== -1;
+        }).length;
+        preview.textContent = count + ' matching customer' + (count !== 1 ? 's' : '') + ' will receive messages';
+      }
+
+      updateSendReview();
+    }
+
+    // Update send review section
+    function updateSendReview() {
+      var dryRun = document.getElementById('dryRunCheckbox').checked;
+      var warningDiv = document.getElementById('dryRunWarning');
+      if (warningDiv) {
+        warningDiv.style.display = dryRun ? 'flex' : 'none';
+      }
+    }
+
     function showAlert(containerId, type, message) {
       var container = document.getElementById(containerId);
       while (container.firstChild) container.removeChild(container.firstChild);
@@ -3166,14 +3438,19 @@
     }
 
     // Credentials
+    var credentialsConfigured = false;
+
     function loadCredentialStatus() {
       serverCall('getCredentialStatus').then(function(result) {
+        var loadingEl = document.getElementById('credStatusLoading');
+        if (loadingEl) loadingEl.style.display = 'none';
         if (!result) {
           console.error('Failed to load credential status: No response from server');
           return;
         }
         if (result.success) {
           var data = result.data;
+          credentialsConfigured = !!data.allSet;
           var statusDiv = document.getElementById('credentialStatus');
           while (statusDiv.firstChild) statusDiv.removeChild(statusDiv.firstChild);
           if (data.allSet) {
@@ -3184,6 +3461,7 @@
             statusDiv.textContent = 'Some credentials are not set. Please configure all fields.';
           }
           statusDiv.style.display = 'flex';
+          updateSetupChecklist();
         }
       }).catch(function(err) { console.error('Failed to load credential status:', err); });
     }
@@ -3259,6 +3537,9 @@
 
       // Auto-detect columns to populate dropdowns
       autoDetectColumns();
+
+      // Update setup checklist with loaded settings
+      updateSetupChecklist();
     }
 
     function saveSettings() {
@@ -3724,7 +4005,11 @@
       msgPreviewDebounceTimer = setTimeout(function() {
         serverCall('previewTemplate', { template: message })
           .then(function(result) {
-            if (result.success && result.preview) {
+            // previewTemplate() returns a plain string (the processed template),
+            // or an object with {success, preview} — handle both
+            if (typeof result === 'string') {
+              preview.textContent = result;
+            } else if (result && result.success && result.preview) {
               preview.textContent = result.preview;
             } else {
               preview.textContent = message;

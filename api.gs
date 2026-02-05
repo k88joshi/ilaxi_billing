@@ -198,16 +198,14 @@ function clearAllStatusesForWeb() {
  */
 function saveCredentialsForWeb(payload) {
   try {
-    const props = PropertiesService.getScriptProperties();
-
     if (payload?.accountSid) {
-      props.setProperty('TWILIO_ACCOUNT_SID', payload.accountSid.trim());
+      scriptProperties.setProperty('TWILIO_ACCOUNT_SID', payload.accountSid.trim());
     }
     if (payload?.authToken) {
-      props.setProperty('TWILIO_AUTH_TOKEN', payload.authToken.trim());
+      scriptProperties.setProperty('TWILIO_AUTH_TOKEN', payload.authToken.trim());
     }
     if (payload?.twilioPhone) {
-      props.setProperty('TWILIO_PHONE_NUMBER', payload.twilioPhone.trim());
+      scriptProperties.setProperty('TWILIO_PHONE_NUMBER', payload.twilioPhone.trim());
     }
 
     Logger.log('Twilio credentials saved from web interface');
@@ -226,10 +224,9 @@ function saveCredentialsForWeb(payload) {
  */
 function getCredentialStatusForWeb() {
   try {
-    const props = PropertiesService.getScriptProperties();
-    const sid = props.getProperty('TWILIO_ACCOUNT_SID');
-    const token = props.getProperty('TWILIO_AUTH_TOKEN');
-    const phone = props.getProperty('TWILIO_PHONE_NUMBER');
+    const sid = scriptProperties.getProperty('TWILIO_ACCOUNT_SID');
+    const token = scriptProperties.getProperty('TWILIO_AUTH_TOKEN');
+    const phone = scriptProperties.getProperty('TWILIO_PHONE_NUMBER');
 
     return {
       success: true,
