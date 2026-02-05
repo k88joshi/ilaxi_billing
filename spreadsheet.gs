@@ -521,6 +521,30 @@ function applyStatusUpdates(sheet, statusUpdates, statusCol, totalRows) {
   }
 }
 
+// ========================================
+// ADD-ON UI WRAPPERS
+// Thin wrappers that show UI prompts/alerts and delegate to billing-core.gs.
+// PARITY: Each wrapper here should have a corresponding web handler in api.gs.
+// See the parity table in CLAUDE.md.
+// ========================================
+
+/**
+ * Prompts the user to choose between Test Mode (dry run) and real sending.
+ * Returns true for dry run, false for real send, or null if cancelled.
+ *
+ * @returns {boolean|null} true = dry run, false = real send, null = cancelled
+ * @private
+ */
+function promptForDryRunMode_() {
+  const response = getUi_().alert(
+    "Send Mode",
+    "Would you like to send in Test Mode?\n\n\u2022 YES = Test Mode (no real SMS sent)\n\u2022 NO = Send for real",
+    getUi_().ButtonSet.YES_NO_CANCEL
+  );
+  if (response === getUi_().Button.CANCEL) return null;
+  return response === getUi_().Button.YES;
+}
+
 /**
  * Sends billing SMS messages to ALL customers with "Unpaid" status.
  * This function will send reminders even if a message was "Sent" before,
@@ -532,43 +556,18 @@ function sendBillsToUnpaid() {
   const templateType = promptForMessageType();
   if (!templateType) return;
 
-  const settings = getSettings();
-  const cols = settings.columns;
-  const sheet = getTargetSheet_();
-  const columns = getHeaderColumnMap();
-  const data = sheet.getDataRange().getValues();
+  const dryRunMode = promptForDryRunMode_();
+  if (dryRunMode === null) return;
 
-  const missingHeaders = validateRequiredColumns(columns, cols);
-  if (missingHeaders.length > 0) {
-    getUi_().alert(`Error: The following required columns are missing: ${missingHeaders.join(", ")}.`);
-    return;
-  }
-  if (data.length <= settings.behavior.headerRowIndex) {
-    getUi_().alert("No customer data found.");
+  const result = sendBillsCore_({ filter: 'unpaid', templateType: templateType, dryRunMode: dryRunMode });
+
+  if (!result.success) {
+    getUi_().alert(`Error: ${result.error}`);
     return;
   }
 
-  // Filter for unpaid rows
-  const paymentCol = columns[cols.paymentStatus];
-  const rowsToProcess = [];
-  for (let i = settings.behavior.headerRowIndex; i < data.length; i++) {
-    const rowData = data[i];
-    if (String(rowData[paymentCol]).toLowerCase() === "unpaid") {
-      rowsToProcess.push({ data: rowData, row: i + 1 });
-    }
-  }
-
-  // Process rows
-  const { sentCount, errorCount, errorDetails, statusUpdates } = processRowsForSending(
-    rowsToProcess, columns, cols, settings, templateType
-  );
-
-  // Update spreadsheet
-  applyStatusUpdates(sheet, statusUpdates, columns[cols.messageStatus], data.length);
-
-  // Display summary
-  const skippedCount = data.length - settings.behavior.headerRowIndex - rowsToProcess.length;
-  showSendSummary(sentCount, errorCount, skippedCount, errorDetails);
+  const d = result.data;
+  showSendSummary(d.sentCount, d.errorCount, d.skippedCount, d.errorDetails, "", d.dryRunMode);
 }
 
 /**
@@ -579,9 +578,10 @@ function sendBillsToUnpaid() {
  * @param {Object} cols - Column name settings
  * @param {Object} settings - Current settings
  * @param {string} templateType - Template type to use
+ * @param {boolean} [dryRunMode] - If defined, overrides settings.behavior.dryRunMode for this batch.
  * @returns {Object} Results with sentCount, errorCount, errorDetails, statusUpdates
  */
-function processRowsForSending(rowsToProcess, columns, cols, settings, templateType) {
+function processRowsForSending(rowsToProcess, columns, cols, settings, templateType, dryRunMode) {
   // Input validation
   if (!Array.isArray(rowsToProcess)) {
     Logger.log("processRowsForSending: Invalid rowsToProcess array");
@@ -623,7 +623,7 @@ function processRowsForSending(rowsToProcess, columns, cols, settings, templateT
       continue;
     }
 
-    const result = sendBill_(rowData[phoneCol], rowData[nameCol], rowData[balanceCol], rowData[tiffinsCol], rowData[dueDateCol], templateType);
+    const result = sendBill_(rowData[phoneCol], rowData[nameCol], rowData[balanceCol], rowData[tiffinsCol], rowData[dueDateCol], templateType, dryRunMode);
     statusUpdates.push({ row, status: result.status, color: result.color });
 
     if (result.success) {
@@ -648,58 +648,27 @@ function sendUnpaidByDueDate() {
   if (dateResult.getSelectedButton() !== getUi_().Button.OK || !dateResult.getResponseText()) {
     return;
   }
-  const targetDate = dateResult.getResponseText().trim().toLowerCase();
+  const targetDate = dateResult.getResponseText().trim();
 
   const templateType = promptForMessageType();
   if (!templateType) return;
 
   if (!checkCredentials()) return;
 
+  const dryRunMode = promptForDryRunMode_();
+  if (dryRunMode === null) return;
+
+  const result = sendBillsCore_({ filter: 'byDate', dueDate: targetDate, templateType: templateType, dryRunMode: dryRunMode });
+
+  if (!result.success) {
+    getUi_().alert(`Error: ${result.error}`);
+    return;
+  }
+
+  const d = result.data;
   const settings = getSettings();
-  const cols = settings.columns;
-  const sheet = getTargetSheet_();
-  const columns = getHeaderColumnMap();
-  const data = sheet.getDataRange().getValues();
-
-  const missingHeaders = validateRequiredColumns(columns, cols);
-  if (missingHeaders.length > 0) {
-    getUi_().alert(`Error: The following required columns are missing: ${missingHeaders.join(", ")}.`);
-    return;
-  }
-  if (data.length <= settings.behavior.headerRowIndex) {
-    getUi_().alert("No customer data found.");
-    return;
-  }
-
-  // Filter for unpaid rows matching the target date
-  const paymentCol = columns[cols.paymentStatus];
-  const dueDateCol = columns[cols.dueDate];
-  const rowsToProcess = [];
-
-  for (let i = settings.behavior.headerRowIndex; i < data.length; i++) {
-    const rowData = data[i];
-    const paymentStatus = String(rowData[paymentCol]).toLowerCase();
-    const dueDate = rowData[dueDateCol];
-    const dueDateStr = String(dueDate).toLowerCase();
-    const monthFromDate = getMonthFromValue(dueDate).toLowerCase();
-
-    if (paymentStatus === "unpaid" && (dueDateStr.includes(targetDate) || monthFromDate.includes(targetDate))) {
-      rowsToProcess.push({ data: rowData, row: i + 1 });
-    }
-  }
-
-  // Process rows
-  const { sentCount, errorCount, errorDetails, statusUpdates } = processRowsForSending(
-    rowsToProcess, columns, cols, settings, templateType
-  );
-
-  // Update spreadsheet
-  applyStatusUpdates(sheet, statusUpdates, columns[cols.messageStatus], data.length);
-
-  // Display summary
   const templateName = getBillTemplate(templateType, settings).name;
-  const skippedCount = data.length - settings.behavior.headerRowIndex - rowsToProcess.length;
-  showSendSummary(sentCount, errorCount, skippedCount, errorDetails, `(${templateName}) for "${targetDate}"`);
+  showSendSummary(d.sentCount, d.errorCount, d.skippedCount, d.errorDetails, `(${templateName}) for "${targetDate}"`, d.dryRunMode);
 }
 
 /**
@@ -707,64 +676,40 @@ function sendUnpaidByDueDate() {
  * Useful for resending a single bill or testing a specific row.
  */
 function sendBillByOrderID() {
-  const result = getUi_().prompt("Enter the exact Order ID to send the bill for:");
-  if (result.getSelectedButton() !== getUi_().Button.OK || !result.getResponseText()) {
+  const promptResult = getUi_().prompt("Enter the exact Order ID to send the bill for:");
+  if (promptResult.getSelectedButton() !== getUi_().Button.OK || !promptResult.getResponseText()) {
     return;
   }
-  const targetOrderID = result.getResponseText().trim();
+  const targetOrderID = promptResult.getResponseText().trim();
+
+  // Look up customer for preview
+  const lookup = lookupCustomerByOrderId_(targetOrderID);
+  if (!lookup.success) {
+    getUi_().alert(`Error: ${lookup.error}`);
+    return;
+  }
+
+  const customer = lookup.data;
+  if (!customer.phone || !customer.name || !customer.balance || !customer.tiffins) {
+    getUi_().alert(`Found Order ID ${targetOrderID} at row ${customer.rowIndex}, but it is missing required data (Phone, Name, Balance, or Tiffins).`);
+    return;
+  }
 
   const templateType = promptForMessageType();
   if (!templateType) return;
 
   if (!checkCredentials()) return;
 
-  const settings = getSettings();
-  const cols = settings.columns;
-  const sheet = getTargetSheet_();
-  const columns = getHeaderColumnMap();
-  const data = sheet.getDataRange().getValues();
-
-  const orderIdCol = columns[cols.orderId];
-  if (orderIdCol === undefined) {
-    getUi_().alert(`Error: The column "${cols.orderId}" was not found.`);
-    return;
-  }
-
-  // Find the row with the matching Order ID
-  let foundRow = -1;
-  for (let i = settings.behavior.headerRowIndex; i < data.length; i++) {
-    if (String(data[i][orderIdCol]).trim() === targetOrderID) {
-      foundRow = i;
-      break;
-    }
-  }
-
-  if (foundRow === -1) {
-    getUi_().alert(`Error: Could not find any row with Order ID "${targetOrderID}".`);
-    return;
-  }
-
-  // Extract and validate data
-  const rowData = data[foundRow];
-  const currentRow = foundRow + 1;
-  const phone = rowData[columns[cols.phoneNumber]];
-  const name = rowData[columns[cols.customerName]];
-  const balance = rowData[columns[cols.balance]];
-  const tiffins = rowData[columns[cols.numTiffins]];
-  const dueDate = rowData[columns[cols.dueDate]];
-  const statusCol = columns[cols.messageStatus];
-
-  if (!phone || !name || !balance || !tiffins) {
-    getUi_().alert(`Found Order ID ${targetOrderID} at row ${currentRow}, but it is missing required data (Phone, Name, Balance, or Tiffins).`);
-    return;
-  }
+  const dryRunMode = promptForDryRunMode_();
+  if (dryRunMode === null) return;
 
   // Show preview and confirm
+  const settings = getSettings();
   const templateName = getBillTemplate(templateType, settings).name;
-  const dryRunNote = settings.behavior.dryRunMode ? "\n\n[DRY RUN MODE - No actual SMS will be sent]" : "";
+  const dryRunNote = dryRunMode ? "\n\n[TEST MODE - No actual SMS will be sent]" : "";
   const confirmResult = getUi_().alert(
     "Confirm Send by Order ID",
-    `Found Order ID ${targetOrderID}:\n\nName: ${name}\nPhone: ${phone}\nBalance: ${formatBalance(balance)}\nMessage Type: ${templateName}\n\nContinue?${dryRunNote}`,
+    `Found Order ID ${targetOrderID}:\n\nName: ${customer.name}\nPhone: ${customer.phone}\nBalance: ${formatBalance(customer.balance)}\nMessage Type: ${templateName}\n\nContinue?${dryRunNote}`,
     getUi_().ButtonSet.YES_NO
   );
 
@@ -773,18 +718,15 @@ function sendBillByOrderID() {
     return;
   }
 
-  // Send the bill and update the sheet
-  const sendResult = sendBill_(phone, name, balance, tiffins, dueDate, templateType);
-  const statusRange = sheet.getRange(currentRow, statusCol + 1);
-  statusRange.setValue(sendResult.status);
-  statusRange.setBackground(sendResult.color);
+  // Send via core
+  const sendResult = sendSingleBillCore_({ orderId: targetOrderID, templateType: templateType, dryRunMode: dryRunMode });
 
   // Notify user
-  const dryRunPrefix = settings.behavior.dryRunMode ? "[DRY RUN] " : "";
+  const dryRunPrefix = dryRunMode ? "[TEST MODE] " : "";
   if (sendResult.success) {
-    getUi_().alert(`${templateName} ${dryRunPrefix}sent successfully to ${name} for Order ${targetOrderID}!`);
+    getUi_().alert(`${templateName} ${dryRunPrefix}sent successfully to ${customer.name} for Order ${targetOrderID}!`);
   } else {
-    getUi_().alert(`${templateName} failed to send. Check the Message Status column for details on row ${currentRow}.`);
+    getUi_().alert(`${templateName} failed to send: ${sendResult.error}`);
   }
 }
 
@@ -801,6 +743,44 @@ function testSingleMessage() {
 
   const settings = getSettings();
   const cols = settings.columns;
+  const testOrderId = settings.behavior.testOrderId;
+
+  // If testOrderId is configured, use it to find the test customer
+  if (testOrderId) {
+    const lookup = lookupCustomerByOrderId_(testOrderId);
+    if (lookup.success) {
+      const customer = lookup.data;
+      if (!customer.phone || !customer.name || !customer.balance || !customer.tiffins) {
+        getUi_().alert(`Test customer (Order ID: ${testOrderId}) is missing required data (Phone, Name, Balance, or Tiffins).`);
+        return;
+      }
+
+      const templateName = getBillTemplate(templateType, settings).name;
+      const confirmResult = getUi_().alert(
+        "Test Message Preview",
+        `About to send a test "${templateName}" to configured test customer (Order ID: ${testOrderId}):\n\nName: ${customer.name}\nPhone: ${customer.phone}\nBalance: ${formatBalance(customer.balance)}\n\n[TEST MODE - No actual SMS will be sent]\n\nContinue?`,
+        getUi_().ButtonSet.YES_NO
+      );
+
+      if (confirmResult !== getUi_().Button.YES) {
+        getUi_().alert("Test cancelled.");
+        return;
+      }
+
+      const sendResult = sendSingleBillCore_({ orderId: testOrderId, templateType: templateType, dryRunMode: true });
+
+      if (sendResult.success) {
+        getUi_().alert(`Test "${templateName}" [TEST MODE] sent successfully to ${customer.name}!`);
+      } else {
+        getUi_().alert(`Test "${templateName}" failed: ${sendResult.error}`);
+      }
+      return;
+    }
+    // Lookup failed — fall through to first-unpaid logic
+    Logger.log(`testSingleMessage: Test Order ID "${testOrderId}" not found, falling back to first unpaid.`);
+  }
+
+  // Fallback: find the first unpaid customer
   const sheet = getTargetSheet_();
   const columns = getHeaderColumnMap();
   const data = sheet.getDataRange().getValues();
@@ -816,7 +796,6 @@ function testSingleMessage() {
     return;
   }
 
-  // Find the first unpaid customer
   let testRow = -1;
   for (let i = settings.behavior.headerRowIndex; i < data.length; i++) {
     if (String(data[i][paymentCol]).toLowerCase() === "unpaid") {
@@ -830,7 +809,6 @@ function testSingleMessage() {
     return;
   }
 
-  // Extract and validate data
   const rowData = data[testRow];
   const currentRow = testRow + 1;
   const phone = rowData[columns[cols.phoneNumber]];
@@ -844,12 +822,10 @@ function testSingleMessage() {
     return;
   }
 
-  // Show preview and confirm
   const templateName = getBillTemplate(templateType, settings).name;
-  const dryRunNote = settings.behavior.dryRunMode ? "\n\n[DRY RUN MODE - No actual SMS will be sent]" : "";
   const confirmResult = getUi_().alert(
     "Test Message Preview",
-    `About to send a test "${templateName}" to the first UNPAID customer (row ${currentRow}):\n\nName: ${name}\nPhone: ${phone}\nBalance: ${formatBalance(balance)}\n\nContinue?${dryRunNote}`,
+    `About to send a test "${templateName}" to the first UNPAID customer (row ${currentRow}):\n\nName: ${name}\nPhone: ${phone}\nBalance: ${formatBalance(balance)}\n\n[TEST MODE - No actual SMS will be sent]\n\nContinue?`,
     getUi_().ButtonSet.YES_NO
   );
 
@@ -858,16 +834,14 @@ function testSingleMessage() {
     return;
   }
 
-  // Send the bill and update the sheet
-  const sendResult = sendBill_(phone, name, balance, tiffins, dueDate, templateType);
+  // Always dry run for test messages
+  const sendResult = sendBill_(phone, name, balance, tiffins, dueDate, templateType, true);
   const statusRange = sheet.getRange(currentRow, statusCol + 1);
   statusRange.setValue(sendResult.status);
   statusRange.setBackground(sendResult.color);
 
-  // Notify user
-  const dryRunPrefix = settings.behavior.dryRunMode ? "[DRY RUN] " : "";
   if (sendResult.success) {
-    getUi_().alert(`Test "${templateName}" ${dryRunPrefix}sent successfully to ${name}!`);
+    getUi_().alert(`Test "${templateName}" [TEST MODE] sent successfully to ${name}!`);
   } else {
     getUi_().alert(`Test "${templateName}" failed. Check the Message Status column on row ${currentRow} for details.`);
   }
@@ -886,29 +860,11 @@ function clearAllStatuses() {
 
   if (response !== getUi_().Button.YES) return;
 
-  const settings = getSettings();
-  const cols = settings.columns;
-  const sheet = getTargetSheet_();
-  const columns = getHeaderColumnMap();
-  const statusColIndex = columns[cols.messageStatus];
+  const result = clearAllStatusesCore_();
 
-  if (statusColIndex === undefined) {
-    getUi_().alert(`Error: Could not find the '${cols.messageStatus}' column header. Please ensure it exists in row ${settings.behavior.headerRowIndex}.`);
+  if (!result.success) {
+    getUi_().alert(`Error: ${result.error}`);
     return;
-  }
-
-  const data = sheet.getDataRange().getValues();
-  const rowCount = data.length - settings.behavior.headerRowIndex;
-
-  if (rowCount > 0) {
-    const startRow = settings.behavior.headerRowIndex + 1;
-    const statusCol = statusColIndex + 1;
-    const clearValues = Array(rowCount).fill([""]);
-    const clearBackgrounds = Array(rowCount).fill([null]);
-
-    const range = sheet.getRange(startRow, statusCol, rowCount, 1);
-    range.setValues(clearValues);
-    range.setBackgrounds(clearBackgrounds);
   }
 
   getUi_().alert("All message statuses cleared!");

@@ -1,6 +1,8 @@
 // ========================================
 // WEB APP API HANDLERS
-// Routes and processes API requests from the web interface
+// Thin wrappers that delegate to billing-core.gs.
+// PARITY: Each handler here should have a corresponding add-on wrapper in spreadsheet.gs.
+// See the parity table in CLAUDE.md.
 // ========================================
 
 /**
@@ -75,81 +77,13 @@ function handleApiRequest_(action, payload) {
 
 /**
  * Retrieves all customer data from the spreadsheet for web display.
+ * Delegates to getCustomersCore_ with date serialization enabled.
  *
  * @returns {Object} Result with customers array
  * @private
  */
 function getCustomersForWeb() {
-  try {
-    Logger.log('getCustomersForWeb: Starting...');
-    const sheet = getTargetSheet_();
-    Logger.log('getCustomersForWeb: Got sheet');
-    const settings = getSettings();
-    Logger.log('getCustomersForWeb: Got settings');
-    const cols = settings.columns;
-    const headerRowIndex = settings.behavior.headerRowIndex;
-
-    const data = sheet.getDataRange().getValues();
-    Logger.log('getCustomersForWeb: Got data, rows=' + data.length);
-    if (data.length <= headerRowIndex) {
-      Logger.log('getCustomersForWeb: No data rows, returning empty');
-      return { success: true, data: [] };
-    }
-
-    // Build column map from headers
-    const headers = data[headerRowIndex - 1];
-    const colMap = {};
-    headers.forEach((header, index) => {
-      if (header) {
-        colMap[String(header).trim()] = index;
-      }
-    });
-
-    // Extract customer data
-    const customers = [];
-    for (let i = headerRowIndex; i < data.length; i++) {
-      const row = data[i];
-      const phoneCol = colMap[cols.phoneNumber];
-      const nameCol = colMap[cols.customerName];
-      const balanceCol = colMap[cols.balance];
-      const tiffinsCol = colMap[cols.numTiffins];
-      const dueDateCol = colMap[cols.dueDate];
-      const statusCol = colMap[cols.messageStatus];
-      const orderIdCol = colMap[cols.orderId];
-      const paymentCol = colMap[cols.paymentStatus];
-
-      // Skip rows without essential data
-      if (!row[nameCol] && !row[phoneCol]) continue;
-
-      // Convert Date objects to strings for google.script.run serialization
-      const dueDateRaw = row[dueDateCol];
-      const dueDateStr = dueDateRaw instanceof Date
-        ? dueDateRaw.toISOString()
-        : (dueDateRaw ? String(dueDateRaw) : '');
-
-      customers.push({
-        rowIndex: i + 1, // 1-based for sheet operations
-        phone: String(row[phoneCol] || ''),
-        name: String(row[nameCol] || ''),
-        balance: row[balanceCol] || 0,
-        formattedBalance: formatBalance(row[balanceCol]),
-        numTiffins: row[tiffinsCol] || 0,
-        dueDate: dueDateStr,
-        month: getMonthFromValue(dueDateRaw),
-        messageStatus: String(row[statusCol] || ''),
-        orderId: String(row[orderIdCol] || ''),
-        paymentStatus: String(row[paymentCol] || '')
-      });
-    }
-
-    Logger.log('getCustomersForWeb: Processed ' + customers.length + ' customers');
-    const result = { success: true, data: customers };
-    Logger.log('getCustomersForWeb: Returning result, data size approx ' + JSON.stringify(result).length + ' chars');
-    return result;
-  } catch (error) {
-    Logger.log('getCustomersForWeb error: ' + error.message + '\nStack: ' + error.stack);
-    return { success: false, error: error.message };
-  }
+  return getCustomersCore_({ serializeDates: true });
 }
 
 /**
@@ -208,253 +142,47 @@ function getCustomerStatsForWeb() {
 
 /**
  * Sends bills to customers based on filter criteria.
+ * Delegates to sendBillsCore_ with payload parameters.
  *
  * @param {Object} payload - Filter options (filter, dueDate, templateType)
  * @returns {Object} Result with sent/error counts
  * @private
  */
 function sendBillsForWeb(payload) {
-  try {
-    // Ensure credentials are loaded
-    if (!checkCredentials(true)) {
-      return { success: false, error: 'Twilio credentials not configured' };
-    }
-
-    const filter = payload?.filter || 'unpaid'; // 'unpaid', 'all', 'byDate'
-    const targetDate = payload?.dueDate || '';
-    const templateType = payload?.templateType || 'firstNotice';
-
-    const settings = getSettings();
-    const cols = settings.columns;
-    const sheet = getTargetSheet_();
-    const data = sheet.getDataRange().getValues();
-
-    // Build column map
-    const headers = data[settings.behavior.headerRowIndex - 1];
-    const colMap = {};
-    headers.forEach((header, index) => {
-      if (header) colMap[String(header).trim()] = index;
-    });
-
-    const phoneCol = colMap[cols.phoneNumber];
-    const nameCol = colMap[cols.customerName];
-    const balanceCol = colMap[cols.balance];
-    const tiffinsCol = colMap[cols.numTiffins];
-    const dueDateCol = colMap[cols.dueDate];
-    const paymentCol = colMap[cols.paymentStatus];
-    const statusCol = colMap[cols.messageStatus];
-
-    // Filter rows to process
-    const rowsToProcess = [];
-    for (let i = settings.behavior.headerRowIndex; i < data.length; i++) {
-      const row = data[i];
-      const paymentStatus = String(row[paymentCol]).toLowerCase();
-      const dueDate = row[dueDateCol];
-
-      let shouldProcess = false;
-
-      if (filter === 'unpaid' && paymentStatus === 'unpaid') {
-        shouldProcess = true;
-      } else if (filter === 'all') {
-        shouldProcess = true;
-      } else if (filter === 'byDate' && paymentStatus === 'unpaid') {
-        const dueDateStr = String(dueDate).toLowerCase();
-        const monthFromDate = getMonthFromValue(dueDate).toLowerCase();
-        const targetLower = targetDate.toLowerCase();
-        if (dueDateStr.includes(targetLower) || monthFromDate.includes(targetLower)) {
-          shouldProcess = true;
-        }
-      }
-
-      if (shouldProcess) {
-        rowsToProcess.push({
-          data: row,
-          row: i + 1,
-          phone: row[phoneCol],
-          name: row[nameCol],
-          balance: row[balanceCol],
-          tiffins: row[tiffinsCol],
-          dueDate: dueDate
-        });
-      }
-    }
-
-    // Process rows (respecting batch size)
-    const batchSize = Math.min(rowsToProcess.length, settings.behavior.batchSize);
-    let sentCount = 0;
-    let errorCount = 0;
-    const errorDetails = [];
-    const statusUpdates = [];
-
-    for (let i = 0; i < batchSize; i++) {
-      const item = rowsToProcess[i];
-
-      if (!item.phone || !item.name || !item.balance || !item.tiffins) {
-        errorCount++;
-        errorDetails.push({ name: item.name || `Row ${item.row}`, error: 'Missing required data' });
-        statusUpdates.push({ row: item.row, status: 'Error: Missing data', color: settings.colors.error });
-        continue;
-      }
-
-      const result = sendBill_(item.phone, item.name, item.balance, item.tiffins, item.dueDate, templateType);
-      statusUpdates.push({ row: item.row, status: result.status, color: result.color });
-
-      if (result.success) {
-        sentCount++;
-      } else {
-        errorCount++;
-        errorDetails.push({ name: item.name, error: result.status });
-      }
-
-      // Delay between messages
-      if (i < batchSize - 1) {
-        Utilities.sleep(settings.behavior.messageDelayMs);
-      }
-    }
-
-    // Apply status updates to sheet
-    applyStatusUpdates(sheet, statusUpdates, statusCol, data.length);
-
-    return {
-      success: true,
-      data: {
-        sentCount,
-        errorCount,
-        skippedCount: rowsToProcess.length - batchSize,
-        totalProcessed: batchSize,
-        errorDetails: errorDetails.slice(0, 10), // Limit error details
-        dryRunMode: settings.behavior.dryRunMode
-      }
-    };
-  } catch (error) {
-    Logger.log(`sendBillsForWeb_ error: ${error.message}`);
-    return { success: false, error: error.message };
-  }
+  return sendBillsCore_({
+    filter: payload?.filter,
+    dueDate: payload?.dueDate,
+    templateType: payload?.templateType,
+    dryRunMode: payload?.dryRunMode
+  });
 }
 
 /**
  * Sends a bill to a single customer by row index or order ID.
+ * Delegates to sendSingleBillCore_ with payload parameters.
  *
  * @param {Object} payload - { rowIndex, orderId, templateType }
  * @returns {Object} Result
  * @private
  */
 function sendSingleBillForWeb(payload) {
-  try {
-    if (!checkCredentials(true)) {
-      return { success: false, error: 'Twilio credentials not configured' };
-    }
-
-    const settings = getSettings();
-    const cols = settings.columns;
-    const sheet = getTargetSheet_();
-    const data = sheet.getDataRange().getValues();
-    const templateType = payload?.templateType || 'firstNotice';
-
-    // Build column map
-    const headers = data[settings.behavior.headerRowIndex - 1];
-    const colMap = {};
-    headers.forEach((header, index) => {
-      if (header) colMap[String(header).trim()] = index;
-    });
-
-    let targetRow = -1;
-
-    // Find by row index
-    if (payload?.rowIndex) {
-      targetRow = payload.rowIndex - 1; // Convert to 0-based
-    }
-    // Find by order ID
-    else if (payload?.orderId) {
-      const orderIdCol = colMap[cols.orderId];
-      for (let i = settings.behavior.headerRowIndex; i < data.length; i++) {
-        if (String(data[i][orderIdCol]).trim() === payload.orderId) {
-          targetRow = i;
-          break;
-        }
-      }
-    }
-
-    if (targetRow < settings.behavior.headerRowIndex || targetRow >= data.length) {
-      return { success: false, error: 'Customer not found' };
-    }
-
-    const row = data[targetRow];
-    const phone = row[colMap[cols.phoneNumber]];
-    const name = row[colMap[cols.customerName]];
-    const balance = row[colMap[cols.balance]];
-    const tiffins = row[colMap[cols.numTiffins]];
-    const dueDate = row[colMap[cols.dueDate]];
-    const statusCol = colMap[cols.messageStatus];
-
-    if (!phone || !name || !balance || !tiffins) {
-      return { success: false, error: 'Customer is missing required data (phone, name, balance, or tiffins)' };
-    }
-
-    const result = sendBill_(phone, name, balance, tiffins, dueDate, templateType);
-
-    // Update status in sheet
-    const statusRange = sheet.getRange(targetRow + 1, statusCol + 1);
-    statusRange.setValue(result.status);
-    statusRange.setBackground(result.color);
-
-    return {
-      success: result.success,
-      data: {
-        customerName: name,
-        status: result.status,
-        dryRunMode: settings.behavior.dryRunMode
-      },
-      error: result.success ? null : result.status
-    };
-  } catch (error) {
-    Logger.log(`sendSingleBillForWeb_ error: ${error.message}`);
-    return { success: false, error: error.message };
-  }
+  return sendSingleBillCore_({
+    rowIndex: payload?.rowIndex,
+    orderId: payload?.orderId,
+    templateType: payload?.templateType,
+    dryRunMode: payload?.dryRunMode
+  });
 }
 
 /**
  * Clears all message statuses in the spreadsheet.
+ * Delegates to clearAllStatusesCore_.
  *
  * @returns {Object} Result
  * @private
  */
 function clearAllStatusesForWeb() {
-  try {
-    const settings = getSettings();
-    const cols = settings.columns;
-    const sheet = getTargetSheet_();
-    const data = sheet.getDataRange().getValues();
-
-    // Build column map
-    const headers = data[settings.behavior.headerRowIndex - 1];
-    const colMap = {};
-    headers.forEach((header, index) => {
-      if (header) colMap[String(header).trim()] = index;
-    });
-
-    const statusColIndex = colMap[cols.messageStatus];
-    if (statusColIndex === undefined) {
-      return { success: false, error: `Column "${cols.messageStatus}" not found` };
-    }
-
-    const rowCount = data.length - settings.behavior.headerRowIndex;
-    if (rowCount > 0) {
-      const startRow = settings.behavior.headerRowIndex + 1;
-      const statusCol = statusColIndex + 1;
-      const clearValues = Array(rowCount).fill(['']);
-      const clearBackgrounds = Array(rowCount).fill([null]);
-
-      const range = sheet.getRange(startRow, statusCol, rowCount, 1);
-      range.setValues(clearValues);
-      range.setBackgrounds(clearBackgrounds);
-    }
-
-    return { success: true, data: { clearedCount: rowCount } };
-  } catch (error) {
-    Logger.log(`clearAllStatusesForWeb_ error: ${error.message}`);
-    return { success: false, error: error.message };
-  }
+  return clearAllStatusesCore_();
 }
 
 // ========================================
