@@ -162,7 +162,7 @@ function onEdit(e) {
         // Check if we already sent a thank you recently to avoid loops?
         // For now, we assume the user intends to send if they type Paid.
 
-        const result = sendThankYouMessage_(customerPhone, customerName, orderId);
+        const result = sendThankYouMessage_(customerPhone, customerName, orderId, settings);
         statusUpdates.push({
           row: currentRow,
           status: result.status,
@@ -174,13 +174,26 @@ function onEdit(e) {
       }
     }
 
-    // Batch write only the rows that were actually updated (not nulls for unaffected rows)
+    // Batch write status updates using setValues/setBackgrounds (avoids per-cell round-trips)
     if (statusUpdates.length > 0) {
+      // Read current status column for the affected row range
+      const statusCol = statusColIndex + 1; // 1-based
+      const currentValues = sheet.getRange(startRow, statusCol, numRows, 1).getValues();
+      const currentBgs = sheet.getRange(startRow, statusCol, numRows, 1).getBackgrounds();
+
+      // Merge updates into the arrays
       for (const update of statusUpdates) {
-        const statusRange = sheet.getRange(update.row, statusColIndex + 1);
-        statusRange.setValue(update.status);
-        statusRange.setBackground(update.color);
+        const idx = update.row - startRow;
+        if (idx >= 0 && idx < numRows) {
+          currentValues[idx][0] = update.status;
+          currentBgs[idx][0] = update.color;
+        }
       }
+
+      // Single batch write
+      const range = sheet.getRange(startRow, statusCol, numRows, 1);
+      range.setValues(currentValues);
+      range.setBackgrounds(currentBgs);
     }
   } catch (error) {
     // Log error but don't show UI alert (triggers can't reliably show UI)
