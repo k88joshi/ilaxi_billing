@@ -3263,7 +3263,7 @@
       var hasCredentials = credentialsConfigured;
       var hasBusiness = !!(currentSettings && currentSettings.business && currentSettings.business.name);
       var hasColumns = !!(currentSettings && currentSettings.columns && Object.keys(currentSettings.columns).some(function(k) { return currentSettings.columns[k]; }));
-      var hasTemplates = !!(currentSettings && currentSettings.templates && currentSettings.templates.firstNotice && currentSettings.templates.firstNotice.content);
+      var hasTemplates = !!(currentSettings && currentSettings.templates && currentSettings.templates.billMessages && currentSettings.templates.billMessages.firstNotice && currentSettings.templates.billMessages.firstNotice.message);
 
       var items = [
         { id: 'setupCredentials', done: hasCredentials },
@@ -3564,6 +3564,7 @@
         }
         if (result.success) {
           showAlert('settingsAlert', 'success', 'Settings saved successfully!');
+          updateSetupChecklist();
         } else {
           showAlert('settingsAlert', 'error', result.error || 'Failed to save');
         }
@@ -3706,6 +3707,7 @@
         }
         if (result.success) {
           showAlert('columnsAlert', 'success', 'Column mappings saved successfully!');
+          updateSetupChecklist();
         } else {
           showAlert('columnsAlert', 'error', result.error || 'Failed to save');
         }
@@ -3899,6 +3901,7 @@
           originalTemplateContent = message;
           updateTemplateStatus('saved');
           showAlert('templatesAlert', 'success', 'Template saved successfully!');
+          updateSetupChecklist();
         } else {
           showAlert('templatesAlert', 'error', result.error || 'Failed to save template');
         }
@@ -4102,6 +4105,7 @@
           msgOriginalContent = message;
           updateMsgSaveStatus('saved');
           showMsgSaveFeedback();
+          updateSetupChecklist();
         } else {
           showAlert('messagesTabAlert', 'error', result.error || 'Failed to save template');
         }
