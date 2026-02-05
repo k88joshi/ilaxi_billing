@@ -1,133 +1,35 @@
 // ========================================
 // WEB APP ENTRY POINTS
-// Handles web app deployment and authentication
+// Handles web app deployment and Google account authentication
 // ========================================
 
 /**
+ * Property key for storing the allowed users whitelist.
+ * @const {string}
+ */
+const ALLOWED_USERS_KEY = 'ALLOWED_USERS';
+
+/**
  * Main entry point for web app GET requests.
- * Serves the login page or main app based on password validation.
+ * Serves the main app if user is authorized, otherwise shows access denied page.
  *
  * @param {Object} e - Event object from web app request
  * @returns {HtmlOutput} HTML page to display
  */
 function doGet(e) {
-  try {
-    // Debug mode: add ?debug=1 to URL to test basic server response
-    if (e?.parameter?.debug === '1') {
-      const debugInfo = {
-        timestamp: new Date().toISOString(),
-        hasPassword: !!PropertiesService.getScriptProperties().getProperty(APP_PASSWORD_KEY),
-        spreadsheetId: SPREADSHEET_ID,
-        spreadsheetConfigured: SPREADSHEET_ID !== 'YOUR_SPREADSHEET_ID_HERE'
-      };
-      return HtmlService.createHtmlOutput(
-        '<html><body style="font-family:monospace;padding:20px;">' +
-        '<h1>Debug Info</h1>' +
-        '<pre>' + JSON.stringify(debugInfo, null, 2) + '</pre>' +
-        '<p>If you see this, server-side is working!</p>' +
-        '</body></html>'
-      ).setTitle('Debug');
-    }
+  const userEmail = getCurrentUserEmail_();
 
-    // Debug mode 2: test template evaluation with a fake password
-    if (e?.parameter?.debug === '2') {
-      try {
-        const template = HtmlService.createTemplateFromFile('webapp-main');
-        template.password = 'test123'; // Safe test password
-        const evaluated = template.evaluate();
-        const content = evaluated.getContent();
-        return HtmlService.createHtmlOutput(
-          '<html><body style="font-family:monospace;padding:20px;">' +
-          '<h1>Template Evaluation: SUCCESS</h1>' +
-          '<p>Template evaluated successfully. Length: ' + content.length + ' chars</p>' +
-          '<p>First 500 chars:</p>' +
-          '<pre style="background:#f0f0f0;padding:10px;overflow:auto;">' +
-          content.substring(0, 500).replace(/</g, '&lt;').replace(/>/g, '&gt;') +
-          '</pre>' +
-          '</body></html>'
-        ).setTitle('Debug 2');
-      } catch (err) {
-        return HtmlService.createHtmlOutput(
-          '<html><body style="font-family:monospace;padding:20px;color:red;">' +
-          '<h1>Template Evaluation: FAILED</h1>' +
-          '<p><strong>Error:</strong> ' + err.toString() + '</p>' +
-          '<p><strong>Stack:</strong></p><pre>' + err.stack + '</pre>' +
-          '</body></html>'
-        ).setTitle('Debug 2 - Error');
-      }
-    }
-
-    // Debug mode 4: exact same code path as normal login - serves actual webapp-main
-    if (e?.parameter?.debug === '4' && e?.parameter?.p) {
-      if (validatePassword_(e.parameter.p)) {
-        const template = HtmlService.createTemplateFromFile('webapp-main');
-        template.password = e.parameter.p;
-        return createHtmlOutput_(template, 'Ilaxi Billing - Debug 4');
-      } else {
-        return HtmlService.createHtmlOutput('<h1>Invalid password for debug=4</h1>');
-      }
-    }
-
-    // Debug mode 5: serve webapp-main WITHOUT going through createHtmlOutput_
-    if (e?.parameter?.debug === '5' && e?.parameter?.p) {
-      if (validatePassword_(e.parameter.p)) {
-        const template = HtmlService.createTemplateFromFile('webapp-main');
-        template.password = e.parameter.p;
-        // Direct evaluate without the helper function
-        return template.evaluate().setTitle('Ilaxi Billing - Debug 5');
-      } else {
-        return HtmlService.createHtmlOutput('<h1>Invalid password for debug=5</h1>');
-      }
-    }
-
-    // Debug mode 3: test with actual password from URL
-    if (e?.parameter?.debug === '3' && e?.parameter?.p) {
-      try {
-        const template = HtmlService.createTemplateFromFile('webapp-main');
-        template.password = e.parameter.p;
-        const evaluated = template.evaluate();
-        const content = evaluated.getContent();
-        // Show the part around APP_PASSWORD to check for issues
-        const pwIndex = content.indexOf('APP_PASSWORD');
-        const snippet = pwIndex > -1 ? content.substring(Math.max(0, pwIndex - 50), pwIndex + 200) : 'APP_PASSWORD not found';
-        return HtmlService.createHtmlOutput(
-          '<html><body style="font-family:monospace;padding:20px;">' +
-          '<h1>Template with Real Password: SUCCESS</h1>' +
-          '<p>Length: ' + content.length + ' chars</p>' +
-          '<p>APP_PASSWORD section:</p>' +
-          '<pre style="background:#f0f0f0;padding:10px;overflow:auto;">' +
-          snippet.replace(/</g, '&lt;').replace(/>/g, '&gt;') +
-          '</pre>' +
-          '</body></html>'
-        ).setTitle('Debug 3');
-      } catch (err) {
-        return HtmlService.createHtmlOutput(
-          '<html><body style="font-family:monospace;padding:20px;color:red;">' +
-          '<h1>Template with Real Password: FAILED</h1>' +
-          '<p><strong>Error:</strong> ' + err.toString() + '</p>' +
-          '<p><strong>Stack:</strong></p><pre>' + err.stack + '</pre>' +
-          '</body></html>'
-        ).setTitle('Debug 3 - Error');
-      }
-    }
-
-    const password = e?.parameter?.p;
-
-    if (validatePassword_(password)) {
-      // Password valid - serve main app
-      const template = HtmlService.createTemplateFromFile('webapp-main');
-      template.password = password; // Pass password for API calls
-      return createHtmlOutput_(template, 'Ilaxi Billing');
-    }
-
-    // No valid password - serve login page
-    // Show error if password was provided but invalid
-    const template = HtmlService.createTemplateFromFile('login');
-    template.errorMessage = password ? 'Invalid password. Please try again.' : '';
-    return createHtmlOutput_(template, 'Login - Ilaxi Billing');
-  } catch (error) {
-    return ContentService.createTextOutput('Server Error: ' + error.toString() + '\nStack: ' + error.stack);
+  if (!userEmail) {
+    return createUnauthorizedPage_('', 'Unable to determine your Google account. Please ensure you are signed in.');
   }
+
+  if (!isUserAuthorized_(userEmail)) {
+    return createUnauthorizedPage_(userEmail, 'Your account is not authorized to access this application.');
+  }
+
+  // User is authorized - serve main app
+  const template = HtmlService.createTemplateFromFile('webapp-main');
+  return createHtmlOutput_(template, 'Ilaxi Billing');
 }
 
 /**
@@ -139,8 +41,18 @@ function doGet(e) {
  */
 function doPost(e) {
   try {
+    // Check authorization first
+    const userEmail = getCurrentUserEmail_();
+    if (!userEmail || !isUserAuthorized_(userEmail)) {
+      return ContentService.createTextOutput(JSON.stringify({
+        success: false,
+        error: 'Unauthorized',
+        errorCode: 'AUTH_REQUIRED'
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     const data = JSON.parse(e.postData.contents);
-    const result = handleApiRequest_(data.action, data.payload, data.password);
+    const result = handleApiRequest_(data.action, data.payload);
     return ContentService.createTextOutput(JSON.stringify(result))
       .setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
@@ -153,89 +65,203 @@ function doPost(e) {
 }
 
 // ========================================
-// PASSWORD MANAGEMENT
+// USER AUTHORIZATION MANAGEMENT
 // ========================================
 
 /**
- * Property key for storing the hashed app password.
- * @const {string}
- */
-const APP_PASSWORD_KEY = 'APP_PASSWORD';
-
-/**
- * Sets the app password (hashed with SHA-256).
- * Run this function manually from the Apps Script editor to set your password.
+ * Gets the email address of the currently logged-in user.
  *
- * @param {string} newPassword - The plaintext password to set
- * @returns {Object} Result with success boolean
+ * @returns {string|null} The user's email address, or null if unavailable
+ * @private
  */
-function setAppPassword(newPassword) {
-  if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 4) {
-    Logger.log('setAppPassword: Password must be at least 4 characters');
-    return { success: false, error: 'Password must be at least 4 characters' };
+function getCurrentUserEmail_() {
+  try {
+    const email = Session.getActiveUser().getEmail();
+    return email || null;
+  } catch (e) {
+    Logger.log(`getCurrentUserEmail_ error: ${e.message}`);
+    return null;
   }
-
-  const hash = hashPassword_(newPassword);
-  PropertiesService.getScriptProperties().setProperty(APP_PASSWORD_KEY, hash);
-  Logger.log('App password set successfully');
-  return { success: true };
 }
 
 /**
- * Validates an input password against the stored hash.
+ * Gets the list of allowed user emails from ScriptProperties.
  *
- * @param {string} inputPassword - The plaintext password to validate
- * @returns {boolean} True if password is valid
- * @private
+ * @returns {string[]} Array of allowed email addresses
  */
-function validatePassword_(inputPassword) {
-  if (!inputPassword || typeof inputPassword !== 'string') {
-    return false;
-  }
-
-  const stored = PropertiesService.getScriptProperties().getProperty(APP_PASSWORD_KEY);
+function getAllowedUsers() {
+  const stored = PropertiesService.getScriptProperties().getProperty(ALLOWED_USERS_KEY);
   if (!stored) {
-    Logger.log('validatePassword_: No password has been set. Run setAppPassword() first.');
+    return [];
+  }
+  try {
+    return JSON.parse(stored);
+  } catch (e) {
+    Logger.log(`getAllowedUsers parse error: ${e.message}`);
+    return [];
+  }
+}
+
+/**
+ * Adds an email to the allowed users whitelist.
+ * Run this function from the Apps Script editor to authorize users.
+ *
+ * @param {string} email - The email address to authorize
+ * @returns {Object} Result with success boolean
+ */
+function addAllowedUser(email) {
+  if (!email || typeof email !== 'string') {
+    Logger.log('addAllowedUser: Invalid email provided');
+    return { success: false, error: 'Invalid email provided' };
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail.includes('@')) {
+    Logger.log('addAllowedUser: Email must contain @');
+    return { success: false, error: 'Invalid email format' };
+  }
+
+  const users = getAllowedUsers();
+  if (users.includes(normalizedEmail)) {
+    Logger.log(`addAllowedUser: ${normalizedEmail} is already authorized`);
+    return { success: true, message: 'User already authorized' };
+  }
+
+  users.push(normalizedEmail);
+  PropertiesService.getScriptProperties().setProperty(ALLOWED_USERS_KEY, JSON.stringify(users));
+  Logger.log(`addAllowedUser: Added ${normalizedEmail} to allowed users`);
+  return { success: true, message: `Added ${normalizedEmail} to allowed users` };
+}
+
+/**
+ * Removes an email from the allowed users whitelist.
+ * Run this function from the Apps Script editor to revoke access.
+ *
+ * @param {string} email - The email address to remove
+ * @returns {Object} Result with success boolean
+ */
+function removeAllowedUser(email) {
+  if (!email || typeof email !== 'string') {
+    Logger.log('removeAllowedUser: Invalid email provided');
+    return { success: false, error: 'Invalid email provided' };
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const users = getAllowedUsers();
+  const index = users.indexOf(normalizedEmail);
+
+  if (index === -1) {
+    Logger.log(`removeAllowedUser: ${normalizedEmail} not found in allowed users`);
+    return { success: false, error: 'User not found in allowed list' };
+  }
+
+  users.splice(index, 1);
+  PropertiesService.getScriptProperties().setProperty(ALLOWED_USERS_KEY, JSON.stringify(users));
+  Logger.log(`removeAllowedUser: Removed ${normalizedEmail} from allowed users`);
+  return { success: true, message: `Removed ${normalizedEmail} from allowed users` };
+}
+
+/**
+ * Checks if the given email is in the allowed users whitelist.
+ *
+ * @param {string} email - The email to check
+ * @returns {boolean} True if user is authorized
+ * @private
+ */
+function isUserAuthorized_(email) {
+  if (!email) {
     return false;
   }
 
-  const inputHash = hashPassword_(inputPassword);
-  return stored === inputHash;
+  const normalizedEmail = email.trim().toLowerCase();
+  const users = getAllowedUsers();
+  return users.includes(normalizedEmail);
 }
 
 /**
- * Hashes a password using SHA-256.
+ * Creates an HTML page for unauthorized access.
  *
- * @param {string} password - The plaintext password
- * @returns {string} Hex-encoded hash
+ * @param {string} email - The user's email (for display)
+ * @param {string} reason - The reason for denial
+ * @returns {HtmlOutput} The access denied page
  * @private
  */
-function hashPassword_(password) {
-  const hash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, password);
-  return hash.map(b => ('0' + (b & 0xFF).toString(16)).slice(-2)).join('');
-}
+function createUnauthorizedPage_(email, reason) {
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Access Denied - Ilaxi Billing</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 40px;
+      max-width: 450px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+    .icon {
+      width: 80px;
+      height: 80px;
+      background: #fee2e2;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 24px;
+    }
+    .icon svg { width: 40px; height: 40px; color: #ef4444; }
+    h1 { color: #1e293b; font-size: 24px; margin-bottom: 12px; }
+    p { color: #64748b; line-height: 1.6; margin-bottom: 16px; }
+    .email {
+      background: #f1f5f9;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 14px;
+      color: #475569;
+      word-break: break-all;
+      margin-bottom: 24px;
+    }
+    .help {
+      font-size: 13px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+    </div>
+    <h1>Access Denied</h1>
+    <p>${reason}</p>
+    ${email ? `<div class="email">${email}</div>` : ''}
+    <p class="help">If you believe you should have access, please contact the administrator.</p>
+  </div>
+</body>
+</html>
+  `.trim();
 
-/**
- * Checks if an app password has been set.
- * Useful for first-time setup verification.
- *
- * @returns {boolean} True if password exists
- */
-function hasAppPassword() {
-  const stored = PropertiesService.getScriptProperties().getProperty(APP_PASSWORD_KEY);
-  return !!stored;
-}
-
-/**
- * Removes the app password.
- * WARNING: This will disable web app access until a new password is set.
- *
- * @returns {Object} Result with success boolean
- */
-function clearAppPassword() {
-  PropertiesService.getScriptProperties().deleteProperty(APP_PASSWORD_KEY);
-  Logger.log('App password cleared');
-  return { success: true };
+  return HtmlService.createHtmlOutput(html)
+    .setTitle('Access Denied - Ilaxi Billing')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
 /**
