@@ -93,7 +93,7 @@ We appreciate your business!
     },
     behavior: {
       dryRunMode: false,
-      autoThankYouEnabled: true,
+      autoThankYouEnabled: false,
       batchSize: 75,
       messageDelayMs: 1000,
       headerRowIndex: 1,
@@ -193,6 +193,14 @@ function saveSettings(settings) {
   try {
     scriptProperties.setProperty(SETTINGS_PROPERTY_KEY, JSON.stringify(settings));
     Logger.log("Settings saved successfully.");
+
+    // Sync the installable onEdit trigger with the auto thank-you setting
+    try {
+      syncEditTrigger_(!!settings.behavior.autoThankYouEnabled);
+    } catch (triggerErr) {
+      Logger.log(`Warning: Could not sync edit trigger: ${triggerErr.message}`);
+    }
+
     return { success: true };
   } catch (e) {
     Logger.log(`Error saving settings: ${e.message}`);

@@ -46,20 +46,15 @@ function onOpen() {
 
 
 /**
- * Runs automatically when a user edits a cell.
- * This is a "simple trigger" that runs automatically without installation.
- * It checks if the "Payment" column was changed to "Paid".
- * If so, it automatically triggers the sendThankYouMessage function.
- *
- * Note: Simple triggers have limitations (no UI alerts, 30-second timeout).
- * Consider converting to an installable trigger for more features.
+ * Installable edit trigger handler for auto thank-you messages.
+ * Must be installed via installEditTrigger() — simple onEdit() cannot call UrlFetchApp.
  *
  * @param {Object} e The event object passed by Google Sheets, containing info about the edit.
  * @property {GoogleAppsScript.Spreadsheet.Range} e.range - The cell range that was edited.
  * @property {string} e.value - The new value of the cell (only for single cell edits).
  * @property {string} e.oldValue - The value of the cell before the edit (single cell only).
  */
-function onEdit(e) {
+function onEditInstallable(e) {
   try {
     // Validate event object
     if (!e || !e.range) {
@@ -194,9 +189,41 @@ function onEdit(e) {
       const range = sheet.getRange(startRow, statusCol, numRows, 1);
       range.setValues(currentValues);
       range.setBackgrounds(currentBgs);
+
+      // Show toast notification summarizing results
+      const sent = statusUpdates.filter(u => u.color === settings.colors.success).length;
+      const failed = statusUpdates.length - sent;
+      let toastMsg = `Thank-you sent to ${sent} customer${sent !== 1 ? "s" : ""}`;
+      if (failed > 0) toastMsg += ` (${failed} failed)`;
+      SpreadsheetApp.getActive().toast(toastMsg, "Auto Thank-You", 5);
     }
   } catch (error) {
     // Log error but don't show UI alert (triggers can't reliably show UI)
     Logger.log(`ERROR in onEdit trigger: ${error.message}\nStack: ${error.stack || "N/A"}`);
+  }
+}
+
+
+// ========================================
+// TRIGGER MANAGEMENT
+// ========================================
+
+/**
+ * Ensures the installable onEdit trigger matches the autoThankYouEnabled setting.
+ * Called automatically when settings are saved.
+ */
+function syncEditTrigger_(enabled) {
+  const triggers = ScriptApp.getProjectTriggers();
+  const existing = triggers.find(t => t.getHandlerFunction() === "onEditInstallable");
+
+  if (enabled && !existing) {
+    ScriptApp.newTrigger("onEditInstallable")
+      .forSpreadsheet(SpreadsheetApp.getActive())
+      .onEdit()
+      .create();
+    Logger.log("Installable onEdit trigger created.");
+  } else if (!enabled && existing) {
+    ScriptApp.deleteTrigger(existing);
+    Logger.log("Installable onEdit trigger removed.");
   }
 }
