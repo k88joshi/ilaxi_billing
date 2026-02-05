@@ -73,7 +73,8 @@ function deletePhoneNumber() {
  * Uses a modal dialog for more screen space than a sidebar.
  */
 function showSettingsDialog() {
-  const html = HtmlService.createHtmlOutputFromFile("settings")
+  const template = HtmlService.createTemplateFromFile("settings");
+  const html = template.evaluate()
     .setWidth(950)
     .setHeight(650);
   SpreadsheetApp.getUi().showModalDialog(html, "Settings");
@@ -274,11 +275,6 @@ function completeFirstTimeSetup(setupData) {
       });
     }
 
-    // Set dry run mode
-    if (setupData.dryRunMode !== undefined) {
-      settings.behavior.dryRunMode = setupData.dryRunMode;
-    }
-
     // Save settings
     const saveResult = saveSettings(settings);
     if (!saveResult.success) {
@@ -412,8 +408,9 @@ function confirmResetSettings() {
  * @param {number} skippedCount - Number of rows skipped (e.g., 'Paid', missing data).
  * @param {Array<Object>} errorDetails - Array of {name, error} objects for logging.
  * @param {string} [filter=""] - Optional string describing any filter (e.g., "for October").
+ * @param {boolean} [dryRunMode=false] - Whether this was a dry run send.
  */
-function showSendSummary(sentCount, errorCount, skippedCount, errorDetails, filter = "") {
+function showSendSummary(sentCount, errorCount, skippedCount, errorDetails, filter = "", dryRunMode = false) {
   // Input validation - ensure counts are valid numbers
   sentCount = typeof sentCount === "number" && !isNaN(sentCount) ? Math.max(0, sentCount) : 0;
   errorCount = typeof errorCount === "number" && !isNaN(errorCount) ? Math.max(0, errorCount) : 0;
@@ -427,11 +424,10 @@ function showSendSummary(sentCount, errorCount, skippedCount, errorDetails, filt
   summary += `⊗ Skipped: ${skippedCount} (e.g., 'Paid', missing data, or wrong date)\n`;
   summary += `━━━━━━━━━━━━━━━━━━━━\n`;
   summary += `Total Processed: ${sentCount + errorCount + skippedCount}\n`;
-  
+
   // Add dry run warning if applicable
-  const settings = getSettings();
-  if (settings.behavior.dryRunMode) {
-    summary += `\n⚠️ DRY RUN MODE - No actual messages were sent!\n`;
+  if (dryRunMode) {
+    summary += `\n⚠️ TEST MODE - No actual messages were sent!\n`;
   }
   
   // Add error details if any errors occurred

@@ -38,24 +38,52 @@ Run `runAllSettingsManagerTests()` in Apps Script editor (defined in `settings-m
 | File | Purpose |
 |------|---------|
 | `main.gs` | Entry points: `onOpen()` menus, `onEdit()` auto-thank-you trigger |
+| `billing-core.gs` | **Shared business logic** — mode-independent core functions called by both modes |
 | `settings-manager.gs` | Settings via `PropertiesService`, template processing, validation |
-| `api.gs` | Web app API router - routes POST requests to handlers |
+| `api.gs` | Web app API router — thin wrappers that delegate to `billing-core.gs` |
 | `webapp.gs` | Web app auth (`doGet`/`doPost`), Google account whitelist |
 | `webapp-main.html` | Web app main UI (customer list, messages, settings tabs) |
 | `twilio.gs` | Twilio SMS with exponential backoff retry (max 4 attempts) |
-| `spreadsheet.gs` | Sheet utilities, column mapping via `getHeaderColumnMap()` |
+| `spreadsheet.gs` | Sheet utilities, column mapping, **add-on UI wrappers** that delegate to `billing-core.gs` |
 | `ui.gs` | Menu dialogs, credential management |
 | `settings.html` | Settings modal UI (tabbed interface, used by both modes) |
+| `design-tokens.html` | Shared CSS custom properties and reset, included via `<?!= include('design-tokens') ?>` |
 | `settings-manager.test.gs` | Unit tests - run `runAllSettingsManagerTests()` in Apps Script editor |
 
 ### Data Flow
 ```
-Sheet Data → getHeaderColumnMap() → Settings/Templates → Twilio API → Status written back
+Sheet Data → billing-core.gs → Settings/Templates → Twilio API → Status written back
 ```
 
 ### Storage
 - **ScriptProperties**: Project-wide settings (web app mode, shared config)
 - **UserProperties**: User-specific settings (add-on mode)
+
+### Dual-Mode Parity (IMPORTANT)
+
+Every user-facing feature must work in **both** add-on and web app modes. Business logic lives in `billing-core.gs`; each mode has thin wrappers.
+
+**When adding or changing a feature, update BOTH columns:**
+
+| Core Function (`billing-core.gs`) | Add-on Wrapper (`spreadsheet.gs`) | Web Wrapper (`api.gs`) | Notes |
+|---|---|---|---|
+| `getCustomersCore_()` | — | `getCustomersForWeb()` | Add-on reads sheet directly |
+| `sendBillsCore_()` | `sendBillsToUnpaid()`, `sendUnpaidByDueDate()` | `sendBillsForWeb()` | Add-on has separate menu items per filter |
+| `sendSingleBillCore_()` | `sendBillByOrderID()` | `sendSingleBillForWeb()` | Add-on shows confirm dialog |
+| `clearAllStatusesCore_()` | `clearAllStatuses()` | `clearAllStatusesForWeb()` | Add-on shows confirm dialog |
+| `lookupCustomerByOrderId_()` | Used by `sendBillByOrderID()` | — | Preview before send |
+| — | `testSingleMessage()` | — | Add-on only (finds first unpaid) |
+| — | — | `getCustomerStatsForWeb()` | Web only (dashboard stats) |
+
+**Shared CSS**: Design tokens live in `design-tokens.html`. Both `settings.html` and `webapp-main.html` include it via `<?!= include('design-tokens') ?>`. Dark theme overrides are webapp-only (in `webapp-main.html`).
+
+**Checklist for new features:**
+1. Write core logic in `billing-core.gs` (return `{success, data, error}`)
+2. Add add-on wrapper in `spreadsheet.gs` (UI prompts/alerts around the core call)
+3. Add web wrapper in `api.gs` (extract params from payload, call core)
+4. Add API route in `handleApiRequest_()` switch statement
+5. Add menu item in `onOpen()` if needed
+6. Update the parity table above
 
 ## Critical Patterns
 

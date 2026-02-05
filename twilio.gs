@@ -218,10 +218,14 @@ function sendTwilioMessage_(formattedPhone, message, messageType, customerName, 
  * @param {number|string} numTiffins - The number of tiffins (raw from sheet).
  * @param {Date|string} dueDate - The due date or month (raw from sheet).
  * @param {string} [templateType="firstNotice"] - Template type: "firstNotice", "followUp", or "finalNotice".
+ * @param {boolean} [dryRunMode] - If defined, overrides settings.behavior.dryRunMode for this send.
  * @returns {Object} Result object with success, status, and color properties.
  */
-function sendBill_(customerPhone, customerName, balance, numTiffins, dueDate, templateType) {
+function sendBill_(customerPhone, customerName, balance, numTiffins, dueDate, templateType, dryRunMode) {
   const settings = getSettings();
+  if (dryRunMode !== undefined) {
+    settings.behavior.dryRunMode = dryRunMode;
+  }
 
   // Ensure credentials are loaded (silent check since calling functions should have validated already)
   if (!checkCredentials(true)) {

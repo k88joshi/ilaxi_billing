@@ -96,7 +96,8 @@ We appreciate your business!
       autoThankYouEnabled: true,
       batchSize: 75,
       messageDelayMs: 1000,
-      headerRowIndex: 1
+      headerRowIndex: 1,
+      testOrderId: ""
     },
     colors: {
       success: "#d9ead3",
@@ -427,7 +428,6 @@ function migrateFromLegacyConfig() {
     migrated.business.whatsappLink = WHATSAPP_LINK || migrated.business.whatsappLink;
 
     // Migrate behavior settings
-    migrated.behavior.dryRunMode = typeof DRY_RUN_MODE !== "undefined" ? DRY_RUN_MODE : false;
     migrated.behavior.batchSize = typeof BATCH_SIZE !== "undefined" ? BATCH_SIZE : 75;
     migrated.behavior.messageDelayMs = typeof MESSAGE_DELAY_MS !== "undefined" ? MESSAGE_DELAY_MS : 1000;
     migrated.behavior.headerRowIndex = typeof HEADER_ROW_INDEX !== "undefined" ? HEADER_ROW_INDEX : 1;
@@ -625,17 +625,40 @@ function deepMerge(target, source) {
  */
 function getSampleDataForPreview() {
   const settings = getSettings();
-  return {
+  const businessData = {
     businessName: settings.business.name,
     etransferEmail: settings.business.etransferEmail,
     phoneNumber: settings.business.phoneNumber,
-    whatsappLink: settings.business.whatsappLink,
+    whatsappLink: settings.business.whatsappLink
+  };
+
+  // Try to use real customer data if testOrderId is configured
+  const testOrderId = settings.behavior.testOrderId;
+  if (testOrderId) {
+    try {
+      const lookup = lookupCustomerByOrderId_(testOrderId);
+      if (lookup.success) {
+        return Object.assign({}, businessData, {
+          customerName: String(lookup.data.name || ""),
+          balance: formatBalance(lookup.data.balance),
+          numTiffins: String(lookup.data.tiffins || "0"),
+          month: getMonthFromValue(lookup.data.dueDate),
+          orderId: testOrderId
+        });
+      }
+    } catch (e) {
+      Logger.log("getSampleDataForPreview: test customer lookup failed: " + e.message);
+    }
+  }
+
+  // Fallback to hardcoded sample data
+  return Object.assign({}, businessData, {
     customerName: "John Doe",
     balance: "$150.00",
     numTiffins: "30",
     month: "January",
     orderId: "ORD-2024-001"
-  };
+  });
 }
 
 /**
