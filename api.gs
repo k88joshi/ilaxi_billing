@@ -5,26 +5,16 @@
 
 /**
  * Routes API requests to appropriate handlers.
- * All actions except 'checkPassword' require valid authentication.
+ * Authorization is handled by doPost before this function is called.
  *
  * @param {string} action - The API action to perform
  * @param {Object} payload - Action-specific data
- * @param {string} password - User's password for authentication
  * @returns {Object} Result object with success boolean and data/error
  * @private
  */
-function handleApiRequest_(action, payload, password) {
-  // Validate password for all actions except login check
-  if (action !== 'checkPassword' && !validatePassword_(password)) {
-    return { success: false, error: 'Unauthorized', errorCode: 'AUTH_REQUIRED' };
-  }
-
+function handleApiRequest_(action, payload) {
   try {
     switch (action) {
-      // Authentication
-      case 'checkPassword':
-        return { success: validatePassword_(payload?.password) };
-
       // Customer data
       case 'getCustomers':
         return getCustomersForWeb();

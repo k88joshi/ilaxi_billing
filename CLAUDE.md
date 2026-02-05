@@ -40,7 +40,7 @@ Run `runAllSettingsManagerTests()` in Apps Script editor (defined in `settings-m
 | `main.gs` | Entry points: `onOpen()` menus, `onEdit()` auto-thank-you trigger |
 | `settings-manager.gs` | Settings via `PropertiesService`, template processing, validation |
 | `api.gs` | Web app API router - routes POST requests to handlers |
-| `webapp.gs` | Web app auth (`doGet`/`doPost`), password validation (SHA-256) |
+| `webapp.gs` | Web app auth (`doGet`/`doPost`), Google account whitelist |
 | `twilio.gs` | Twilio SMS with exponential backoff retry (max 4 attempts) |
 | `spreadsheet.gs` | Sheet utilities, column mapping via `getHeaderColumnMap()` |
 | `ui.gs` | Menu dialogs, credential management |
@@ -92,22 +92,28 @@ GitHub Actions on push to master:
 | `CLASP_TOKEN` | Contents of `~/.clasprc.json` for CLASP authentication |
 | `SPREADSHEET_ID` | Google Sheet ID for web app mode (from URL: `/d/{ID}/edit`) |
 
-## Web App Password Setup
+## Web App User Authorization Setup
 
-To set the password for web app login (one-time setup):
+Access is restricted to whitelisted Google accounts. To authorize users:
 
 1. Open Apps Script editor: `clasp open-script`
-2. Add this temporary function to any `.gs` file:
+2. In the function dropdown, select `addAllowedUser`
+3. In the execution log console, run:
    ```javascript
-   function setupPassword() {
-     setAppPassword("your-password-here");
-   }
+   addAllowedUser("user@gmail.com")
    ```
-3. Select `setupPassword` from the function dropdown and click **Run**
-4. Check execution log for "App password set successfully"
-5. Delete the `setupPassword` function (don't leave password in code)
+4. Repeat for each user who needs access
 
-Related functions in `webapp.gs`: `hasAppPassword()`, `clearAppPassword()`
+**Deployment Settings** (when deploying as web app):
+- Execute as: **Me** (script owner)
+- Who has access: **Anyone with Google account**
+
+The whitelist in ScriptProperties restricts actual access beyond Google's auth.
+
+Related functions in `webapp.gs`:
+- `addAllowedUser(email)` - Add a user to the whitelist
+- `removeAllowedUser(email)` - Remove a user from the whitelist
+- `getAllowedUsers()` - List all authorized emails
 
 ## Constraints
 

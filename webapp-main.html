@@ -3,19 +3,7 @@
 <head>
   <base target="_top">
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval'; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src *; style-src * 'unsafe-inline';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script>
-    window.onerror = function(msg, url, line, col, error) {
-      document.body.innerHTML = '<div style="color:red; padding:20px; font-family:monospace; background:#fee;">' +
-        '<h1>Startup Error</h1>' +
-        '<p><strong>Message:</strong> ' + msg + '</p>' +
-        '<p><strong>Line:</strong> ' + line + '</p>' +
-        '<p><strong>Error:</strong> ' + (error ? error.stack : 'N/A') + '</p>' +
-        '</div>';
-      return false;
-    };
-  </script>
   <style>
     /* ============================================
        CSS Custom Properties - Design Tokens
@@ -464,9 +452,6 @@
   </style>
 </head>
 <body>
-  <div style="background:yellow; color:black; padding:10px; text-align:center; font-weight:bold;">
-    DEBUG MODE: Web App Loaded
-  </div>
   <header class="header">
     <div class="header-content">
       <h1>
@@ -640,8 +625,6 @@
   </div>
 
   <script>
-    // Store password for API calls
-    var APP_PASSWORD = <?!= JSON.stringify(password) ?>;
     var currentSettings = null;
     var currentCustomers = [];
     var selectedCustomerRow = null;
@@ -1034,8 +1017,8 @@
 
     // Auth
     function logout() {
-      var currentUrl = window.location.href.split('?')[0];
-      window.location.href = currentUrl;
+      // Google handles re-auth on page reload
+      window.location.reload();
     }
   </script>
 </body>
