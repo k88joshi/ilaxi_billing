@@ -505,3 +505,19 @@ function getCredentialStatusForWeb() {
     return { success: false, error: error.message };
   }
 }
+
+/**
+ * Wraps autoDetectColumns for web app usage.
+ * Returns the standard {success, data} format expected by the webapp.
+ *
+ * @returns {Object} Result with success boolean and data containing headers/detections
+ */
+function autoDetectColumnsForWeb() {
+  try {
+    const result = autoDetectColumns();
+    return { success: true, data: result };
+  } catch (error) {
+    Logger.log(`autoDetectColumnsForWeb error: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
