@@ -41,10 +41,12 @@ Run `runAllSettingsManagerTests()` in Apps Script editor (defined in `settings-m
 | `settings-manager.gs` | Settings via `PropertiesService`, template processing, validation |
 | `api.gs` | Web app API router - routes POST requests to handlers |
 | `webapp.gs` | Web app auth (`doGet`/`doPost`), Google account whitelist |
+| `webapp-main.html` | Web app main UI (customer list, messages, settings tabs) |
 | `twilio.gs` | Twilio SMS with exponential backoff retry (max 4 attempts) |
 | `spreadsheet.gs` | Sheet utilities, column mapping via `getHeaderColumnMap()` |
 | `ui.gs` | Menu dialogs, credential management |
-| `settings.html` | Settings modal UI (tabbed interface) |
+| `settings.html` | Settings modal UI (tabbed interface, used by both modes) |
+| `settings-manager.test.gs` | Unit tests - run `runAllSettingsManagerTests()` in Apps Script editor |
 
 ### Data Flow
 ```
