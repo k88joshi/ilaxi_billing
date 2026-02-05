@@ -93,6 +93,7 @@ We appreciate your business!
     },
     behavior: {
       dryRunMode: false,
+      autoThankYouEnabled: true,
       batchSize: 75,
       messageDelayMs: 1000,
       headerRowIndex: 1
