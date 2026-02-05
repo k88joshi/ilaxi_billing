@@ -1926,7 +1926,7 @@
       gap: var(--space-5);
     }
 
-    /* Toggle switch for dry run mode */
+    /* Toggle switch */
     .toggle-field {
       display: flex;
       align-items: flex-start;
@@ -2357,21 +2357,6 @@
               Review &amp; Send
             </h3>
 
-            <!-- Dry Run Toggle -->
-            <div style="display: flex; align-items: flex-start; gap: var(--space-4); padding: var(--space-4); background: var(--color-border-light); border: 1px solid var(--color-border); border-radius: var(--radius-lg); margin-bottom: var(--space-4);">
-              <div style="padding-top: 2px;">
-                <input type="checkbox" id="dryRunCheckbox" onchange="updateSendReview();" style="width: 18px; height: 18px; accent-color: var(--color-warning); cursor: pointer;">
-              </div>
-              <div>
-                <label for="dryRunCheckbox" style="font-size: var(--text-sm); font-weight: 600; color: var(--color-text); cursor: pointer; display: block; margin-bottom: var(--space-1);">
-                  Dry Run Mode
-                </label>
-                <p style="font-size: var(--text-sm); color: var(--color-text-secondary); line-height: var(--line-height-relaxed); margin: 0;">
-                  Test your billing run without sending real SMS messages. The spreadsheet will be updated with status results marked as "[DRY RUN]" so you can review what would be sent.
-                </p>
-              </div>
-            </div>
-
             <div id="dryRunWarning" class="callout callout-warn" style="display: none;">
               <svg class="callout-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
               <div class="callout-content"><strong>Test Mode Active</strong> No real messages will be sent. The status column will show "[DRY RUN]" results so you can verify everything looks correct before sending for real.</div>
@@ -2382,10 +2367,6 @@
               Send Bills
             </button>
           </div>
-
-          <hr class="section-divider">
-          <h3 class="section-heading">Other Actions</h3>
-          <button class="btn btn-secondary" onclick="clearStatuses()">Clear All Message Statuses</button>
         </div>
       </div>
     </div>
@@ -2879,6 +2860,29 @@
                 <div class="toggle-label">Auto Thank-You Messages</div>
                 <p class="toggle-desc">When enabled, a thank-you message is automatically sent when you mark a payment as "Paid" in the spreadsheet.</p>
               </div>
+            </div>
+
+            <div class="toggle-field">
+              <label class="toggle-switch">
+                <input type="checkbox" id="dryRunCheckbox" onchange="updateSendReview();">
+                <span class="toggle-slider"></span>
+              </label>
+              <div class="toggle-content">
+                <div class="toggle-label">Dry Run Mode</div>
+                <p class="toggle-desc">Test your billing run without sending real SMS messages. The spreadsheet will be updated with status results marked as "[DRY RUN]" so you can review what would be sent.</p>
+              </div>
+            </div>
+
+            <div style="padding: var(--space-4) 0; border-top: 1px solid var(--color-border);">
+              <label class="form-field-label" style="margin-bottom: var(--space-2);">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                Clear All Message Statuses
+              </label>
+              <p class="form-field-desc" style="margin-bottom: var(--space-3);">Remove all message status values and colors from your spreadsheet. This cannot be undone.</p>
+              <button class="btn btn-secondary" onclick="clearStatuses()">
+                <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                Clear All Statuses
+              </button>
             </div>
 
             <div class="form-field-row">
