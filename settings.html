@@ -2323,22 +2323,37 @@
       </div>
 
       <!-- Thank You Message -->
-      <div class="card">
+      <div class="card" id="thankYouCard">
         <div class="card-header">
           <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
           </svg>
           <div class="card-header-text">
             <h2 class="card-title">Thank You Message</h2>
-            <p class="card-subtitle">Sent automatically when you mark a payment as "Paid"</p>
+            <p class="card-subtitle">Sent when you mark a payment as "Paid"</p>
           </div>
         </div>
 
-        <div class="tip-box" style="margin-bottom: var(--space-4); margin-top: 0;">
+        <div id="autoThankYouCard" class="toggle-card" style="margin-bottom: var(--space-4);">
+          <div class="toggle-info">
+            <div class="toggle-title">
+              Auto-Send Enabled
+              <span id="autoThankYouBadge" class="toggle-badge">On</span>
+            </div>
+            <div class="toggle-description" id="autoThankYouDescription">Automatically send this message when payment is marked "Paid"</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="autoThankYouEnabled" aria-describedby="autoThankYouDescription" checked>
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+
+        <div id="autoThankYouFeedback" class="tip-box" style="margin-bottom: var(--space-4); margin-top: 0;">
           <svg class="tip-box-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
           </svg>
-          <span><strong>Automatic:</strong> This message is sent automatically whenever you change a customer's payment status to "Paid" in your spreadsheet!</span>
+          <span id="autoThankYouFeedbackText">Active: This message will be sent automatically when you mark a payment as "Paid".</span>
         </div>
 
         <div class="placeholder-section">
@@ -2442,19 +2457,6 @@
           <span><strong>Recommended:</strong> Turn on Test Mode when you first set up, to make sure everything looks right before sending real messages.</span>
         </div>
 
-        <div id="autoThankYouCard" class="toggle-card">
-          <div class="toggle-info">
-            <div class="toggle-title">
-              Auto Thank-You Messages
-              <span id="autoThankYouBadge" class="toggle-badge">On</span>
-            </div>
-            <div class="toggle-description" id="autoThankYouDescription">Automatically send a thank-you message when you mark a payment as "Paid" in the spreadsheet.</div>
-          </div>
-          <label class="toggle">
-            <input type="checkbox" id="autoThankYouEnabled" aria-describedby="autoThankYouDescription">
-            <span class="toggle-track"></span>
-          </label>
-        </div>
       </div>
 
       <!-- Colors Card -->
@@ -3012,17 +3014,32 @@
       var card = document.getElementById('autoThankYouCard');
       var badge = document.getElementById('autoThankYouBadge');
       var description = document.getElementById('autoThankYouDescription');
+      var feedbackBox = document.getElementById('autoThankYouFeedback');
+      var feedbackText = document.getElementById('autoThankYouFeedbackText');
+      var thankYouCard = document.getElementById('thankYouCard');
 
       if (isEnabled) {
         card.classList.add('active');
         badge.textContent = 'On';
         badge.classList.remove('warning');
-        description.textContent = 'Automatically send a thank-you message when you mark a payment as "Paid" in the spreadsheet.';
+        badge.style.background = '#d1fae5';
+        badge.style.color = '#065f46';
+        description.textContent = 'Automatically send this message when payment is marked "Paid"';
+        feedbackBox.style.background = '#d1fae5';
+        feedbackBox.style.borderColor = '#10b981';
+        feedbackText.textContent = 'Active: This message will be sent automatically when you mark a payment as "Paid".';
+        thankYouCard.style.opacity = '1';
       } else {
         card.classList.remove('active');
         badge.textContent = 'Off';
         badge.classList.add('warning');
-        description.textContent = 'Auto thank-you messages are disabled. Customers will not receive automatic confirmation when marked as paid.';
+        badge.style.background = '#fef3c7';
+        badge.style.color = '#92400e';
+        description.textContent = 'Auto-send is OFF - messages will NOT be sent automatically';
+        feedbackBox.style.background = '#fef3c7';
+        feedbackBox.style.borderColor = '#f59e0b';
+        feedbackText.textContent = 'Disabled: Customers will NOT receive automatic thank-you messages when marked as paid.';
+        thankYouCard.style.opacity = '0.7';
       }
     }
 

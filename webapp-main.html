@@ -2793,6 +2793,17 @@
               </div>
             </div>
 
+            <div class="toggle-field">
+              <label class="toggle-switch">
+                <input type="checkbox" id="autoThankYouEnabled" checked>
+                <span class="toggle-slider"></span>
+              </label>
+              <div class="toggle-content">
+                <div class="toggle-label">Auto Thank-You Messages</div>
+                <p class="toggle-desc">When enabled, a thank-you message is automatically sent when you mark a payment as "Paid" in the spreadsheet.</p>
+              </div>
+            </div>
+
             <div class="form-field-row">
               <div class="form-field">
                 <label class="form-field-label">
@@ -3339,6 +3350,7 @@
       document.getElementById('headerRow').value = settings.behavior.headerRowIndex || 1;
       document.getElementById('dryRunMode').checked = settings.behavior.dryRunMode || false;
       document.getElementById('dryRunCheckbox').checked = settings.behavior.dryRunMode || false;
+      document.getElementById('autoThankYouEnabled').checked = settings.behavior.autoThankYouEnabled !== false;
 
       // Load first template
       loadSelectedTemplate();
@@ -3360,6 +3372,7 @@
       currentSettings.behavior.messageDelayMs = parseInt(document.getElementById('messageDelay').value) || 1000;
       currentSettings.behavior.headerRowIndex = parseInt(document.getElementById('headerRow').value) || 1;
       currentSettings.behavior.dryRunMode = document.getElementById('dryRunMode').checked;
+      currentSettings.behavior.autoThankYouEnabled = document.getElementById('autoThankYouEnabled').checked;
 
       serverCall('saveSettings', currentSettings).then(function(result) {
         if (!result) {
