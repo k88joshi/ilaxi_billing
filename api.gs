@@ -81,13 +81,18 @@ function handleApiRequest_(action, payload) {
  */
 function getCustomersForWeb() {
   try {
+    Logger.log('getCustomersForWeb: Starting...');
     const sheet = getTargetSheet_();
+    Logger.log('getCustomersForWeb: Got sheet');
     const settings = getSettings();
+    Logger.log('getCustomersForWeb: Got settings');
     const cols = settings.columns;
     const headerRowIndex = settings.behavior.headerRowIndex;
 
     const data = sheet.getDataRange().getValues();
+    Logger.log('getCustomersForWeb: Got data, rows=' + data.length);
     if (data.length <= headerRowIndex) {
+      Logger.log('getCustomersForWeb: No data rows, returning empty');
       return { success: true, data: [] };
     }
 
@@ -116,24 +121,33 @@ function getCustomersForWeb() {
       // Skip rows without essential data
       if (!row[nameCol] && !row[phoneCol]) continue;
 
+      // Convert Date objects to strings for google.script.run serialization
+      const dueDateRaw = row[dueDateCol];
+      const dueDateStr = dueDateRaw instanceof Date
+        ? dueDateRaw.toISOString()
+        : (dueDateRaw ? String(dueDateRaw) : '');
+
       customers.push({
         rowIndex: i + 1, // 1-based for sheet operations
-        phone: row[phoneCol] || '',
-        name: row[nameCol] || '',
+        phone: String(row[phoneCol] || ''),
+        name: String(row[nameCol] || ''),
         balance: row[balanceCol] || 0,
         formattedBalance: formatBalance(row[balanceCol]),
         numTiffins: row[tiffinsCol] || 0,
-        dueDate: row[dueDateCol] || '',
-        month: getMonthFromValue(row[dueDateCol]),
-        messageStatus: row[statusCol] || '',
-        orderId: row[orderIdCol] || '',
-        paymentStatus: row[paymentCol] || ''
+        dueDate: dueDateStr,
+        month: getMonthFromValue(dueDateRaw),
+        messageStatus: String(row[statusCol] || ''),
+        orderId: String(row[orderIdCol] || ''),
+        paymentStatus: String(row[paymentCol] || '')
       });
     }
 
-    return { success: true, data: customers };
+    Logger.log('getCustomersForWeb: Processed ' + customers.length + ' customers');
+    const result = { success: true, data: customers };
+    Logger.log('getCustomersForWeb: Returning result, data size approx ' + JSON.stringify(result).length + ' chars');
+    return result;
   } catch (error) {
-    Logger.log(`getCustomersForWeb_ error: ${error.message}`);
+    Logger.log('getCustomersForWeb error: ' + error.message + '\nStack: ' + error.stack);
     return { success: false, error: error.message };
   }
 }

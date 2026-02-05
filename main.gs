@@ -81,6 +81,11 @@ function onEdit(e) {
     const settings = getSettings();
     const cols = settings.columns;
 
+    // Check if auto thank-you is enabled
+    if (!settings.behavior.autoThankYouEnabled) {
+      return;
+    }
+
     // Ignore edits in header or above
     if (range.getRow() <= settings.behavior.headerRowIndex) return;
 

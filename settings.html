@@ -2441,6 +2441,20 @@
           </svg>
           <span><strong>Recommended:</strong> Turn on Test Mode when you first set up, to make sure everything looks right before sending real messages.</span>
         </div>
+
+        <div id="autoThankYouCard" class="toggle-card">
+          <div class="toggle-info">
+            <div class="toggle-title">
+              Auto Thank-You Messages
+              <span id="autoThankYouBadge" class="toggle-badge">On</span>
+            </div>
+            <div class="toggle-description" id="autoThankYouDescription">Automatically send a thank-you message when you mark a payment as "Paid" in the spreadsheet.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="autoThankYouEnabled" aria-describedby="autoThankYouDescription">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
       </div>
 
       <!-- Colors Card -->
@@ -2786,6 +2800,7 @@
       setupPlaceholderChips();
       setupColorPickers();
       setupDryRunToggle();
+      setupAutoThankYouToggle();
       setupCharacterCounters();
       setupChangeTracking();
       setupInlineValidation();
@@ -2983,6 +2998,35 @@
     }
 
     // ============================================
+    // Auto Thank-You Toggle
+    // ============================================
+    function setupAutoThankYouToggle() {
+      var toggle = document.getElementById('autoThankYouEnabled');
+      toggle.addEventListener('change', function() {
+        updateAutoThankYouUI(toggle.checked);
+        markAsChanged();
+      });
+    }
+
+    function updateAutoThankYouUI(isEnabled) {
+      var card = document.getElementById('autoThankYouCard');
+      var badge = document.getElementById('autoThankYouBadge');
+      var description = document.getElementById('autoThankYouDescription');
+
+      if (isEnabled) {
+        card.classList.add('active');
+        badge.textContent = 'On';
+        badge.classList.remove('warning');
+        description.textContent = 'Automatically send a thank-you message when you mark a payment as "Paid" in the spreadsheet.';
+      } else {
+        card.classList.remove('active');
+        badge.textContent = 'Off';
+        badge.classList.add('warning');
+        description.textContent = 'Auto thank-you messages are disabled. Customers will not receive automatic confirmation when marked as paid.';
+      }
+    }
+
+    // ============================================
     // Change Tracking
     // ============================================
     function setupChangeTracking() {
@@ -3054,6 +3098,10 @@
       var dryRunToggle = document.getElementById('dryRunMode');
       dryRunToggle.checked = currentSettings.behavior.dryRunMode;
       updateDryRunUI(dryRunToggle.checked);
+
+      var autoThankYouToggle = document.getElementById('autoThankYouEnabled');
+      autoThankYouToggle.checked = currentSettings.behavior.autoThankYouEnabled !== false;
+      updateAutoThankYouUI(autoThankYouToggle.checked);
 
       document.getElementById('batchSize').value = currentSettings.behavior.batchSize;
       document.getElementById('messageDelayMs').value = currentSettings.behavior.messageDelayMs;
@@ -3158,6 +3206,7 @@
         },
         behavior: {
           dryRunMode: document.getElementById('dryRunMode').checked,
+          autoThankYouEnabled: document.getElementById('autoThankYouEnabled').checked,
           batchSize: parseInt(document.getElementById('batchSize').value, 10),
           messageDelayMs: parseInt(document.getElementById('messageDelayMs').value, 10),
           headerRowIndex: parseInt(document.getElementById('headerRowIndex').value, 10)
