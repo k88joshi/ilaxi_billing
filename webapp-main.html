@@ -333,6 +333,68 @@
     .btn:disabled { opacity: 0.6; cursor: not-allowed; }
     .btn-sm { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
     .btn-xs { padding: var(--space-1) var(--space-2); font-size: var(--text-xs); }
+    .btn-ghost { background: transparent; color: var(--color-text-secondary); border: 1px solid var(--color-border); }
+    .btn-ghost:hover { background: var(--color-border-light); color: var(--color-text); }
+    .btn-ghost.btn-danger-ghost { color: var(--color-error); border-color: var(--color-error); }
+    .btn-ghost.btn-danger-ghost:hover { background: var(--color-error-light); }
+
+    /* Button state transitions */
+    .btn-spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: btnSpin 0.6s linear infinite;
+    }
+    @keyframes btnSpin {
+      to { transform: rotate(360deg); }
+    }
+    .btn-state-loading { opacity: 0.85; cursor: wait; pointer-events: none; }
+    .btn-state-success { background: var(--color-success) !important; border-color: var(--color-success) !important; }
+    .btn-state-error { background: var(--color-error) !important; border-color: var(--color-error) !important; }
+
+    /* Toast notifications */
+    .toast-container {
+      position: fixed;
+      top: var(--space-4);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-2);
+      pointer-events: none;
+    }
+    .toast {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-3) var(--space-4);
+      border-radius: var(--radius-full);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      color: white;
+      box-shadow: var(--shadow-lg);
+      pointer-events: auto;
+      animation: toastIn 0.3s ease-out;
+      white-space: nowrap;
+    }
+    .toast svg { width: 16px; height: 16px; flex-shrink: 0; }
+    .toast-success { background: var(--color-success); }
+    .toast-error { background: var(--color-error); }
+    .toast-warning { background: #d97706; }
+    .toast-out { animation: toastOut 0.25s ease-in forwards; }
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(-12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes toastOut {
+      from { opacity: 1; transform: translateY(0); }
+      to { opacity: 0; transform: translateY(-12px); }
+    }
 
     .btn-icon {
       width: 16px;
@@ -1765,6 +1827,49 @@
       overflow: hidden;
     }
 
+    /* Settings nav footer (manage toolbar) */
+    .settings-nav-footer {
+      border-top: 1px solid var(--color-border);
+      padding: var(--space-3) var(--space-4);
+      margin-top: auto;
+    }
+    .settings-nav-footer-title {
+      font-size: var(--text-xs);
+      font-weight: 600;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: var(--space-2);
+      padding: 0 var(--space-1);
+    }
+    .settings-nav-footer-actions {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+    }
+    .settings-nav-footer-actions .btn {
+      justify-content: flex-start;
+      width: 100%;
+      font-size: var(--text-xs);
+      padding: var(--space-2) var(--space-3);
+    }
+    .settings-nav-footer-actions .btn svg {
+      width: 14px;
+      height: 14px;
+      min-width: 14px;
+      min-height: 14px;
+      flex-shrink: 0;
+    }
+    .settings-layout.collapsed .settings-nav-footer-title {
+      display: none;
+    }
+    .settings-layout.collapsed .settings-nav-footer-actions .btn span {
+      display: none;
+    }
+    .settings-layout.collapsed .settings-nav-footer-actions .btn {
+      justify-content: center;
+    }
+
     /* Tooltip for collapsed state */
     .settings-nav-item[data-tooltip] {
       position: relative;
@@ -2126,6 +2231,23 @@
       .column-mapping-grid {
         grid-template-columns: 1fr;
       }
+
+      .settings-nav-footer {
+        border-top: none;
+        border-left: 1px solid var(--color-border);
+        padding: var(--space-2) var(--space-3);
+        margin-top: 0;
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+      }
+      .settings-nav-footer-title { display: none; }
+      .settings-nav-footer-actions {
+        flex-direction: row;
+      }
+      .settings-nav-footer-actions .btn span { display: none; }
+      .settings-nav-footer-actions .btn { width: auto; padding: var(--space-2); }
     }
   </style>
 </head>
@@ -2503,7 +2625,6 @@
                 <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                 Save Template
               </button>
-              <span class="save-feedback" id="msgSaveFeedback"></span>
             </div>
           </div>
 
@@ -2585,7 +2706,7 @@
             <input type="text" id="twilioPhone" placeholder="+1XXXXXXXXXX">
           </div>
           <div class="btn-group">
-            <button class="btn btn-primary" onclick="saveCredentials()">Save Credentials</button>
+            <button class="btn btn-primary" id="saveCredentialsBtn" onclick="saveCredentials()">Save Credentials</button>
             <button class="btn btn-secondary" onclick="testCredentials()">Test Connection</button>
           </div>
         </div>
@@ -2621,6 +2742,23 @@
               <svg class="settings-nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
               <span class="settings-nav-label">Advanced</span>
             </button>
+          </div>
+          <div class="settings-nav-footer">
+            <div class="settings-nav-footer-title">Manage</div>
+            <div class="settings-nav-footer-actions">
+              <button class="btn btn-ghost btn-sm" onclick="exportSettingsUI()" title="Export settings as JSON">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                <span>Export</span>
+              </button>
+              <button class="btn btn-ghost btn-sm" onclick="importSettingsUI()" title="Import settings from JSON file">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                <span>Import</span>
+              </button>
+              <button class="btn btn-ghost btn-danger-ghost btn-sm" onclick="confirmResetSettings()" title="Reset all settings to defaults">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                <span>Reset All</span>
+              </button>
+            </div>
           </div>
         </nav>
 
@@ -2677,7 +2815,7 @@
 
             <div class="settings-actions">
               <span class="settings-actions-hint">Changes are saved when you click the button</span>
-              <button class="btn btn-primary" onclick="saveSettings()">
+              <button class="btn btn-primary" id="saveBusinessBtn" onclick="saveSettings(this)">
                 <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                 Save Changes
               </button>
@@ -2826,7 +2964,7 @@
 
             <div class="settings-actions">
               <span class="settings-actions-hint">Match each field to a column in your spreadsheet</span>
-              <button class="btn btn-primary" onclick="saveColumnMappings()">
+              <button class="btn btn-primary" id="saveColumnsBtn" onclick="saveColumnMappings()">
                 <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                 Save Column Mappings
               </button>
@@ -2925,7 +3063,7 @@
 
             <div class="settings-actions">
               <span class="settings-actions-hint">These settings apply to all billing operations</span>
-              <button class="btn btn-primary" onclick="saveSettings()">
+              <button class="btn btn-primary" id="saveAdvancedBtn" onclick="saveSettings(this)">
                 <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                 Save Advanced Settings
               </button>
@@ -3040,7 +3178,9 @@
           'testCredentials': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).testTwilioCredentialsFromSettings(); },
           'getCredentialStatus': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getCredentialStatusForWeb(); },
           'previewTemplate': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).previewTemplate(payload.template); },
-          'autoDetectColumns': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).autoDetectColumnsForWeb(); }
+          'autoDetectColumns': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).autoDetectColumnsForWeb(); },
+          'resetSettings': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).resetToDefaults(); },
+          'importSettings': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).importSettings(payload); }
         };
         if (handlers[action]) handlers[action]();
         else reject(new Error('Unknown action: ' + action));
@@ -3351,6 +3491,106 @@
       container.appendChild(alertDiv);
     }
 
+    function createSvgIcon(pathD) {
+      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('class', 'btn-icon');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('stroke', 'currentColor');
+      var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('stroke-linejoin', 'round');
+      path.setAttribute('stroke-width', '2');
+      path.setAttribute('d', pathD);
+      svg.appendChild(path);
+      return svg;
+    }
+
+    var ICON_CHECK = 'M5 13l4 4L19 7';
+    var ICON_X = 'M6 18L18 6M6 6l12 12';
+    var ICON_WARN = 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z';
+
+    function setButtonState(btn, state) {
+      if (!btn) return;
+      if (!btn.getAttribute('data-original-html')) {
+        btn.setAttribute('data-original-html', btn.innerHTML);
+      }
+      if (btn._revertTimer) {
+        clearTimeout(btn._revertTimer);
+        btn._revertTimer = null;
+      }
+      btn.classList.remove('btn-state-loading', 'btn-state-success', 'btn-state-error');
+
+      if (state === 'loading') {
+        btn.disabled = true;
+        btn.classList.add('btn-state-loading');
+        while (btn.firstChild) btn.removeChild(btn.firstChild);
+        var spinner = document.createElement('span');
+        spinner.className = 'btn-spinner';
+        btn.appendChild(spinner);
+        btn.appendChild(document.createTextNode(' Saving\u2026'));
+      } else if (state === 'success') {
+        btn.disabled = false;
+        btn.classList.add('btn-state-success');
+        while (btn.firstChild) btn.removeChild(btn.firstChild);
+        btn.appendChild(createSvgIcon(ICON_CHECK));
+        btn.appendChild(document.createTextNode(' Saved!'));
+        btn._revertTimer = setTimeout(function() { setButtonState(btn, 'default'); }, 2000);
+      } else if (state === 'error') {
+        btn.disabled = false;
+        btn.classList.add('btn-state-error');
+        while (btn.firstChild) btn.removeChild(btn.firstChild);
+        btn.appendChild(createSvgIcon(ICON_X));
+        btn.appendChild(document.createTextNode(' Failed'));
+        btn._revertTimer = setTimeout(function() { setButtonState(btn, 'default'); }, 2000);
+      } else {
+        // default — restore original content
+        btn.disabled = false;
+        var original = btn.getAttribute('data-original-html');
+        if (original) {
+          // Safe: restoring the button's own original static HTML
+          btn.innerHTML = original; // eslint-disable-line no-unsanitized/property
+        }
+      }
+    }
+
+    function showToast(message, type) {
+      var container = document.getElementById('toastContainer');
+      while (container.firstChild) container.removeChild(container.firstChild);
+
+      var toast = document.createElement('div');
+      toast.className = 'toast toast-' + (type || 'success');
+
+      var iconPaths = { success: ICON_CHECK, error: ICON_X, warning: ICON_WARN };
+      var iconSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      iconSvg.setAttribute('fill', 'none');
+      iconSvg.setAttribute('viewBox', '0 0 24 24');
+      iconSvg.setAttribute('stroke', 'currentColor');
+      iconSvg.style.width = '16px';
+      iconSvg.style.height = '16px';
+      iconSvg.style.flexShrink = '0';
+      var iconPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      iconPath.setAttribute('stroke-linecap', 'round');
+      iconPath.setAttribute('stroke-linejoin', 'round');
+      iconPath.setAttribute('stroke-width', '2');
+      iconPath.setAttribute('d', iconPaths[type] || iconPaths.success);
+      iconSvg.appendChild(iconPath);
+      toast.appendChild(iconSvg);
+
+      var textSpan = document.createElement('span');
+      textSpan.textContent = message;
+      toast.appendChild(textSpan);
+
+      container.appendChild(toast);
+
+      setTimeout(function() {
+        toast.classList.add('toast-out');
+        setTimeout(function() {
+          if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 250);
+      }, 3500);
+    }
+
     function sendBills() {
       var btn = document.getElementById('sendBillsBtn');
       var filter = document.getElementById('sendFilter').value;
@@ -3471,6 +3711,7 @@
     }
 
     function saveCredentials() {
+      var btn = document.getElementById('saveCredentialsBtn');
       var sid = document.getElementById('accountSid').value.trim();
       var token = document.getElementById('authToken').value.trim();
       var phone = document.getElementById('twilioPhone').value.trim();
@@ -3480,19 +3721,28 @@
         return;
       }
 
+      setButtonState(btn, 'loading');
       serverCall('saveCredentials', { accountSid: sid || undefined, authToken: token || undefined, twilioPhone: phone || undefined })
         .then(function(result) {
           if (result.success) {
+            setButtonState(btn, 'success');
+            showToast('Credentials saved!', 'success');
             showAlert('credentialAlert', 'success', 'Credentials saved successfully!');
             document.getElementById('accountSid').value = '';
             document.getElementById('authToken').value = '';
             document.getElementById('twilioPhone').value = '';
             loadCredentialStatus();
           } else {
+            setButtonState(btn, 'error');
+            showToast(result.error || 'Failed to save', 'error');
             showAlert('credentialAlert', 'error', result.error || 'Failed to save');
           }
         })
-        .catch(function(err) { showAlert('credentialAlert', 'error', 'Error: ' + err.message); });
+        .catch(function(err) {
+          setButtonState(btn, 'error');
+          showToast('Error: ' + err.message, 'error');
+          showAlert('credentialAlert', 'error', 'Error: ' + err.message);
+        });
     }
 
     function testCredentials() {
@@ -3546,7 +3796,7 @@
       updateSetupChecklist();
     }
 
-    function saveSettings() {
+    function saveSettings(btn) {
       if (!currentSettings) {
         showAlert('settingsAlert', 'error', 'Settings not loaded. Please refresh.');
         return;
@@ -3561,18 +3811,35 @@
       currentSettings.behavior.testOrderId = document.getElementById('testOrderId').value.trim();
       currentSettings.behavior.autoThankYouEnabled = document.getElementById('autoThankYouEnabled').checked;
 
+      setButtonState(btn, 'loading');
       serverCall('saveSettings', currentSettings).then(function(result) {
         if (!result) {
+          setButtonState(btn, 'error');
+          showToast('No response from server', 'error');
           showAlert('settingsAlert', 'error', 'No response from server.');
           return;
         }
         if (result.success) {
-          showAlert('settingsAlert', 'success', 'Settings saved successfully!');
+          if (result.warning) {
+            setButtonState(btn, 'success');
+            showToast('Settings saved with warning', 'warning');
+            showAlert('settingsAlert', 'warning', result.warning);
+          } else {
+            setButtonState(btn, 'success');
+            showToast('Settings saved!', 'success');
+            showAlert('settingsAlert', 'success', 'Settings saved successfully!');
+          }
           updateSetupChecklist();
         } else {
+          setButtonState(btn, 'error');
+          showToast(result.error || 'Failed to save', 'error');
           showAlert('settingsAlert', 'error', result.error || 'Failed to save');
         }
-      }).catch(function(err) { showAlert('settingsAlert', 'error', 'Error: ' + err.message); });
+      }).catch(function(err) {
+        setButtonState(btn, 'error');
+        showToast('Error: ' + err.message, 'error');
+        showAlert('settingsAlert', 'error', 'Error: ' + err.message);
+      });
     }
 
     // Column Mapping
@@ -3690,6 +3957,7 @@
     }
 
     function saveColumnMappings() {
+      var btn = document.getElementById('saveColumnsBtn');
       if (!currentSettings) {
         showAlert('columnsAlert', 'error', 'Settings not loaded. Please refresh.');
         return;
@@ -3704,18 +3972,29 @@
         }
       });
 
+      setButtonState(btn, 'loading');
       serverCall('saveSettings', currentSettings).then(function(result) {
         if (!result) {
+          setButtonState(btn, 'error');
+          showToast('No response from server', 'error');
           showAlert('columnsAlert', 'error', 'No response from server.');
           return;
         }
         if (result.success) {
+          setButtonState(btn, 'success');
+          showToast('Column mappings saved!', 'success');
           showAlert('columnsAlert', 'success', 'Column mappings saved successfully!');
           updateSetupChecklist();
         } else {
+          setButtonState(btn, 'error');
+          showToast(result.error || 'Failed to save', 'error');
           showAlert('columnsAlert', 'error', result.error || 'Failed to save');
         }
-      }).catch(function(err) { showAlert('columnsAlert', 'error', 'Error: ' + err.message); });
+      }).catch(function(err) {
+        setButtonState(btn, 'error');
+        showToast('Error: ' + err.message, 'error');
+        showAlert('columnsAlert', 'error', 'Error: ' + err.message);
+      });
     }
 
     // Template Management
@@ -4056,14 +4335,7 @@
       }
     }
 
-    function showMsgSaveFeedback() {
-      var feedback = document.getElementById('msgSaveFeedback');
-      feedback.textContent = 'Saved!';
-      feedback.classList.add('visible');
-      setTimeout(function() {
-        feedback.classList.remove('visible');
-      }, 2000);
-    }
+
 
     function saveMsgTemplate() {
       if (!currentSettings || !currentSettings.templates) {
@@ -4084,8 +4356,7 @@
       }
 
       var btn = document.getElementById('msgSaveBtn');
-      btn.disabled = true;
-      btn.textContent = 'Saving...';
+      setButtonState(btn, 'loading');
 
       if (msgCurrentTemplate === 'thankYou') {
         currentSettings.templates.thankYouMessage = message;
@@ -4098,24 +4369,26 @@
       }
 
       serverCall('saveSettings', currentSettings).then(function(result) {
-        btn.disabled = false;
-        btn.textContent = 'Save Template';
-
         if (!result) {
+          setButtonState(btn, 'error');
+          showToast('No response from server', 'error');
           showAlert('messagesTabAlert', 'error', 'No response from server.');
           return;
         }
         if (result.success) {
+          setButtonState(btn, 'success');
+          showToast('Template saved!', 'success');
           msgOriginalContent = message;
           updateMsgSaveStatus('saved');
-          showMsgSaveFeedback();
           updateSetupChecklist();
         } else {
+          setButtonState(btn, 'error');
+          showToast(result.error || 'Failed to save', 'error');
           showAlert('messagesTabAlert', 'error', result.error || 'Failed to save template');
         }
       }).catch(function(err) {
-        btn.disabled = false;
-        btn.textContent = 'Save Template';
+        setButtonState(btn, 'error');
+        showToast('Error: ' + err.message, 'error');
         showAlert('messagesTabAlert', 'error', 'Error: ' + err.message);
       });
     }
@@ -4127,11 +4400,80 @@
       }
     }
 
+    // Settings Management
+    function exportSettingsUI() {
+      if (!currentSettings) {
+        showToast('Settings not loaded. Please refresh.', 'error');
+        return;
+      }
+      try {
+        var json = JSON.stringify(currentSettings, null, 2);
+        var blob = new Blob([json], { type: 'application/json' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'billing-settings-backup.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('Settings exported', 'success');
+      } catch (err) {
+        showToast('Export failed: ' + err.message, 'error');
+      }
+    }
+
+    function importSettingsUI() {
+      var input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.onchange = function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+          try {
+            JSON.parse(ev.target.result); // validate JSON
+          } catch (err) {
+            showToast('Invalid JSON file', 'error');
+            return;
+          }
+          serverCall('importSettings', ev.target.result).then(function(result) {
+            if (result && result.success) {
+              showToast('Settings imported', 'success');
+              loadSettings();
+            } else {
+              showToast((result && result.error) || 'Import failed', 'error');
+            }
+          }).catch(function(err) {
+            showToast('Import error: ' + err.message, 'error');
+          });
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    }
+
+    function confirmResetSettings() {
+      if (!confirm('Reset all settings to defaults? This cannot be undone.')) return;
+      serverCall('resetSettings').then(function(result) {
+        if (result && result.success) {
+          showToast('Settings reset to defaults', 'success');
+          loadSettings();
+        } else {
+          showToast((result && result.error) || 'Reset failed', 'error');
+        }
+      }).catch(function(err) {
+        showToast('Reset error: ' + err.message, 'error');
+      });
+    }
+
     // Auth
     function logout() {
       // Google handles re-auth on page reload
       window.location.reload();
     }
   </script>
+  <div id="toastContainer" class="toast-container"></div>
 </body>
 </html>
