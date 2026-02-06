@@ -115,16 +115,24 @@ return { success: false, error: "Error message" };
 
 ## CI/CD
 
-GitHub Actions on push to master:
+GitHub Actions workflow with two paths:
+
+**On pull requests** (lint → push):
 1. **Lint**: ESLint syntax check on all `.gs` files
-2. **Inject secrets**: Replaces `SPREADSHEET_ID` placeholder before deploy
-3. **Deploy**: Auto-push via CLASP
+2. **Push**: `clasp push -f` updates HEAD — testable at the `/dev` URL
+
+**On merge to master** (lint → push → deploy):
+1. **Lint**: ESLint syntax check on all `.gs` files
+2. **Push**: `clasp push -f` updates HEAD
+3. **Deploy**: `clasp deploy --deploymentId` updates the production `/exec` URL
 
 ### Required GitHub Secrets
 | Secret | Purpose |
 |--------|---------|
 | `CLASP_TOKEN` | Contents of `~/.clasprc.json` for CLASP authentication |
+| `SCRIPT_ID` | Apps Script project ID (from `.clasp.json` `scriptId` field, or URL: `/projects/{ID}/edit`) |
 | `SPREADSHEET_ID` | Google Sheet ID for web app mode (from URL: `/d/{ID}/edit`) |
+| `DEPLOYMENT_ID` | Web app deployment ID for production `/exec` deploys (get from Apps Script editor > Deploy > Manage deployments, or run `clasp deployments`) |
 
 ## Web App User Authorization Setup
 

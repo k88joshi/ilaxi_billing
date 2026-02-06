@@ -61,12 +61,10 @@ jobs:
       - name: Run ESLint
         run: npx eslint "*.gs" --max-warnings 0
 
-  deploy:
-    name: Deploy to Apps Script
+  push:
+    name: Push to Apps Script
     runs-on: ubuntu-latest
     needs: lint
-    # Deploy on PRs (to test) AND on push to master (to release)
-    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/master')
     steps:
       - uses: actions/checkout@v4
 
@@ -77,6 +75,18 @@ jobs:
 
       - name: Install clasp
         run: npm install -g @google/clasp
+
+      - name: Generate .clasp.json
+        env:
+          SCRIPT_ID: ${{ secrets.SCRIPT_ID }}
+        run: |
+          if [ -n "$SCRIPT_ID" ]; then
+            echo "{\"scriptId\":\"$SCRIPT_ID\",\"rootDir\":\".\"}" > .clasp.json
+            echo "Generated .clasp.json"
+          else
+            echo "::error::SCRIPT_ID secret not configured - cannot push to Apps Script"
+            exit 1
+          fi
 
       - name: Inject spreadsheet ID
         env:
@@ -89,16 +99,56 @@ jobs:
             echo "Warning: SPREADSHEET_ID secret not configured - web app mode will not work"
           fi
 
-      - name: Deploy to Apps Script
+      - name: Push to Apps Script (HEAD)
         env:
           CLASP_TOKEN: ${{ secrets.CLASP_TOKEN }}
         run: |
           if [ -n "$CLASP_TOKEN" ]; then
             echo "$CLASP_TOKEN" > ~/.clasprc.json
             clasp push -f
-            echo "✅ Deployed to Apps Script (HEAD)"
-            echo "::notice::🚀 Test your changes here: https://script.google.com/macros/s/${{ secrets.SCRIPT_ID }}/dev"
+            echo "Pushed to Apps Script (HEAD)"
           else
-            echo "CLASP_TOKEN secret not configured - skipping deploy"
-            echo "To enable auto-deploy, add your ~/.clasprc.json contents as a repository secret named CLASP_TOKEN"
+            echo "CLASP_TOKEN secret not configured - skipping push"
+            echo "To enable, add your ~/.clasprc.json contents as a repository secret named CLASP_TOKEN"
           fi
+
+      - name: Show /dev test URL
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "::notice::Test your changes at the /dev URL: https://script.google.com/macros/s/${{ secrets.SCRIPT_ID }}/dev"
+
+  deploy:
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    needs: push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install clasp
+        run: npm install -g @google/clasp
+
+      - name: Deploy to production
+        env:
+          CLASP_TOKEN: ${{ secrets.CLASP_TOKEN }}
+          SCRIPT_ID: ${{ secrets.SCRIPT_ID }}
+          DEPLOYMENT_ID: ${{ secrets.DEPLOYMENT_ID }}
+        run: |
+          if [ -z "$CLASP_TOKEN" ]; then
+            echo "CLASP_TOKEN secret not configured - skipping deploy"
+            exit 0
+          fi
+          if [ -z "$DEPLOYMENT_ID" ]; then
+            echo "::warning::DEPLOYMENT_ID secret not configured - skipping production deploy"
+            echo "Push to HEAD succeeded, but production /exec URL was NOT updated."
+            echo "Add DEPLOYMENT_ID secret to enable production deploys on merge to master."
+            exit 0
+          fi
+          echo "$CLASP_TOKEN" > ~/.clasprc.json
+          echo "{\"scriptId\":\"$SCRIPT_ID\",\"rootDir\":\".\"}" > .clasp.json
+          clasp deploy --deploymentId "$DEPLOYMENT_ID" -d "CI deploy $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "Deployed to production"
+          echo "::notice::Production /exec URL updated"

@@ -285,6 +285,15 @@ function updatePaymentStatusCore_(params) {
       return { success: false, error: 'Row index and payment status are required' };
     }
 
+    // Validate against allowed statuses
+    const allowedStatuses = ['paid', 'unpaid'];
+    const normalizedStatus = String(newStatus).trim().toLowerCase();
+    if (allowedStatuses.indexOf(normalizedStatus) === -1) {
+      return { success: false, error: 'Invalid payment status. Allowed values: Paid, Unpaid' };
+    }
+    // Title case for display
+    const titleCaseStatus = normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1);
+
     const sheet = getTargetSheet_();
     const settings = getSettings();
     const cols = settings.columns;
@@ -301,9 +310,9 @@ function updatePaymentStatusCore_(params) {
     }
 
     // Update the cell (rowIndex is 1-based, paymentStatusCol is 0-based)
-    sheet.getRange(rowIndex, paymentStatusCol + 1).setValue(newStatus);
+    sheet.getRange(rowIndex, paymentStatusCol + 1).setValue(titleCaseStatus);
 
-    return { success: true, data: { rowIndex: rowIndex, paymentStatus: newStatus } };
+    return { success: true, data: { rowIndex: rowIndex, paymentStatus: titleCaseStatus } };
   } catch (error) {
     Logger.log(`updatePaymentStatusCore_ error: ${error.message}`);
     return { success: false, error: error.message };

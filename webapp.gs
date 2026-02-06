@@ -10,6 +10,104 @@
 const ALLOWED_USERS_KEY = 'ALLOWED_USERS';
 
 /**
+ * Property key for storing the admin users list.
+ * @const {string}
+ */
+const ADMIN_USERS_KEY = 'ADMIN_USERS';
+
+/**
+ * Gets the list of admin user emails from ScriptProperties.
+ *
+ * @returns {string[]} Array of admin email addresses
+ */
+function getAdminUsers() {
+  const stored = scriptProperties.getProperty(ADMIN_USERS_KEY);
+  if (!stored) {
+    return [];
+  }
+  try {
+    return JSON.parse(stored);
+  } catch (e) {
+    Logger.log(`getAdminUsers parse error: ${e.message}`);
+    return [];
+  }
+}
+
+/**
+ * Adds an email to the admin users list.
+ * Run this function from the Apps Script editor to grant admin access.
+ *
+ * @param {string} email - The email address to make admin
+ * @returns {Object} Result with success boolean
+ */
+function addAdminUser(email) {
+  if (!email || typeof email !== 'string') {
+    Logger.log('addAdminUser: Invalid email provided');
+    return { success: false, error: 'Invalid email provided' };
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail.includes('@')) {
+    Logger.log('addAdminUser: Email must contain @');
+    return { success: false, error: 'Invalid email format' };
+  }
+
+  const users = getAdminUsers();
+  if (users.includes(normalizedEmail)) {
+    Logger.log(`addAdminUser: ${normalizedEmail} is already an admin`);
+    return { success: true, message: 'User is already an admin' };
+  }
+
+  users.push(normalizedEmail);
+  scriptProperties.setProperty(ADMIN_USERS_KEY, JSON.stringify(users));
+  Logger.log(`addAdminUser: Added ${normalizedEmail} to admin users`);
+  return { success: true, message: `Added ${normalizedEmail} to admin users` };
+}
+
+/**
+ * Removes an email from the admin users list.
+ *
+ * @param {string} email - The email address to remove from admins
+ * @returns {Object} Result with success boolean
+ */
+function removeAdminUser(email) {
+  if (!email || typeof email !== 'string') {
+    Logger.log('removeAdminUser: Invalid email provided');
+    return { success: false, error: 'Invalid email provided' };
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const users = getAdminUsers();
+  const index = users.indexOf(normalizedEmail);
+
+  if (index === -1) {
+    Logger.log(`removeAdminUser: ${normalizedEmail} not found in admin users`);
+    return { success: false, error: 'User not found in admin list' };
+  }
+
+  users.splice(index, 1);
+  scriptProperties.setProperty(ADMIN_USERS_KEY, JSON.stringify(users));
+  Logger.log(`removeAdminUser: Removed ${normalizedEmail} from admin users`);
+  return { success: true, message: `Removed ${normalizedEmail} from admin users` };
+}
+
+/**
+ * Checks if the given email is in the admin users list.
+ *
+ * @param {string} email - The email to check
+ * @returns {boolean} True if user is an admin
+ * @private
+ */
+function isAdminUser_(email) {
+  if (!email) {
+    return false;
+  }
+  const normalizedEmail = email.trim().toLowerCase();
+  const admins = getAdminUsers();
+  return admins.includes(normalizedEmail);
+}
+
+/**
  * Main entry point for web app GET requests.
  * Serves the main app if user is authorized, otherwise shows access denied page.
  *
@@ -52,14 +150,14 @@ function doPost(e) {
     }
 
     const data = JSON.parse(e.postData.contents);
-    const result = handleApiRequest_(data.action, data.payload);
+    const result = handleApiRequest_(data.action, data.payload, userEmail);
     return ContentService.createTextOutput(JSON.stringify(result))
       .setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
     Logger.log(`doPost error: ${error.message}`);
     return ContentService.createTextOutput(JSON.stringify({
       success: false,
-      error: `Request failed: ${error.message}`
+      error: 'Request failed'
     })).setMimeType(ContentService.MimeType.JSON);
   }
 }
@@ -284,7 +382,6 @@ function getWebAppUrl() {
 
 /**
  * Creates the HTML output with standard settings.
- * Safely handles XFrameOptionsMode to avoid null errors.
  *
  * @param {HtmlTemplate} template - The template to evaluate
  * @param {string} title - The page title
@@ -292,16 +389,9 @@ function getWebAppUrl() {
  * @private
  */
 function createHtmlOutput_(template, title) {
-  const output = template.evaluate()
+  return template.evaluate()
     .setTitle(title)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-
-  // Safely set XFrameOptionsMode if available
-  if (HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.ALLOWALL != null) {
-    output.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  }
-
-  return output;
 }
 
 // ========================================
