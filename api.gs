@@ -65,6 +65,10 @@ function handleApiRequest_(action, payload) {
       case 'autoDetectColumns':
         return { success: true, data: autoDetectColumns() };
 
+      // Spreadsheet link
+      case 'getSpreadsheetUrl':
+        return { success: true, data: getTargetSpreadsheet_().getUrl() };
+
       default:
         return { success: false, error: `Unknown action: ${action}`, errorCode: 'UNKNOWN_ACTION' };
     }
