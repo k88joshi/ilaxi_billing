@@ -12,43 +12,43 @@
     [data-theme="dark"] {
       --color-primary: #d4726c;
       --color-primary-hover: #e8a09b;
-      --color-primary-light: rgba(212, 114, 108, 0.15);
-      --color-primary-ghost: rgba(212, 114, 108, 0.15);
+      --color-primary-light: rgba(212, 114, 108, 0.12);
+      --color-primary-ghost: rgba(212, 114, 108, 0.1);
 
       --color-success: #34d399;
-      --color-success-light: rgba(52, 211, 153, 0.15);
+      --color-success-light: rgba(52, 211, 153, 0.12);
       --color-success-text: #6ee7b7;
       --color-error: #f87171;
-      --color-error-light: rgba(248, 113, 113, 0.15);
+      --color-error-light: rgba(248, 113, 113, 0.12);
       --color-error-text: #fca5a5;
       --color-warning: #fbbf24;
-      --color-warning-light: rgba(251, 191, 36, 0.15);
+      --color-warning-light: rgba(251, 191, 36, 0.12);
       --color-warning-text: #fcd34d;
       --color-info: #60a5fa;
-      --color-info-light: rgba(96, 165, 250, 0.15);
+      --color-info-light: rgba(96, 165, 250, 0.12);
       --color-info-text: #93c5fd;
 
-      --color-bg: #0f172a;
-      --color-surface: #1e293b;
-      --color-surface-elevated: #334155;
-      --color-border: #334155;
-      --color-border-light: #1e293b;
+      --color-bg: #1c1917;
+      --color-surface: #292524;
+      --color-surface-elevated: #44403c;
+      --color-border: #44403c;
+      --color-border-light: #292524;
 
-      --color-text: #f1f5f9;
-      --color-text-secondary: #94a3b8;
-      --color-text-muted: #64748b;
-      --color-text-inverted: #0f172a;
+      --color-text: #fafaf9;
+      --color-text-secondary: #a8a29e;
+      --color-text-muted: #78716c;
+      --color-text-inverted: #1c1917;
 
-      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
-      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
-      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 2px 8px -2px rgba(0, 0, 0, 0.4);
+      --shadow-lg: 0 8px 24px -4px rgba(0, 0, 0, 0.5);
 
       --header-gradient: linear-gradient(135deg, #5a1010 0%, #7a2020 100%);
     }
 
     .header {
-      background: linear-gradient(135deg, var(--color-primary) 0%, #8b2020 100%);
-      padding: var(--space-3) var(--space-6);
+      background: var(--header-gradient);
+      padding: var(--space-4) var(--space-6);
       position: relative;
     }
 
@@ -67,17 +67,19 @@
       display: flex;
       align-items: center;
       gap: var(--space-2);
+      letter-spacing: -0.2px;
     }
 
     .header-actions {
       display: flex;
       gap: var(--space-2);
+      align-items: center;
     }
 
     .btn-header {
-      background: rgba(255, 255, 255, 0.2);
-      color: white;
-      border: none;
+      background: rgba(255, 255, 255, 0.15);
+      color: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.15);
       padding: var(--space-1) var(--space-3);
       border-radius: var(--radius-md);
       font-size: var(--text-xs);
@@ -89,12 +91,259 @@
     }
 
     .btn-header:hover {
-      background: rgba(255, 255, 255, 0.3);
+      background: rgba(255, 255, 255, 0.25);
+      color: white;
     }
 
     .btn-header svg {
       width: 16px;
       height: 16px;
+    }
+
+    /* Header status pills */
+    .header-status-pills {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: var(--radius-full);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition-fast);
+      border: none;
+    }
+
+    .status-pill--dry-run {
+      background: rgba(251, 191, 36, 0.25);
+      color: #fef3c7;
+    }
+
+    .status-pill--dry-run:hover {
+      background: rgba(251, 191, 36, 0.35);
+    }
+
+    .status-pill--live {
+      background: rgba(52, 211, 153, 0.2);
+      color: #d1fae5;
+    }
+
+    .status-pill--live:hover {
+      background: rgba(52, 211, 153, 0.3);
+    }
+
+    .status-pill--auto-ty {
+      background: rgba(96, 165, 250, 0.2);
+      color: #dbeafe;
+    }
+
+    .status-pill--auto-ty:hover {
+      background: rgba(96, 165, 250, 0.3);
+    }
+
+    .status-pill-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .status-pill--dry-run .status-pill-dot { background: #fbbf24; }
+    .status-pill--live .status-pill-dot { background: #34d399; }
+    .status-pill--auto-ty .status-pill-dot { background: #60a5fa; }
+
+    /* Header users display */
+    .header-users {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.7);
+      padding: 3px 8px;
+      border-radius: var(--radius-full);
+      background: rgba(255, 255, 255, 0.1);
+      position: relative;
+      cursor: pointer;
+    }
+
+    .header-users:empty { display: none; }
+
+    .header-users svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    .users-popover {
+      display: none;
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      min-width: 220px;
+      z-index: 200;
+      padding: var(--space-2) 0;
+    }
+
+    .header-users:hover .users-popover,
+    .header-users:focus-within .users-popover {
+      display: block;
+    }
+
+    .users-popover-title {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--color-text-secondary);
+      padding: var(--space-1) var(--space-3) var(--space-2);
+    }
+
+    .users-popover-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: 6px var(--space-3);
+      font-size: var(--text-sm);
+      color: var(--color-text);
+    }
+
+    .users-popover-item .user-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--color-success);
+      flex-shrink: 0;
+    }
+
+    .users-popover-item.current-user {
+      font-weight: 500;
+    }
+
+    .users-popover-item .you-badge {
+      font-size: 9px;
+      padding: 1px 5px;
+      border-radius: var(--radius-full);
+      background: var(--color-primary-light);
+      color: var(--color-primary);
+      font-weight: 600;
+      margin-left: auto;
+    }
+
+    /* User management list in settings */
+    .users-manage-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+    }
+
+    .users-manage-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: 5px var(--space-2);
+      background: var(--color-border-light);
+      border-radius: var(--radius-sm);
+      font-size: var(--text-xs);
+    }
+
+    .users-manage-item .user-email {
+      flex: 1;
+      color: var(--color-text);
+    }
+
+    .users-manage-item .you-tag {
+      font-size: var(--text-xs);
+      padding: 1px 6px;
+      border-radius: var(--radius-full);
+      background: var(--color-primary-light);
+      color: var(--color-primary);
+      font-weight: 600;
+    }
+
+    .users-manage-item .btn-remove-user {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--color-text-muted);
+      padding: 2px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      transition: color var(--transition-fast), background var(--transition-fast);
+    }
+
+    .users-manage-item .btn-remove-user:hover {
+      color: var(--color-error);
+      background: var(--color-error-light);
+    }
+
+    .users-manage-item .btn-remove-user:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .users-manage-item .btn-remove-user:disabled:hover {
+      color: var(--color-text-muted);
+      background: none;
+    }
+
+    /* Send form layout */
+    .send-form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: var(--space-4);
+      margin-bottom: var(--space-3);
+    }
+
+    /* Payment status dropdown in table */
+    .payment-status-select {
+      appearance: none;
+      -webkit-appearance: none;
+      border: 1px solid transparent;
+      background: transparent;
+      padding: 3px 22px 3px 10px;
+      border-radius: var(--radius-full);
+      font-size: var(--text-xs);
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition-fast);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2378716c' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 6px center;
+    }
+
+    .payment-status-select:hover {
+      border-color: var(--color-border);
+    }
+
+    .payment-status-select:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 2px var(--color-primary-ghost);
+      outline: none;
+    }
+
+    .payment-status-select.status-paid {
+      background-color: var(--color-success-light);
+      color: #047857;
+    }
+
+    .payment-status-select.status-unpaid {
+      background-color: var(--color-warning-light);
+      color: #b45309;
+    }
+
+    .payment-status-select.status-other {
+      background-color: var(--color-border-light);
+      color: var(--color-text-secondary);
     }
 
     .theme-toggle-icon {
@@ -121,7 +370,7 @@
       display: flex;
       background: var(--color-surface);
       border-bottom: 1px solid var(--color-border);
-      padding: 0 var(--space-4);
+      padding: 0 var(--space-6);
       max-width: 1200px;
       margin: 0 auto;
     }
@@ -129,11 +378,11 @@
     .tab {
       display: flex;
       align-items: center;
-      gap: var(--space-1);
-      padding: var(--space-2) var(--space-3);
-      font-size: var(--text-xs);
+      gap: 6px;
+      padding: var(--space-3) var(--space-4);
+      font-size: var(--text-sm);
       font-weight: 500;
-      color: var(--color-text-secondary);
+      color: var(--color-text-muted);
       cursor: pointer;
       border-bottom: 2px solid transparent;
       transition: var(--transition-fast);
@@ -145,21 +394,21 @@
 
     .tab:hover {
       color: var(--color-text);
-      background: var(--color-border-light);
     }
 
     .tab.active {
       color: var(--color-primary);
       border-bottom-color: var(--color-primary);
+      font-weight: 600;
     }
 
     .tab-icon {
-      width: 15px;
-      height: 15px;
+      width: 16px;
+      height: 16px;
     }
 
     .content {
-      padding: var(--space-4);
+      padding: var(--space-6);
       max-width: 1200px;
       margin: 0 auto;
     }
@@ -180,14 +429,14 @@
 
     .card {
       background: var(--color-surface);
-      border-radius: var(--radius-md);
+      border-radius: var(--radius-lg);
       box-shadow: var(--shadow-sm);
       border: 1px solid var(--color-border);
       margin-bottom: var(--space-4);
     }
 
     .card-header {
-      padding: var(--space-3) var(--space-4);
+      padding: var(--space-4) var(--space-5);
       border-bottom: 1px solid var(--color-border);
       display: flex;
       justify-content: space-between;
@@ -195,12 +444,13 @@
     }
 
     .card-title {
-      font-size: var(--text-base);
+      font-size: var(--text-lg);
       font-weight: 600;
+      letter-spacing: -0.2px;
     }
 
     .card-body {
-      padding: var(--space-4);
+      padding: var(--space-5);
     }
 
     .stats-grid {
@@ -233,121 +483,144 @@
     .stat-value.warning { color: var(--color-warning); }
     .stat-value.error { color: var(--color-error); }
 
-    /* Dashboard two-column layout */
-    #panel-dashboard .tab-intro { margin-bottom: var(--space-2); }
-
-    .dashboard-layout {
+    /* ============================================
+       Dashboard Hero Stats — 3 horizontal cards
+       ============================================ */
+    .hero-stats {
       display: grid;
-      grid-template-columns: 280px 1fr;
+      grid-template-columns: repeat(3, 1fr);
       gap: var(--space-4);
-      align-items: start;
+      margin-bottom: var(--space-6);
     }
 
-    .dashboard-sidebar {
+    .hero-stat {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-5);
       display: flex;
       flex-direction: column;
       gap: var(--space-3);
-      position: sticky;
-      top: var(--space-4);
-    }
-
-    .dashboard-main { min-width: 0; }
-    .dashboard-main .card { margin-bottom: 0; }
-
-    /* Stat card hierarchy — primary (Unpaid, Outstanding) */
-    .stat-card-primary {
-      border-left: 3px solid var(--color-warning);
-      background: var(--color-warning-light);
-      padding: var(--space-3);
-      border-radius: var(--radius-md);
-    }
-
-    .stat-card-primary.error-accent {
-      border-left-color: var(--color-error);
-      background: var(--color-error-light);
-    }
-
-    .stat-card-primary .stat-value {
-      font-size: var(--text-2xl);
-    }
-
-    /* Secondary stats row (Total, Paid) */
-    .stats-secondary-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-2);
-    }
-
-    .stats-secondary-row .stat-card {
-      padding: var(--space-2);
-      margin-bottom: 0;
-    }
-
-    .stats-secondary-row .stat-card-icon {
-      width: 24px;
-      height: 24px;
-      margin-bottom: var(--space-1);
-    }
-
-    .stats-secondary-row .stat-card-icon svg {
-      width: 12px;
-      height: 12px;
-    }
-
-    .stats-secondary-row .stat-value {
-      font-size: var(--text-lg);
-    }
-
-    .stats-secondary-row .stat-label {
-      font-size: 10px;
-    }
-
-    /* Compact quick actions sidebar */
-    .quick-actions-sidebar {
-      background: var(--color-surface);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-md);
+      transition: var(--transition-fast);
+      position: relative;
       overflow: hidden;
     }
 
-    .quick-actions-header {
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--color-text-muted);
-      padding: var(--space-2) var(--space-3);
-      border-bottom: 1px solid var(--color-border);
+    .hero-stat::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
     }
 
-    .quick-action-compact {
+    .hero-stat--outstanding::before { background: var(--color-primary); }
+    .hero-stat--unpaid::before { background: var(--color-warning); }
+    .hero-stat--paid::before { background: var(--color-success); }
+
+    .hero-stat-top {
       display: flex;
-      align-items: center;
-      gap: var(--space-2);
-      padding: var(--space-2) var(--space-3);
-      cursor: pointer;
-      transition: var(--transition-fast);
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+
+    .hero-stat-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .hero-stat-label {
       font-size: var(--text-xs);
       font-weight: 500;
-      color: var(--color-text);
-      border-bottom: 1px solid var(--color-border-light);
+      color: var(--color-text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
 
-    .quick-action-compact:last-child { border-bottom: none; }
-    .quick-action-compact:hover { background: var(--color-border-light); }
+    .hero-stat-value {
+      font-size: var(--text-3xl);
+      font-weight: 700;
+      color: var(--color-text);
+      letter-spacing: -0.5px;
+      line-height: 1.1;
+    }
 
-    .quick-action-compact svg {
-      width: 16px;
-      height: 16px;
+    .hero-stat-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
       flex-shrink: 0;
     }
 
-    /* Unpaid row highlighting */
-    tr.row-unpaid { background: var(--color-warning-light); }
-    tr.row-unpaid:hover { background: #fde68a; }
+    .hero-stat-icon svg {
+      width: 20px;
+      height: 20px;
+    }
 
-    [data-theme="dark"] tr.row-unpaid { background: rgba(251, 191, 36, 0.08); }
-    [data-theme="dark"] tr.row-unpaid:hover { background: rgba(251, 191, 36, 0.15); }
+    .hero-stat--outstanding .hero-stat-icon { background: var(--color-primary-light); color: var(--color-primary); }
+    .hero-stat--unpaid .hero-stat-icon { background: var(--color-warning-light); color: var(--color-warning); }
+    .hero-stat--paid .hero-stat-icon { background: var(--color-success-light); color: var(--color-success); }
+
+    .hero-stat-detail {
+      font-size: var(--text-xs);
+      color: var(--color-text-muted);
+      line-height: 1.4;
+    }
+
+    .hero-stat-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: var(--text-xs);
+      font-weight: 600;
+      color: var(--color-primary);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      transition: var(--transition-fast);
+    }
+
+    .hero-stat-cta:hover {
+      opacity: 0.8;
+    }
+
+    .hero-stat-cta svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    /* Dashboard toolbar */
+    .dashboard-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-4);
+    }
+
+    .dashboard-toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .dashboard-toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+
+    /* Unpaid row highlighting */
+    tr.row-unpaid { background: rgba(251, 191, 36, 0.06); }
+    tr.row-unpaid:hover { background: rgba(251, 191, 36, 0.12); }
+
+    [data-theme="dark"] tr.row-unpaid { background: rgba(251, 191, 36, 0.06); }
+    [data-theme="dark"] tr.row-unpaid:hover { background: rgba(251, 191, 36, 0.12); }
 
     .table-container {
       overflow-x: auto;
@@ -359,16 +632,18 @@
     }
 
     th, td {
-      padding: var(--space-2) var(--space-3);
+      padding: var(--space-3) var(--space-4);
       text-align: left;
       border-bottom: 1px solid var(--color-border);
-      font-size: var(--text-xs);
+      font-size: var(--text-sm);
     }
 
     th {
-      font-weight: 600;
+      font-weight: 500;
       font-size: var(--text-xs);
-      color: var(--color-text-secondary);
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
       background: var(--color-border-light);
     }
 
@@ -379,7 +654,7 @@
     .status-badge {
       display: inline-flex;
       align-items: center;
-      padding: var(--space-1) var(--space-2);
+      padding: 3px 10px;
       border-radius: var(--radius-full);
       font-size: var(--text-xs);
       font-weight: 500;
@@ -431,8 +706,8 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: var(--space-1);
-      padding: var(--space-2) var(--space-3);
+      gap: 6px;
+      padding: var(--space-2) var(--space-4);
       font-size: var(--text-xs);
       font-weight: 500;
       border-radius: var(--radius-md);
@@ -443,12 +718,12 @@
 
     .btn-primary { background: var(--color-primary); color: white; }
     .btn-primary:hover { background: var(--color-primary-hover); }
-    .btn-secondary { background: var(--color-border-light); color: var(--color-text); border: 1px solid var(--color-border); }
-    .btn-secondary:hover { background: var(--color-border); }
+    .btn-secondary { background: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-border); }
+    .btn-secondary:hover { background: var(--color-border-light); }
     .btn-danger { background: var(--color-error); color: white; }
     .btn-danger:hover { background: var(--color-error-text); }
-    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-    .btn-sm { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-sm { padding: 6px var(--space-3); font-size: var(--text-xs); }
     .btn-xs { padding: var(--space-1) var(--space-2); font-size: var(--text-xs); }
     .btn-ghost { background: transparent; color: var(--color-text-secondary); border: 1px solid var(--color-border); }
     .btn-ghost:hover { background: var(--color-border-light); color: var(--color-text); }
@@ -475,13 +750,12 @@
     /* Toast notifications */
     .toast-container {
       position: fixed;
-      top: var(--space-4);
-      left: 50%;
-      transform: translateX(-50%);
+      bottom: var(--space-6);
+      right: var(--space-6);
       z-index: 10000;
       display: flex;
       flex-direction: column;
-      align-items: center;
+      align-items: flex-end;
       gap: var(--space-2);
       pointer-events: none;
     }
@@ -489,8 +763,8 @@
       display: inline-flex;
       align-items: center;
       gap: var(--space-2);
-      padding: var(--space-3) var(--space-4);
-      border-radius: var(--radius-full);
+      padding: var(--space-3) var(--space-5);
+      border-radius: var(--radius-lg);
       font-size: var(--text-sm);
       font-weight: 500;
       color: white;
@@ -505,12 +779,12 @@
     .toast-warning { background: #d97706; }
     .toast-out { animation: toastOut 0.25s ease-in forwards; }
     @keyframes toastIn {
-      from { opacity: 0; transform: translateY(-12px); }
-      to { opacity: 1; transform: translateY(0); }
+      from { opacity: 0; transform: translateX(16px); }
+      to { opacity: 1; transform: translateX(0); }
     }
     @keyframes toastOut {
-      from { opacity: 1; transform: translateY(0); }
-      to { opacity: 0; transform: translateY(-12px); }
+      from { opacity: 1; transform: translateX(0); }
+      to { opacity: 0; transform: translateX(16px); }
     }
 
     .btn-icon {
@@ -543,19 +817,19 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: var(--space-6);
-      color: var(--color-text-secondary);
+      padding: var(--space-8);
+      color: var(--color-text-muted);
       font-size: var(--text-sm);
+      gap: var(--space-3);
     }
 
     .spinner {
-      width: 24px;
-      height: 24px;
+      width: 20px;
+      height: 20px;
       border: 2px solid var(--color-border);
       border-top-color: var(--color-primary);
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
-      margin-right: var(--space-3);
     }
 
     @keyframes spin {
@@ -581,15 +855,16 @@
 
     .modal {
       background: var(--color-surface);
-      border-radius: var(--radius-lg);
-      max-width: 500px;
+      border-radius: var(--radius-xl);
+      max-width: 480px;
       width: 90%;
       max-height: 90vh;
       overflow-y: auto;
+      box-shadow: var(--shadow-lg);
     }
 
     .modal-header {
-      padding: var(--space-3) var(--space-4);
+      padding: var(--space-4) var(--space-5);
       border-bottom: 1px solid var(--color-border);
       display: flex;
       justify-content: space-between;
@@ -598,7 +873,7 @@
 
     .modal-title {
       font-weight: 600;
-      font-size: var(--text-sm);
+      font-size: var(--text-base);
     }
 
     .modal-close {
@@ -619,6 +894,110 @@
       display: flex;
       justify-content: flex-end;
       gap: var(--space-2);
+    }
+
+    /* Fullscreen preview modal */
+    .preview-fullscreen-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1100;
+      padding: var(--space-5);
+    }
+
+    .preview-fullscreen-modal.visible {
+      display: flex;
+    }
+
+    .preview-fullscreen-inner {
+      background: linear-gradient(160deg, #1e1b4b 0%, #312e81 50%, #3730a3 100%);
+      border-radius: var(--radius-xl);
+      max-width: 500px;
+      width: 100%;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 25px 80px -12px rgba(0, 0, 0, 0.6);
+    }
+
+    .preview-fullscreen-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-4) var(--space-5);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .preview-fullscreen-header h3 {
+      font-size: var(--text-base);
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .preview-fullscreen-close {
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      border-radius: var(--radius-md);
+      padding: 6px;
+      cursor: pointer;
+      color: rgba(255, 255, 255, 0.7);
+      transition: background 0.15s;
+    }
+
+    .preview-fullscreen-close:hover {
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+    }
+
+    .preview-fullscreen-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: var(--space-5);
+    }
+
+    .preview-fullscreen-bubble {
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 16px 16px 4px 16px;
+      padding: var(--space-4) var(--space-5);
+      color: rgba(255, 255, 255, 0.95);
+      font-size: var(--text-base);
+      line-height: 1.7;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .preview-fullscreen-meta {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-3) var(--space-5) var(--space-4);
+      font-size: var(--text-xs);
+      color: rgba(255, 255, 255, 0.4);
+    }
+
+    .btn-expand-preview {
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      border-radius: var(--radius-md);
+      padding: 4px 8px;
+      cursor: pointer;
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .btn-expand-preview:hover {
+      background: rgba(255, 255, 255, 0.2);
+      color: rgba(255, 255, 255, 0.9);
     }
 
     code {
@@ -1131,7 +1510,7 @@
     }
 
     .messages-title {
-      font-size: var(--text-xl);
+      font-size: var(--text-2xl);
       font-weight: 700;
       color: var(--color-text);
       margin-bottom: var(--space-1);
@@ -1293,7 +1672,7 @@
       grid-template-columns: 1fr 340px;
       gap: 0;
       background: var(--color-surface);
-      border-radius: var(--radius-lg);
+      border-radius: var(--radius-xl);
       border: 1px solid var(--color-border);
       overflow: hidden;
       min-height: 480px;
@@ -1497,16 +1876,7 @@
       margin-bottom: var(--space-2);
     }
 
-    .preview-device-notch {
-      width: 100px;
-      height: 28px;
-      background: #0c0a1d;
-      border-radius: 0 0 16px 16px;
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
-      top: 0;
-    }
+    /* notch removed for cleaner preview */
 
     .preview-device-title {
       display: flex;
@@ -1657,40 +2027,40 @@
     }
 
     @media (max-width: 768px) {
-      .tabs { overflow-x: auto; padding: 0 var(--space-2); }
-      .tab { padding: var(--space-2); white-space: nowrap; font-size: 10px; }
+      .tabs { overflow-x: auto; padding: 0 var(--space-3); }
+      .tab { padding: var(--space-2) var(--space-3); white-space: nowrap; font-size: var(--text-xs); }
       .tab-icon { width: 14px; height: 14px; }
-      .content { padding: var(--space-3); }
-      .stats-grid { grid-template-columns: 1fr 1fr; gap: var(--space-2); }
-      .stat-card { padding: var(--space-2); }
-      .stat-value { font-size: var(--text-lg); }
+      .content { padding: var(--space-4); }
+      .hero-stats { grid-template-columns: 1fr; gap: var(--space-3); }
+      .hero-stat { padding: var(--space-4); }
+      .hero-stat-value { font-size: var(--text-2xl); }
       .form-row { grid-template-columns: 1fr; }
-      .header { padding: var(--space-2) var(--space-4); }
+      .header { padding: var(--space-3) var(--space-4); }
       .header h1 { font-size: var(--text-base); }
-      .card-body { padding: var(--space-3); }
-      .card-header { padding: var(--space-2) var(--space-3); }
-      .filter-bar { flex-wrap: wrap; padding: var(--space-2) var(--space-3); }
+      .card-body { padding: var(--space-4); }
+      .card-header { padding: var(--space-3) var(--space-4); }
+      .filter-bar { flex-wrap: wrap; padding: var(--space-3); }
       .filter-group { min-width: calc(50% - var(--space-2)); }
-      .dashboard-layout { grid-template-columns: 1fr; }
-      .dashboard-sidebar { position: static; }
-      .stat-card-primary .stat-value { font-size: var(--text-xl); }
-      .quick-actions-sidebar { display: flex; flex-direction: row; }
-      .quick-actions-header { display: none; }
-      .quick-action-compact { flex: 1; justify-content: center; border-bottom: none; border-right: 1px solid var(--color-border-light); padding: var(--space-2); }
-      .quick-action-compact:last-child { border-right: none; }
+      .dashboard-toolbar { flex-direction: column; gap: var(--space-3); align-items: stretch; }
+    }
+
+    @media (min-width: 769px) and (max-width: 1024px) {
+      .hero-stats { grid-template-columns: repeat(3, 1fr); gap: var(--space-3); }
+      .hero-stat { padding: var(--space-4); }
+      .hero-stat-value { font-size: var(--text-2xl); }
     }
 
     /* Customer Filter Bar */
     .filter-bar {
       display: flex;
-      align-items: flex-end;
+      align-items: center;
       gap: var(--space-3);
-      padding: var(--space-2) var(--space-4);
+      padding: var(--space-3) var(--space-5);
       border-bottom: 1px solid var(--color-border);
       background: var(--color-surface);
       flex-wrap: wrap;
     }
-    .filter-group { display: flex; flex-direction: column; gap: var(--space-1); }
+    .filter-group { display: flex; flex-direction: column; gap: 3px; }
     .filter-label {
       font-size: 10px;
       font-weight: 600;
@@ -1699,10 +2069,10 @@
       color: var(--color-text-muted);
     }
     .filter-select, .filter-input {
-      padding: var(--space-1) var(--space-2);
+      padding: 5px var(--space-3);
       font-size: var(--text-xs);
       border: 1px solid var(--color-border);
-      border-radius: var(--radius-md);
+      border-radius: var(--radius-full);
       outline: none;
       background: var(--color-bg);
       color: var(--color-text);
@@ -1712,11 +2082,12 @@
       border-color: var(--color-primary);
       box-shadow: 0 0 0 2px var(--color-primary-ghost);
     }
-    .filter-input { width: 70px; }
+    .filter-input { width: 72px; }
     .filter-count {
       font-size: var(--text-xs);
       color: var(--color-text-secondary);
       white-space: nowrap;
+      font-weight: 500;
     }
 
     /* ============================================
@@ -1838,7 +2209,7 @@
       grid-template-columns: 200px 1fr;
       gap: 0;
       background: var(--color-surface);
-      border-radius: var(--radius-md);
+      border-radius: var(--radius-lg);
       border: 1px solid var(--color-border);
       overflow: hidden;
       min-height: 480px;
@@ -2207,19 +2578,19 @@
     /* Inline form row */
     .form-field-row {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: var(--space-5);
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: var(--space-3);
     }
 
     /* Toggle switch */
     .toggle-field {
       display: flex;
       align-items: flex-start;
-      gap: var(--space-3);
-      padding: var(--space-3);
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-3);
       background: var(--color-border-light);
       border-radius: var(--radius-md);
-      margin-bottom: var(--space-3);
+      margin-bottom: var(--space-2);
     }
 
     .toggle-switch {
@@ -2442,13 +2813,14 @@
         Ilaxi Billing
       </h1>
       <div class="header-actions">
+        <div class="header-status-pills" id="headerStatusPills"></div>
+        <span class="header-users" id="headerUsers" title="Authorized users"></span>
         <button class="btn-header" onclick="toggleTheme()" title="Toggle dark/light mode" aria-label="Toggle dark/light mode">
           <span class="theme-toggle-icon">
             <svg class="icon-moon" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
             <svg class="icon-sun" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
           </span>
         </button>
-        <button class="btn-header" onclick="logout()">Sign Out</button>
       </div>
     </div>
   </header>
@@ -2481,6 +2853,7 @@
     <div class="tab-panel active" id="panel-dashboard">
       <div class="tab-intro">
         <div class="tab-intro-title">Dashboard</div>
+        <div class="tab-intro-desc">Your billing overview at a glance. Track payments, send reminders, and manage customers.</div>
       </div>
 
       <!-- Setup Checklist (hidden when all done) -->
@@ -2524,112 +2897,107 @@
         </div>
       </div>
 
-      <div class="dashboard-layout">
-        <!-- Sidebar: Stats + Quick Actions -->
-        <div class="dashboard-sidebar">
-          <div id="statsGrid">
-            <!-- Primary stats (prominent) -->
-            <div class="stat-card stat-card-primary" style="margin-bottom: var(--space-2);">
-              <div class="stat-card-icon" style="background: var(--color-warning-light); color: var(--color-warning);">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-              </div>
-              <div class="stat-label">Unpaid</div><div class="stat-value warning" id="statUnpaid">-</div>
+      <!-- Hero Stats — 3 horizontal cards -->
+      <div class="hero-stats" id="statsGrid">
+        <div class="hero-stat hero-stat--outstanding">
+          <div class="hero-stat-top">
+            <div class="hero-stat-info">
+              <span class="hero-stat-label">Outstanding</span>
+              <span class="hero-stat-value" id="statBalance">$0.00</span>
             </div>
-            <div class="stat-card stat-card-primary error-accent" style="margin-bottom: var(--space-2);">
-              <div class="stat-card-icon" style="background: var(--color-error-light); color: var(--color-error);">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-              </div>
-              <div class="stat-label">Outstanding Balance</div><div class="stat-value" id="statBalance">-</div>
-            </div>
-            <!-- Secondary stats (compact) -->
-            <div class="stats-secondary-row">
-              <div class="stat-card">
-                <div class="stat-card-icon" style="background: var(--color-info-light); color: var(--color-info);">
-                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                </div>
-                <div class="stat-label">Total</div><div class="stat-value" id="statTotal">-</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-card-icon" style="background: var(--color-success-light); color: var(--color-success);">
-                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </div>
-                <div class="stat-label">Paid</div><div class="stat-value success" id="statPaid">-</div>
-              </div>
+            <div class="hero-stat-icon">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             </div>
           </div>
-
-          <!-- Quick Actions -->
-          <div class="quick-actions-sidebar">
-            <div class="quick-actions-header">Quick Actions</div>
-            <div class="quick-action-compact" onclick="switchTab('send')">
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color: var(--color-primary);"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
-              Send Bills
-            </div>
-            <div class="quick-action-compact" onclick="switchTab('messages')">
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color: var(--color-success);"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-              Edit Templates
-            </div>
-            <div class="quick-action-compact" onclick="refreshCustomers()">
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color: var(--color-info);"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-              Refresh Data
-            </div>
-            <a class="quick-action-compact" id="openSpreadsheetAction" href="#" target="_blank" style="text-decoration:none; color:inherit;">
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color: var(--color-success);"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-              Open Spreadsheet
-            </a>
-          </div>
+          <button class="hero-stat-cta" onclick="switchTab('send')">
+            Collect Payment
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+          </button>
         </div>
 
-        <!-- Main: Customer table -->
-        <div class="dashboard-main">
-          <div class="card">
-            <div class="card-header">
-              <h2 class="card-title">Customers</h2>
-              <button class="btn btn-secondary" onclick="refreshCustomers()">
-                <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                Refresh
-              </button>
+        <div class="hero-stat hero-stat--unpaid">
+          <div class="hero-stat-top">
+            <div class="hero-stat-info">
+              <span class="hero-stat-label">Unpaid</span>
+              <span class="hero-stat-value" id="statUnpaid">0</span>
             </div>
-            <div class="filter-bar" id="customerFilters">
-              <div class="filter-group">
-                <label class="filter-label">Payment</label>
-                <select class="filter-select" id="filterPayment" onchange="applyCustomerFilters()">
-                  <option value="">All</option>
-                  <option value="paid">Paid</option>
-                  <option value="unpaid">Unpaid</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-              <div class="filter-group">
-                <label class="filter-label">Notice Sent</label>
-                <select class="filter-select" id="filterNotice" onchange="applyCustomerFilters()">
-                  <option value="">All</option>
-                  <option value="first">First Notice</option>
-                  <option value="followup">Follow-up</option>
-                  <option value="final">Final Notice</option>
-                  <option value="thankyou">Thank You</option>
-                  <option value="error">Error</option>
-                  <option value="none">Not Sent</option>
-                </select>
-              </div>
-              <div class="filter-group">
-                <label class="filter-label">Balance</label>
-                <div style="display:flex; gap:var(--space-2); align-items:center;">
-                  <input type="number" class="filter-input" id="filterBalanceMin" placeholder="Min" oninput="applyCustomerFilters()">
-                  <span style="color:var(--color-text-muted);">&ndash;</span>
-                  <input type="number" class="filter-input" id="filterBalanceMax" placeholder="Max" oninput="applyCustomerFilters()">
-                </div>
-              </div>
-              <div class="filter-group" style="justify-content:flex-end;">
-                <span class="filter-count" id="filterCount"></span>
-                <button class="btn btn-ghost btn-xs" onclick="clearCustomerFilters()">Clear</button>
-              </div>
+            <div class="hero-stat-icon">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             </div>
-            <div class="card-body">
-              <div class="table-container" id="customersTable">
-                <div class="loading"><div class="spinner"></div>Loading customers...</div>
-              </div>
+          </div>
+          <button class="hero-stat-cta" onclick="switchTab('send')">
+            Send Reminders
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+          </button>
+        </div>
+
+        <div class="hero-stat hero-stat--paid">
+          <div class="hero-stat-top">
+            <div class="hero-stat-info">
+              <span class="hero-stat-label">Paid</span>
+              <span class="hero-stat-value" id="statPaid">0</span>
             </div>
+            <div class="hero-stat-icon">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+          </div>
+          <span class="hero-stat-detail" id="statTotal">Total customers: -</span>
+        </div>
+      </div>
+
+      <!-- Customers Table Card -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Customers</h2>
+          <div style="display:flex; gap:var(--space-2); align-items:center;">
+            <a class="btn btn-ghost btn-sm" id="openSpreadsheetAction" href="#" target="_blank" style="text-decoration:none;">
+              <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+              Spreadsheet
+            </a>
+            <button class="btn btn-secondary btn-sm" onclick="refreshCustomers()">
+              <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              Refresh
+            </button>
+          </div>
+        </div>
+        <div class="filter-bar" id="customerFilters">
+          <div class="filter-group">
+            <label class="filter-label">Payment</label>
+            <select class="filter-select" id="filterPayment" onchange="applyCustomerFilters()">
+              <option value="">All</option>
+              <option value="paid">Paid</option>
+              <option value="unpaid">Unpaid</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">Notice</label>
+            <select class="filter-select" id="filterNotice" onchange="applyCustomerFilters()">
+              <option value="">All</option>
+              <option value="first">First Notice</option>
+              <option value="followup">Follow-up</option>
+              <option value="final">Final Notice</option>
+              <option value="thankyou">Thank You</option>
+              <option value="error">Error</option>
+              <option value="none">Not Sent</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">Balance</label>
+            <div style="display:flex; gap:var(--space-1); align-items:center;">
+              <input type="number" class="filter-input" id="filterBalanceMin" placeholder="Min" oninput="applyCustomerFilters()">
+              <span style="color:var(--color-text-muted); font-size: var(--text-xs);">to</span>
+              <input type="number" class="filter-input" id="filterBalanceMax" placeholder="Max" oninput="applyCustomerFilters()">
+            </div>
+          </div>
+          <div style="margin-left:auto; display:flex; align-items:center; gap:var(--space-2);">
+            <span class="filter-count" id="filterCount"></span>
+            <button class="btn btn-ghost btn-xs" onclick="clearCustomerFilters()">Clear</button>
+          </div>
+        </div>
+        <div class="card-body" style="padding: 0;">
+          <div class="table-container" id="customersTable">
+            <div class="loading"><div class="spinner"></div>Loading customers...</div>
           </div>
         </div>
       </div>
@@ -2639,57 +3007,27 @@
     <div class="tab-panel" id="panel-send">
       <div class="tab-intro">
         <div class="tab-intro-title">Send Bills</div>
-        <div class="tab-intro-desc">Send SMS billing reminders to your customers in 3 easy steps.</div>
-      </div>
-
-      <div class="steps-bar" id="sendStepsBar">
-        <div class="step-item active" id="sendStep1">
-          <span class="step-num">1</span> Select Recipients
-        </div>
-        <div class="step-connector"></div>
-        <div class="step-item" id="sendStep2">
-          <span class="step-num">2</span> Choose Template
-        </div>
-        <div class="step-connector"></div>
-        <div class="step-item" id="sendStep3">
-          <span class="step-num">3</span> Review &amp; Send
-        </div>
+        <div class="tab-intro-desc">Send SMS billing reminders to your customers.</div>
       </div>
 
       <div class="card">
         <div class="card-body">
           <div id="sendAlert"></div>
 
-          <!-- Step 1: Select Recipients -->
-          <div style="margin-bottom: var(--space-6);">
-            <h3 style="font-size: var(--text-base); font-weight: 600; color: var(--color-text); margin-bottom: var(--space-3); display: flex; align-items: center; gap: var(--space-2);">
-              <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--color-primary); color: white; display: inline-flex; align-items: center; justify-content: center; font-size: var(--text-xs); font-weight: 700;">1</span>
-              Select Recipients
-            </h3>
-            <div class="form-row">
-              <div class="form-group">
-                <label for="sendFilter">Send To</label>
-                <select id="sendFilter" onchange="toggleDateInput(); updateRecipientCount();">
-                  <option value="unpaid">All Unpaid Customers</option>
-                  <option value="byDate">Unpaid by Due Date</option>
-                </select>
-              </div>
-              <div class="form-group" id="dueDateGroup" style="display: none;">
-                <label for="dueDate">Due Date/Month</label>
-                <input type="text" id="dueDate" placeholder="e.g., October or 2024-10-31" oninput="updateRecipientCount();">
-              </div>
-            </div>
-            <div id="recipientPreview" style="font-size: var(--text-sm); color: var(--color-text-secondary); margin-top: var(--space-2);"></div>
-          </div>
-
-          <!-- Step 2: Choose Template -->
-          <div style="margin-bottom: var(--space-6);">
-            <h3 style="font-size: var(--text-base); font-weight: 600; color: var(--color-text); margin-bottom: var(--space-3); display: flex; align-items: center; gap: var(--space-2);">
-              <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--color-primary); color: white; display: inline-flex; align-items: center; justify-content: center; font-size: var(--text-xs); font-weight: 700;">2</span>
-              Choose Template
-            </h3>
+          <div class="send-form-grid">
             <div class="form-group">
-              <label for="templateType">Message Template</label>
+              <label for="sendFilter">Recipients</label>
+              <select id="sendFilter" onchange="toggleDateInput(); updateRecipientCount();">
+                <option value="unpaid">All Unpaid Customers</option>
+                <option value="byDate">Unpaid by Due Date</option>
+              </select>
+            </div>
+            <div class="form-group" id="dueDateGroup" style="display: none;">
+              <label for="dueDate">Due Date / Month</label>
+              <input type="text" id="dueDate" placeholder="e.g., October or 2024-10-31" oninput="updateRecipientCount();">
+            </div>
+            <div class="form-group">
+              <label for="templateType">Template</label>
               <select id="templateType">
                 <option value="firstNotice">First Notice</option>
                 <option value="followUp">Follow-up Reminder</option>
@@ -2698,23 +3036,17 @@
             </div>
           </div>
 
-          <!-- Step 3: Review & Send -->
-          <div id="sendReviewSection" style="margin-bottom: var(--space-4);">
-            <h3 style="font-size: var(--text-base); font-weight: 600; color: var(--color-text); margin-bottom: var(--space-3); display: flex; align-items: center; gap: var(--space-2);">
-              <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--color-primary); color: white; display: inline-flex; align-items: center; justify-content: center; font-size: var(--text-xs); font-weight: 700;">3</span>
-              Review &amp; Send
-            </h3>
+          <div id="recipientPreview" style="font-size: var(--text-sm); color: var(--color-text-secondary); margin-top: var(--space-2); margin-bottom: var(--space-4);"></div>
 
-            <div id="dryRunWarning" class="callout callout-warn" style="display: none;">
-              <svg class="callout-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-              <div class="callout-content"><strong>Test Mode Active</strong> No real messages will be sent. The status column will show "[DRY RUN]" results so you can verify everything looks correct before sending for real.</div>
-            </div>
-
-            <button class="btn btn-primary" id="sendBillsBtn" onclick="sendBills()" style="padding: var(--space-3) var(--space-6); font-size: var(--text-base);">
-              <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
-              Send Bills
-            </button>
+          <div id="dryRunWarning" class="callout callout-warn" style="display: none;">
+            <svg class="callout-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            <div class="callout-content"><strong>Dry Run Mode is ON.</strong> No real messages will be sent. Status column will show "[DRY RUN]" results.</div>
           </div>
+
+          <button class="btn btn-primary" id="sendBillsBtn" onclick="sendBills()" style="padding: var(--space-3) var(--space-6);">
+            <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+            Send Bills
+          </button>
         </div>
       </div>
     </div>
@@ -2858,12 +3190,17 @@
           <div class="message-preview-side">
             <div class="preview-device">
               <div class="preview-device-header">
-                <div class="preview-device-notch"></div>
                 <div class="preview-device-title">
                   <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
                   Live Preview
                 </div>
-                <span class="preview-sample-badge">Sample Data</span>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span class="preview-sample-badge">Sample Data</span>
+                  <button class="btn-expand-preview" onclick="openFullscreenPreview()" title="View fullscreen">
+                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+                    Expand
+                  </button>
+                </div>
               </div>
               <div class="preview-device-screen">
                 <div class="preview-conversation">
@@ -3199,7 +3536,7 @@
 
           <!-- Advanced Panel -->
           <div class="settings-panel" id="settings-advanced">
-            <div class="settings-section-header">
+            <div class="settings-section-header" style="margin-bottom: var(--space-2);">
               <h2 class="settings-section-title">
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
                 Advanced Options
@@ -3207,22 +3544,14 @@
               <p class="settings-section-desc">Technical settings for power users. Most users won't need to change these.</p>
             </div>
 
-            <div class="info-card">
-              <svg class="info-card-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-              <div class="info-card-content">
-                <div class="info-card-title">When to use these settings</div>
-                <p class="info-card-text">These options control how quickly messages are sent and help with testing. Only change them if you know what you're doing or were asked to by support.</p>
-              </div>
-            </div>
-
             <div class="toggle-field">
               <label class="toggle-switch">
-                <input type="checkbox" id="autoThankYouEnabled" checked>
+                <input type="checkbox" id="autoThankYouEnabled" checked onchange="if(currentSettings && currentSettings.behavior){ currentSettings.behavior.autoThankYouEnabled = this.checked; } updateHeaderStatusPills();">
                 <span class="toggle-slider"></span>
               </label>
               <div class="toggle-content">
                 <div class="toggle-label">Auto Thank-You Messages</div>
-                <p class="toggle-desc">When enabled, a thank-you message is automatically sent when you mark a payment as "Paid" in the spreadsheet.</p>
+                <p class="toggle-desc">Automatically send a thank-you when a payment is marked "Paid" in the spreadsheet.</p>
               </div>
             </div>
 
@@ -3233,61 +3562,86 @@
               </label>
               <div class="toggle-content">
                 <div class="toggle-label">Dry Run Mode</div>
-                <p class="toggle-desc">Test your billing run without sending real SMS messages. The spreadsheet will be updated with status results marked as "[DRY RUN]" so you can review what would be sent.</p>
+                <p class="toggle-desc">Test without sending real SMS. Statuses will be marked "[DRY RUN]".</p>
               </div>
             </div>
 
-            <div style="padding: var(--space-4) 0; border-top: 1px solid var(--color-border);">
-              <label class="form-field-label" style="margin-bottom: var(--space-2);">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                Clear All Message Statuses
-              </label>
-              <p class="form-field-desc" style="margin-bottom: var(--space-3);">Remove all message status values and colors from your spreadsheet. This cannot be undone.</p>
-              <button class="btn btn-secondary" onclick="clearStatuses()">
-                <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                Clear All Statuses
-              </button>
-            </div>
-
-            <div class="form-field-row">
-              <div class="form-field">
+            <div class="form-field-row" style="margin-top: var(--space-2);">
+              <div class="form-field" style="margin-bottom: var(--space-2);">
                 <label class="form-field-label">
                   <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
                   Batch Size
                 </label>
-                <p class="form-field-desc">Maximum messages to send at once (1-200)</p>
+                <p class="form-field-desc">Max messages at once (1-200)</p>
                 <input type="number" id="batchSize" min="1" max="200" value="75">
               </div>
 
-              <div class="form-field">
+              <div class="form-field" style="margin-bottom: var(--space-2);">
                 <label class="form-field-label">
                   <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                   Message Delay
                 </label>
-                <p class="form-field-desc">Wait time between messages in milliseconds</p>
+                <p class="form-field-desc">Wait time between messages (ms)</p>
                 <input type="number" id="messageDelay" min="500" max="5000" value="1000">
               </div>
             </div>
 
-            <div class="form-field">
-              <label class="form-field-label">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
-                Header Row
-              </label>
-              <p class="form-field-desc">Which row in your spreadsheet contains the column headers (usually row 1)</p>
-              <input type="number" id="headerRow" min="1" value="1" style="max-width: 120px;">
+            <div class="form-field-row">
+              <div class="form-field" style="margin-bottom: var(--space-2);">
+                <label class="form-field-label">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+                  Header Row
+                </label>
+                <p class="form-field-desc">Row with column headers (usually 1)</p>
+                <input type="number" id="headerRow" min="1" value="1" style="max-width: 120px;">
+              </div>
+
+              <div class="form-field" style="margin-bottom: var(--space-2);">
+                <label class="form-field-label">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                  Test Customer Order ID
+                </label>
+                <p class="form-field-desc">Real customer data for previews. Leave empty for sample data.</p>
+                <input type="text" id="testOrderId" placeholder="e.g. ORD-2024-001">
+              </div>
             </div>
 
-            <div class="form-field">
-              <label class="form-field-label">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
-                Test Customer Order ID
+            <!-- User Access Management -->
+            <div style="padding: var(--space-3) 0; border-top: 1px solid var(--color-border);">
+              <label class="form-field-label" style="margin-bottom: var(--space-1);">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                Web App Access
               </label>
-              <p class="form-field-desc">Enter an Order ID from your spreadsheet. This customer's real data will be used for template previews. Leave empty for sample data.</p>
-              <input type="text" id="testOrderId" placeholder="e.g. ORD-2024-001" style="max-width: 250px;">
+              <p class="form-field-desc" style="margin-bottom: var(--space-2);">Manage which Google accounts can access this web app.</p>
+              <div style="display: flex; gap: var(--space-2); margin-bottom: var(--space-2);">
+                <input type="email" id="newUserEmail" placeholder="user@gmail.com" style="flex: 1; padding: 6px var(--space-2); font-size: var(--text-sm); border: 1px solid var(--color-border); border-radius: var(--radius-md); outline: none;" onkeydown="if(event.key==='Enter'){addUser();}" onfocus="this.style.borderColor='var(--color-primary)'" onblur="this.style.borderColor='var(--color-border)'">
+                <button class="btn btn-secondary btn-sm" onclick="addUser()">
+                  <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                  Add
+                </button>
+              </div>
+              <div id="usersList" class="users-manage-list"></div>
             </div>
 
-            <div class="settings-actions">
+            <!-- Danger Zone: Clear actions -->
+            <div style="padding: var(--space-3) 0; border-top: 1px solid var(--color-border);">
+              <label class="form-field-label" style="margin-bottom: var(--space-2);">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                Danger Zone
+              </label>
+              <div style="display: flex; gap: var(--space-2); flex-wrap: wrap;">
+                <button class="btn btn-secondary btn-sm" onclick="clearStatuses()">
+                  <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  Clear All Statuses
+                </button>
+                <button class="btn btn-ghost btn-danger-ghost btn-sm" id="clearCredsBtn" onclick="clearCredentials()">
+                  <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                  Clear Twilio Credentials
+                </button>
+              </div>
+            </div>
+
+            <div class="settings-actions" style="margin-top: var(--space-3);">
               <span class="settings-actions-hint">These settings apply to all billing operations</span>
               <button class="btn btn-primary" id="saveAdvancedBtn" onclick="saveSettings(this)">
                 <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
@@ -3324,6 +3678,28 @@
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeSendModal()">Cancel</button>
         <button class="btn btn-primary" id="modalSendBtn" onclick="sendSingleBill()">Send Bill</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fullscreen Preview Modal -->
+  <div class="preview-fullscreen-modal" id="previewFullscreenModal" onclick="if(event.target===this)closeFullscreenPreview()">
+    <div class="preview-fullscreen-inner">
+      <div class="preview-fullscreen-header">
+        <h3>Message Preview</h3>
+        <button class="preview-fullscreen-close" onclick="closeFullscreenPreview()">
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="preview-fullscreen-body">
+        <div class="preview-fullscreen-bubble" id="fullscreenPreviewContent">
+          No preview available. Start typing a message template to see a preview.
+        </div>
+      </div>
+      <div class="preview-fullscreen-meta">
+        <span>SMS</span>
+        <span>&middot;</span>
+        <span>Sample Data</span>
       </div>
     </div>
   </div>
@@ -3373,6 +3749,15 @@
       loadSettings();
       loadCredentialStatus();
       restoreSettingsNavState();
+      loadCurrentUser();
+
+      // Close modals on Escape key
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+          closeFullscreenPreview();
+          closeSendModal();
+        }
+      });
     });
 
     // XSS-safe text escaping function
@@ -3407,7 +3792,11 @@
           'autoDetectColumns': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).autoDetectColumnsForWeb(); },
           'resetSettings': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).resetToDefaults(); },
           'importSettings': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).importSettings(payload); },
-          'getSpreadsheetUrl': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getSpreadsheetUrlForWeb(); }
+          'getSpreadsheetUrl': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getSpreadsheetUrlForWeb(); },
+          'updatePaymentStatus': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).updatePaymentStatusForWeb(payload); },
+          'getCurrentUser': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getCurrentUserForWeb(); },
+          'addUser': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).addUserForWeb(payload); },
+          'removeUser': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).removeUserForWeb(payload); }
         };
         if (handlers[action]) handlers[action]();
         else reject(new Error('Unknown action: ' + action));
@@ -3507,7 +3896,7 @@
         }
         if (result.success) {
           var stats = result.data;
-          setTextContent('statTotal', stats.total);
+          setTextContent('statTotal', stats.total + ' total customers');
           setTextContent('statUnpaid', stats.unpaid);
           setTextContent('statPaid', stats.paid);
           setTextContent('statBalance', '$' + stats.unpaidBalance.toFixed(2));
@@ -3562,17 +3951,17 @@
       while (container.firstChild) container.removeChild(container.firstChild);
 
       if (!customers || customers.length === 0) {
-        var p = document.createElement('p');
-        p.style.color = 'var(--color-text-secondary)';
-        p.textContent = 'No customers found.';
-        container.appendChild(p);
+        var emptyDiv = document.createElement('div');
+        emptyDiv.style.cssText = 'padding: var(--space-8) var(--space-6); text-align: center; color: var(--color-text-muted);';
+        emptyDiv.textContent = 'No customers found.';
+        container.appendChild(emptyDiv);
         return;
       }
 
       var table = document.createElement('table');
       var thead = document.createElement('thead');
       var headerRow = document.createElement('tr');
-      ['Name', 'Phone', 'Balance', 'Due Date', 'Payment', 'Status', 'Actions'].forEach(function(h) {
+      ['Customer', 'Balance', 'Due Date', 'Payment', 'Status', ''].forEach(function(h) {
         var th = document.createElement('th');
         th.textContent = h;
         headerRow.appendChild(th);
@@ -3587,15 +3976,20 @@
           tr.className = 'row-unpaid';
         }
 
+        // Combined name + phone cell
         var tdName = document.createElement('td');
-        tdName.textContent = c.name;
+        var nameStrong = document.createElement('strong');
+        nameStrong.textContent = c.name;
+        nameStrong.style.cssText = 'display: block; font-weight: 600;';
+        tdName.appendChild(nameStrong);
+        var phoneSmall = document.createElement('span');
+        phoneSmall.textContent = c.phone;
+        phoneSmall.style.cssText = 'font-size: 11px; color: var(--color-text-muted);';
+        tdName.appendChild(phoneSmall);
         tr.appendChild(tdName);
 
-        var tdPhone = document.createElement('td');
-        tdPhone.textContent = c.phone;
-        tr.appendChild(tdPhone);
-
         var tdBalance = document.createElement('td');
+        tdBalance.style.fontWeight = '600';
         tdBalance.textContent = c.formattedBalance;
         tr.appendChild(tdBalance);
 
@@ -3604,10 +3998,22 @@
         tr.appendChild(tdDate);
 
         var tdPayment = document.createElement('td');
-        var paymentBadge = document.createElement('span');
-        paymentBadge.className = 'status-badge ' + (String(c.paymentStatus).toLowerCase() === 'paid' ? 'paid' : 'unpaid');
-        paymentBadge.textContent = c.paymentStatus || 'Unknown';
-        tdPayment.appendChild(paymentBadge);
+        var paymentSelect = document.createElement('select');
+        var currentPS = String(c.paymentStatus).toLowerCase();
+        paymentSelect.className = 'payment-status-select status-' + (currentPS === 'paid' ? 'paid' : currentPS === 'unpaid' ? 'unpaid' : 'other');
+        ['Paid', 'Unpaid'].forEach(function(opt) {
+          var option = document.createElement('option');
+          option.value = opt;
+          option.textContent = opt;
+          if (String(c.paymentStatus).toLowerCase() === opt.toLowerCase()) option.selected = true;
+          paymentSelect.appendChild(option);
+        });
+        paymentSelect.onchange = (function(rowIdx, selectEl) {
+          return function() {
+            updatePaymentStatus(rowIdx, selectEl.value, selectEl);
+          };
+        })(c.rowIndex, paymentSelect);
+        tdPayment.appendChild(paymentSelect);
         tr.appendChild(tdPayment);
 
         var tdStatus = document.createElement('td');
@@ -3618,14 +4024,16 @@
           statusBadge.textContent = statusText.substring(0, 30);
           tdStatus.appendChild(statusBadge);
         } else {
-          tdStatus.textContent = statusText.substring(0, 30);
+          tdStatus.style.color = 'var(--color-text-muted)';
+          tdStatus.textContent = statusText ? statusText.substring(0, 30) : '\u2013';
         }
         tr.appendChild(tdStatus);
 
         var tdActions = document.createElement('td');
+        tdActions.style.textAlign = 'right';
         var btn = document.createElement('button');
         btn.className = 'btn btn-secondary btn-sm';
-        btn.textContent = 'Send';
+        btn.textContent = String(c.paymentStatus).toLowerCase() === 'unpaid' ? 'Send Reminder' : 'View';
         btn.onclick = (function(rowIndex) { return function() { openSendModal(rowIndex); }; })(c.rowIndex);
         tdActions.appendChild(btn);
         tr.appendChild(tdActions);
@@ -3768,6 +4176,11 @@
       if (warningDiv) {
         warningDiv.style.display = dryRun ? 'flex' : 'none';
       }
+      // Sync to currentSettings for header pills
+      if (currentSettings && currentSettings.behavior) {
+        currentSettings.behavior.dryRunMode = dryRun;
+      }
+      updateHeaderStatusPills();
     }
 
     function showAlert(containerId, type, message) {
@@ -3879,6 +4292,196 @@
       }, 3500);
     }
 
+    // Payment Status Update
+    function updatePaymentStatus(rowIndex, newStatus, selectEl) {
+      var prevClass = selectEl.className;
+      var statusClass = newStatus.toLowerCase() === 'paid' ? 'status-paid' : newStatus.toLowerCase() === 'unpaid' ? 'status-unpaid' : 'status-other';
+      selectEl.className = 'payment-status-select ' + statusClass;
+      selectEl.disabled = true;
+
+      serverCall('updatePaymentStatus', { rowIndex: rowIndex, paymentStatus: newStatus })
+        .then(function(result) {
+          selectEl.disabled = false;
+          if (result.success) {
+            // Update cached data
+            var customer = currentCustomers.find(function(c) { return c.rowIndex === rowIndex; });
+            if (customer) customer.paymentStatus = newStatus;
+            showToast(newStatus + ' - status updated', 'success');
+            loadStats();
+          } else {
+            selectEl.className = prevClass;
+            showToast(result.error || 'Failed to update status', 'error');
+          }
+        })
+        .catch(function(err) {
+          selectEl.disabled = false;
+          selectEl.className = prevClass;
+          showToast('Error: ' + err.message, 'error');
+        });
+    }
+
+    // Header status pills (Dry Run + Auto Thank-You)
+    function updateHeaderStatusPills() {
+      var container = document.getElementById('headerStatusPills');
+      while (container.firstChild) container.removeChild(container.firstChild);
+
+      if (!currentSettings) return;
+
+      var dryRun = currentSettings.behavior && currentSettings.behavior.dryRunMode;
+      var autoTY = currentSettings.behavior && currentSettings.behavior.autoThankYouEnabled !== false;
+
+      if (dryRun) {
+        var pill = document.createElement('button');
+        pill.className = 'status-pill status-pill--dry-run';
+        pill.title = 'Dry Run Mode is ON - click to go to settings';
+        pill.onclick = function() { switchTab('settings'); setTimeout(function(){ switchSettingsTab('advanced'); }, 100); };
+        pill.innerHTML = '<span class="status-pill-dot"></span>Dry Run';
+        container.appendChild(pill);
+      } else {
+        var livePill = document.createElement('button');
+        livePill.className = 'status-pill status-pill--live';
+        livePill.title = 'Live mode - messages will be sent for real';
+        livePill.onclick = function() { switchTab('settings'); setTimeout(function(){ switchSettingsTab('advanced'); }, 100); };
+        livePill.innerHTML = '<span class="status-pill-dot"></span>Live';
+        container.appendChild(livePill);
+      }
+
+      if (autoTY) {
+        var tyPill = document.createElement('button');
+        tyPill.className = 'status-pill status-pill--auto-ty';
+        tyPill.title = 'Auto Thank-You messages are ON';
+        tyPill.onclick = function() { switchTab('settings'); setTimeout(function(){ switchSettingsTab('advanced'); }, 100); };
+        tyPill.innerHTML = '<span class="status-pill-dot"></span>Auto Thank-You';
+        container.appendChild(tyPill);
+      }
+    }
+
+    // Current User + Active Users
+    function loadCurrentUser() {
+      serverCall('getCurrentUser').then(function(result) {
+        if (!result || !result.success) return;
+        var data = result.data;
+        var usersEl = document.getElementById('headerUsers');
+        if (!usersEl) return;
+
+        var users = data.activeUsers || [];
+        var userCount = users.length;
+        if (userCount > 0) {
+          var html = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>' + userCount + ' user' + (userCount !== 1 ? 's' : '');
+          html += '<div class="users-popover">';
+          html += '<div class="users-popover-title">Authorized Users</div>';
+          var currentEmail = (data.email || '').toLowerCase();
+          users.forEach(function(email) {
+            var isCurrent = email.toLowerCase() === currentEmail;
+            html += '<div class="users-popover-item' + (isCurrent ? ' current-user' : '') + '">';
+            html += '<span class="user-dot"></span>';
+            html += '<span>' + email + '</span>';
+            if (isCurrent) html += '<span class="you-badge">you</span>';
+            html += '</div>';
+          });
+          html += '</div>';
+          usersEl.innerHTML = html;
+          usersEl.removeAttribute('title');
+        }
+      }).catch(function() {});
+    }
+
+    // Clear Twilio credentials
+    function clearCredentials() {
+      if (!confirm('Are you sure you want to clear all Twilio credentials? You will need to re-enter them to send messages.')) return;
+      var btn = document.getElementById('clearCredsBtn');
+      btn.disabled = true;
+      btn.textContent = 'Clearing...';
+      serverCall('clearCredentials')
+        .then(function(result) {
+          btn.disabled = false;
+          btn.innerHTML = '<svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg> Clear All Credentials';
+          if (result.success) {
+            showToast('Twilio credentials cleared', 'success');
+            loadCredentialStatus();
+          } else {
+            showToast(result.error || 'Failed to clear credentials', 'error');
+          }
+        })
+        .catch(function(err) {
+          btn.disabled = false;
+          btn.innerHTML = '<svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg> Clear All Credentials';
+          showToast(err.message || 'Failed to clear credentials', 'error');
+        });
+    }
+
+    // User management
+    var currentUserEmail = '';
+
+    function renderUsersList(users) {
+      var container = document.getElementById('usersList');
+      if (!container) return;
+      if (!users || users.length === 0) {
+        container.innerHTML = '<p style="font-size: var(--text-sm); color: var(--color-text-muted); padding: var(--space-2);">No authorized users.</p>';
+        return;
+      }
+      var html = '';
+      users.forEach(function(email) {
+        var isCurrentUser = email.toLowerCase() === currentUserEmail.toLowerCase();
+        html += '<div class="users-manage-item">';
+        html += '<span class="user-email">' + escapeHtml(email) + '</span>';
+        if (isCurrentUser) html += '<span class="you-tag">you</span>';
+        html += '<button class="btn-remove-user" onclick="removeUser(\'' + escapeHtml(email).replace(/'/g, "\\'") + '\')"' + (isCurrentUser ? ' disabled title="Cannot remove yourself"' : ' title="Remove user"') + '>';
+        html += '<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+        html += '</button></div>';
+      });
+      container.innerHTML = html;
+    }
+
+    function loadUsersList() {
+      serverCall('getCurrentUser').then(function(result) {
+        if (result && result.success) {
+          currentUserEmail = result.data.email || '';
+          renderUsersList(result.data.activeUsers || []);
+        }
+      });
+    }
+
+    function addUser() {
+      var input = document.getElementById('newUserEmail');
+      var email = (input.value || '').trim();
+      if (!email || !email.includes('@')) {
+        showToast('Please enter a valid email address', 'error');
+        return;
+      }
+      serverCall('addUser', { email: email })
+        .then(function(result) {
+          if (result.success) {
+            input.value = '';
+            renderUsersList(result.data.users);
+            loadCurrentUser();
+            showToast('User added successfully', 'success');
+          } else {
+            showToast(result.error || 'Failed to add user', 'error');
+          }
+        })
+        .catch(function(err) {
+          showToast(err.message || 'Failed to add user', 'error');
+        });
+    }
+
+    function removeUser(email) {
+      if (!confirm('Remove ' + email + ' from authorized users?')) return;
+      serverCall('removeUser', { email: email })
+        .then(function(result) {
+          if (result.success) {
+            renderUsersList(result.data.users);
+            loadCurrentUser();
+            showToast('User removed', 'success');
+          } else {
+            showToast(result.error || 'Failed to remove user', 'error');
+          }
+        })
+        .catch(function(err) {
+          showToast(err.message || 'Failed to remove user', 'error');
+        });
+    }
+
     function sendBills() {
       var btn = document.getElementById('sendBillsBtn');
       var filter = document.getElementById('sendFilter').value;
@@ -3938,6 +4541,19 @@
     function closeSendModal() {
       document.getElementById('sendSingleModal').classList.remove('visible');
       selectedCustomerRow = null;
+    }
+
+    function openFullscreenPreview() {
+      var bubble = document.getElementById('msgPreviewBubble');
+      var fullscreenContent = document.getElementById('fullscreenPreviewContent');
+      if (bubble && fullscreenContent) {
+        fullscreenContent.textContent = bubble.textContent || 'No preview available.';
+      }
+      document.getElementById('previewFullscreenModal').classList.add('visible');
+    }
+
+    function closeFullscreenPreview() {
+      document.getElementById('previewFullscreenModal').classList.remove('visible');
     }
 
     function sendSingleBill() {
@@ -4061,6 +4677,7 @@
           populateSettingsForm(result.settings);
         }
       }).catch(function(err) { console.error('Failed to load settings:', err); });
+      loadUsersList();
     }
 
     function populateSettingsForm(settings) {
@@ -4073,6 +4690,7 @@
       document.getElementById('headerRow').value = settings.behavior.headerRowIndex || 1;
       document.getElementById('testOrderId').value = settings.behavior.testOrderId || '';
       document.getElementById('autoThankYouEnabled').checked = settings.behavior.autoThankYouEnabled !== false;
+      document.getElementById('dryRunCheckbox').checked = !!settings.behavior.dryRunMode;
 
       // Load first template
       loadSelectedTemplate();
@@ -4082,6 +4700,10 @@
 
       // Update setup checklist with loaded settings
       updateSetupChecklist();
+
+      // Update header status pills
+      updateHeaderStatusPills();
+      updateSendReview();
     }
 
     function saveSettings(btn) {
@@ -4756,11 +5378,6 @@
       });
     }
 
-    // Auth
-    function logout() {
-      // Google handles re-auth on page reload
-      window.location.reload();
-    }
   </script>
   <div id="toastContainer" class="toast-container"></div>
 </body>
