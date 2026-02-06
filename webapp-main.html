@@ -97,6 +97,66 @@
       height: 16px;
     }
 
+    .active-users {
+      display: flex;
+      align-items: center;
+      margin-right: var(--space-1);
+    }
+
+    .avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 12px;
+      font-weight: 600;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      position: relative;
+      cursor: default;
+      text-transform: uppercase;
+    }
+
+    .avatar + .avatar {
+      margin-left: -6px;
+    }
+
+    .avatar.is-you {
+      border-color: rgba(255, 255, 255, 0.9);
+    }
+
+    .avatar-tooltip {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg-primary, #1e293b);
+      color: var(--text-primary, #f8fafc);
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      font-size: 11px;
+      font-weight: 400;
+      white-space: nowrap;
+      z-index: 100;
+      pointer-events: none;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+
+    .avatar:hover .avatar-tooltip {
+      display: block;
+    }
+
+    @media (max-width: 768px) {
+      .avatar {
+        width: 24px;
+        height: 24px;
+        font-size: 10px;
+      }
+    }
+
     .theme-toggle-icon {
       transition: var(--transition-base);
     }
@@ -2442,13 +2502,13 @@
         Ilaxi Billing
       </h1>
       <div class="header-actions">
+        <div id="activeUsers" class="active-users"></div>
         <button class="btn-header" onclick="toggleTheme()" title="Toggle dark/light mode" aria-label="Toggle dark/light mode">
           <span class="theme-toggle-icon">
             <svg class="icon-moon" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
             <svg class="icon-sun" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
           </span>
         </button>
-        <button class="btn-header" onclick="logout()">Sign Out</button>
       </div>
     </div>
   </header>
@@ -3373,6 +3433,7 @@
       loadSettings();
       loadCredentialStatus();
       restoreSettingsNavState();
+      startPresenceTracking();
     });
 
     // XSS-safe text escaping function
@@ -3407,7 +3468,8 @@
           'autoDetectColumns': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).autoDetectColumnsForWeb(); },
           'resetSettings': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).resetToDefaults(); },
           'importSettings': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).importSettings(payload); },
-          'getSpreadsheetUrl': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getSpreadsheetUrlForWeb(); }
+          'getSpreadsheetUrl': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getSpreadsheetUrlForWeb(); },
+          'heartbeat': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).heartbeatAndGetActiveUsers(); }
         };
         if (handlers[action]) handlers[action]();
         else reject(new Error('Unknown action: ' + action));
@@ -4756,10 +4818,63 @@
       });
     }
 
-    // Auth
-    function logout() {
-      // Google handles re-auth on page reload
-      window.location.reload();
+    // Presence tracking
+    var AVATAR_COLORS = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22','#34495e'];
+
+    function getAvatarColor(email) {
+      var hash = 0;
+      for (var i = 0; i < email.length; i++) {
+        hash = ((hash << 5) - hash) + email.charCodeAt(i);
+        hash |= 0;
+      }
+      return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+    }
+
+    function getAvatarInitial(email) {
+      return email.charAt(0).toUpperCase();
+    }
+
+    function renderActiveUsers(activeUsers, currentUser) {
+      var container = document.getElementById('activeUsers');
+      if (!container) return;
+      while (container.firstChild) container.removeChild(container.firstChild);
+
+      // Sort: current user first
+      var sorted = activeUsers.slice().sort(function(a, b) {
+        if (a === currentUser) return -1;
+        if (b === currentUser) return 1;
+        return a.localeCompare(b);
+      });
+
+      sorted.forEach(function(email) {
+        var isYou = email === currentUser;
+        var div = document.createElement('div');
+        div.className = 'avatar' + (isYou ? ' is-you' : '');
+        div.style.backgroundColor = getAvatarColor(email);
+        div.textContent = getAvatarInitial(email);
+
+        var tooltip = document.createElement('span');
+        tooltip.className = 'avatar-tooltip';
+        tooltip.textContent = email + (isYou ? ' (you)' : '');
+        div.appendChild(tooltip);
+
+        container.appendChild(div);
+      });
+    }
+
+    function sendHeartbeat() {
+      serverCall('heartbeat').then(function(result) {
+        if (result && result.success) {
+          renderActiveUsers(result.data.activeUsers, result.data.currentUser);
+        }
+      }).catch(function() {
+        // Silently ignore heartbeat errors
+      });
+    }
+
+    function startPresenceTracking() {
+      sendHeartbeat();
+      setInterval(sendHeartbeat, 60000);
     }
   </script>
   <div id="toastContainer" class="toast-container"></div>

@@ -69,6 +69,10 @@ function handleApiRequest_(action, payload) {
       case 'getSpreadsheetUrl':
         return getSpreadsheetUrlForWeb();
 
+      // Presence
+      case 'heartbeat':
+        return heartbeatAndGetActiveUsers();
+
       default:
         return { success: false, error: `Unknown action: ${action}`, errorCode: 'UNKNOWN_ACTION' };
     }
@@ -278,6 +282,82 @@ function autoDetectColumnsForWeb() {
     return { success: true, data: result };
   } catch (error) {
     Logger.log(`autoDetectColumnsForWeb error: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+// ========================================
+// PRESENCE / HEARTBEAT
+// ========================================
+
+/**
+ * Registers the caller's heartbeat and returns all active users.
+ * Each heartbeat is stored as an individual CacheService key with 180s TTL.
+ * An index key tracks the set of known emails so we can enumerate them.
+ *
+ * @returns {Object} { success, data: { activeUsers: string[], currentUser: string } }
+ */
+function heartbeatAndGetActiveUsers() {
+  try {
+    const currentUser = getCurrentUserEmail_();
+    if (!currentUser) {
+      return { success: false, error: 'Unable to determine current user' };
+    }
+
+    const cache = CacheService.getScriptCache();
+    const HEARTBEAT_TTL = 180; // seconds
+    const STALE_THRESHOLD = 120000; // 2 minutes in ms
+    const INDEX_KEY = 'active_users_index';
+
+    // Write this user's heartbeat (timestamp)
+    cache.put('heartbeat_' + currentUser, String(Date.now()), HEARTBEAT_TTL);
+
+    // Update the index under a lock to avoid races
+    const lock = LockService.getScriptLock();
+    lock.waitLock(5000);
+
+    let indexEmails;
+    try {
+      const raw = cache.get(INDEX_KEY);
+      indexEmails = raw ? JSON.parse(raw) : [];
+
+      // Ensure current user is in the index
+      if (indexEmails.indexOf(currentUser) === -1) {
+        indexEmails.push(currentUser);
+      }
+
+      // Batch-fetch all heartbeat keys
+      const keys = indexEmails.map(function(e) { return 'heartbeat_' + e; });
+      const values = cache.getAll(keys);
+
+      // Filter to active users (heartbeat exists and is recent)
+      const now = Date.now();
+      const activeUsers = [];
+      const updatedIndex = [];
+
+      indexEmails.forEach(function(email) {
+        const ts = values['heartbeat_' + email];
+        if (ts && (now - parseInt(ts, 10)) < STALE_THRESHOLD) {
+          activeUsers.push(email);
+          updatedIndex.push(email);
+        }
+      });
+
+      // Write back cleaned index (600s TTL so it survives longer than individual heartbeats)
+      cache.put(INDEX_KEY, JSON.stringify(updatedIndex), 600);
+
+      lock.releaseLock();
+
+      return {
+        success: true,
+        data: { activeUsers: activeUsers, currentUser: currentUser }
+      };
+    } catch (innerError) {
+      lock.releaseLock();
+      throw innerError;
+    }
+  } catch (error) {
+    Logger.log('heartbeatAndGetActiveUsers error: ' + error.message);
     return { success: false, error: error.message };
   }
 }
