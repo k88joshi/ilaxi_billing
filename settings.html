@@ -3128,7 +3128,11 @@
             currentSettings = settings;
             originalSettings = JSON.parse(JSON.stringify(settings));
             clearChanges();
-            showToast('Settings saved!', 'success');
+            if (result.warning) {
+              showToast(result.warning, 'warning');
+            } else {
+              showToast('Settings saved!', 'success');
+            }
           } else {
             showToast('Could not save: ' + result.error, 'error');
           }
@@ -4027,7 +4031,11 @@
             currentSettings = settings;
             originalSettings = JSON.parse(JSON.stringify(settings));
             clearChanges();
-            showToast('Settings saved!', 'success');
+            if (result.warning) {
+              showToast(result.warning, 'warning');
+            } else {
+              showToast('Settings saved!', 'success');
+            }
           } else {
             showToast('Could not save: ' + result.error, 'error');
           }

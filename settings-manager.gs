@@ -195,12 +195,19 @@ function saveSettings(settings) {
     Logger.log("Settings saved successfully.");
 
     // Sync the installable onEdit trigger with the auto thank-you setting
+    let triggerWarning = null;
     try {
       syncEditTrigger_(!!settings.behavior.autoThankYouEnabled);
     } catch (triggerErr) {
       Logger.log(`Warning: Could not sync edit trigger: ${triggerErr.message}`);
+      if (settings.behavior.autoThankYouEnabled) {
+        triggerWarning = "Settings saved, but the trigger could not be created from this context. To install it: open the Apps Script editor (Extensions > Apps Script), select 'installAutoThankYouTrigger' from the function dropdown, and click Run.";
+      }
     }
 
+    if (triggerWarning) {
+      return { success: true, warning: triggerWarning };
+    }
     return { success: true };
   } catch (e) {
     Logger.log(`Error saving settings: ${e.message}`);

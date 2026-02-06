@@ -44,6 +44,9 @@ function handleApiRequest_(action, payload) {
       case 'resetSettings':
         return resetToDefaults();
 
+      case 'importSettings':
+        return importSettings(payload);
+
       // Credentials
       case 'testCredentials':
         return testTwilioCredentialsFromSettings();

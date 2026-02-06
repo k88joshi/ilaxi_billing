@@ -87,6 +87,12 @@ function onEditInstallable(e) {
     // Get column indices
     const columns = getHeaderColumnMap();
     const paymentColIndex = columns[cols.paymentStatus]; // 0-based
+
+    // Validate payment column exists — if mapping is wrong, exit with clear log
+    if (paymentColIndex === undefined) {
+      Logger.log(`Auto thank-you: Payment column "${cols.paymentStatus}" not found in sheet headers. Check Settings > Spreadsheet > Column Mappings.`);
+      return;
+    }
     const paymentCol = paymentColIndex + 1; // 1-based
 
     // Check if the edited range includes the Payment column
@@ -109,6 +115,17 @@ function onEditInstallable(e) {
     const phoneColIndex = columns[cols.phoneNumber];
     const orderIdColIndex = columns[cols.orderId];
     const statusColIndex = columns[cols.messageStatus];
+
+    // Validate all required columns exist
+    const missingCols = [];
+    if (nameColIndex === undefined) missingCols.push(`"${cols.customerName}"`);
+    if (phoneColIndex === undefined) missingCols.push(`"${cols.phoneNumber}"`);
+    if (orderIdColIndex === undefined) missingCols.push(`"${cols.orderId}"`);
+    if (statusColIndex === undefined) missingCols.push(`"${cols.messageStatus}"`);
+    if (missingCols.length > 0) {
+      Logger.log(`Auto thank-you: Required columns not found in sheet headers: ${missingCols.join(", ")}. Check Settings > Spreadsheet > Column Mappings.`);
+      return;
+    }
 
     // We'll fetch the full data for these rows to get Name, Phone, OrderID
     // Optimization: Only fetch if we find at least one "Paid"
@@ -135,9 +152,14 @@ function onEditInstallable(e) {
       const paymentValue = String(rowData[paymentColIndex]).toLowerCase();
 
       // Check if this specific row is "Paid"
-      // Note: We don't strictly check oldValue here for multi-cell edits as it's not available per-cell in 'e'
-      // This means pasting "Paid" over "Paid" might re-trigger, which is acceptable or can be guarded against by checking Message Status
       if (paymentValue === "paid") {
+        // Duplicate-send guard: skip if Message Status already shows a thank-you was sent
+        const existingStatus = String(rowData[statusColIndex] || "").toLowerCase();
+        if (existingStatus.includes("thank you sent")) {
+          Logger.log(`Skipping auto-thanks for row ${currentRow}: already sent (status: "${rowData[statusColIndex]}")`);
+          continue;
+        }
+
         Logger.log(`Payment status detected as "Paid" for row ${currentRow}. Processing "Thank You" message.`);
 
         const customerName = rowData[nameColIndex];
@@ -153,9 +175,6 @@ function onEditInstallable(e) {
           });
           continue;
         }
-
-        // Check if we already sent a thank you recently to avoid loops?
-        // For now, we assume the user intends to send if they type Paid.
 
         const result = sendThankYouMessage_(customerPhone, customerName, orderId, settings);
         statusUpdates.push({
@@ -211,14 +230,19 @@ function onEditInstallable(e) {
 /**
  * Ensures the installable onEdit trigger matches the autoThankYouEnabled setting.
  * Called automatically when settings are saved.
+ *
+ * NOTE: This requires ScriptApp permissions which are only available from the
+ * add-on context or Script Editor — NOT from the web app sandbox.
+ * If this fails in web app mode, use installAutoThankYouTrigger() from the Script Editor.
  */
 function syncEditTrigger_(enabled) {
   const triggers = ScriptApp.getProjectTriggers();
   const existing = triggers.find(t => t.getHandlerFunction() === "onEditInstallable");
 
   if (enabled && !existing) {
+    const spreadsheet = getTargetSpreadsheet_();
     ScriptApp.newTrigger("onEditInstallable")
-      .forSpreadsheet(SpreadsheetApp.getActive())
+      .forSpreadsheet(spreadsheet)
       .onEdit()
       .create();
     Logger.log("Installable onEdit trigger created.");
@@ -226,4 +250,27 @@ function syncEditTrigger_(enabled) {
     ScriptApp.deleteTrigger(existing);
     Logger.log("Installable onEdit trigger removed.");
   }
+}
+
+/**
+ * Manually installs the auto thank-you onEdit trigger.
+ * Run this from the Apps Script editor if the web app cannot create triggers.
+ *
+ * Steps: Open Apps Script editor → Select this function → Click Run
+ */
+function installAutoThankYouTrigger() {
+  const triggers = ScriptApp.getProjectTriggers();
+  const existing = triggers.find(t => t.getHandlerFunction() === "onEditInstallable");
+
+  if (existing) {
+    Logger.log("Auto thank-you trigger already exists. No action needed.");
+    return;
+  }
+
+  const spreadsheet = getTargetSpreadsheet_();
+  ScriptApp.newTrigger("onEditInstallable")
+    .forSpreadsheet(spreadsheet)
+    .onEdit()
+    .create();
+  Logger.log("Auto thank-you trigger installed successfully.");
 }
