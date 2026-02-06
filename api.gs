@@ -11,11 +11,18 @@
  *
  * @param {string} action - The API action to perform
  * @param {Object} payload - Action-specific data
+ * @param {string} userEmail - The authenticated user's email
  * @returns {Object} Result object with success boolean and data/error
  * @private
  */
-function handleApiRequest_(action, payload) {
+function handleApiRequest_(action, payload, userEmail) {
   try {
+    // Admin-only actions require admin role
+    const adminActions = ['saveCredentials', 'clearCredentials', 'addUser', 'removeUser', 'resetSettings', 'importSettings'];
+    if (adminActions.indexOf(action) !== -1 && !isAdminUser_(userEmail)) {
+      return { success: false, error: 'This action requires admin privileges', errorCode: 'ADMIN_REQUIRED' };
+    }
+
     switch (action) {
       // Customer data
       case 'getCustomers':
@@ -38,7 +45,7 @@ function handleApiRequest_(action, payload) {
         return updatePaymentStatusForWeb(payload);
 
       case 'getCurrentUser':
-        return getCurrentUserForWeb();
+        return getCurrentUserForWeb(userEmail);
 
       // Settings
       case 'getSettings':
@@ -97,7 +104,7 @@ function handleApiRequest_(action, payload) {
     }
   } catch (error) {
     Logger.log(`API Error [${action}]: ${error.message}`);
-    return { success: false, error: error.message, errorCode: 'SERVER_ERROR' };
+    return { success: false, error: 'An unexpected error occurred', errorCode: 'SERVER_ERROR' };
   }
 }
 
@@ -310,14 +317,15 @@ function updatePaymentStatusForWeb(payload) {
 }
 
 /**
- * Returns the current user's email, live users, and authorized users for the UI.
+ * Returns the current user's email, live users, authorized users, and admin status for the UI.
  *
- * @returns {Object} Result with user email, live users, and authorized users
+ * @param {string} [userEmail] - The authenticated user's email (passed from doPost)
+ * @returns {Object} Result with user email, live users, authorized users, and isAdmin flag
  * @private
  */
-function getCurrentUserForWeb() {
+function getCurrentUserForWeb(userEmail) {
   try {
-    const email = getCurrentUserEmail_();
+    const email = userEmail || getCurrentUserEmail_();
     // Record heartbeat for the current user on load
     const liveUsers = email ? recordHeartbeat_(email) : getLiveUsers_();
     const authorizedUsers = getAllowedUsers();
@@ -326,7 +334,8 @@ function getCurrentUserForWeb() {
       data: {
         email: email,
         liveUsers: liveUsers,
-        authorizedUsers: authorizedUsers
+        authorizedUsers: authorizedUsers,
+        isAdmin: isAdminUser_(email)
       }
     };
   } catch (error) {

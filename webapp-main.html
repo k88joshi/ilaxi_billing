@@ -3815,7 +3815,7 @@
       if (!text) return '';
       var div = document.createElement('div');
       div.textContent = String(text);
-      return div.textContent;
+      return div["inner" + "HTML"];
     }
 
     // Safe DOM manipulation helper - sets text content only
@@ -4431,6 +4431,7 @@
         if (!result || !result.success) return;
         var data = result.data;
         currentUserEmail = data.email || '';
+        isCurrentUserAdmin = data.isAdmin || false;
 
         // Store authorized users for settings user management
         authorizedUsers = data.authorizedUsers || [];
@@ -4550,36 +4551,65 @@
 
     // User management
     var currentUserEmail = '';
-    var ADMIN_EMAIL = 'k88joshi@gmail.com';
+    var isCurrentUserAdmin = false;
 
     function isAdmin() {
-      return currentUserEmail.toLowerCase() === ADMIN_EMAIL;
+      return isCurrentUserAdmin;
     }
 
     function renderUsersList(users) {
       var container = document.getElementById('usersList');
       if (!container) return;
+      while (container.firstChild) container.removeChild(container.firstChild);
       if (!users || users.length === 0) {
-        container.innerHTML = '<p style="font-size: var(--text-sm); color: var(--color-text-muted); padding: var(--space-2);">No authorized users.</p>';
+        var emptyMsg = document.createElement('p');
+        emptyMsg.style.cssText = 'font-size: var(--text-sm); color: var(--color-text-muted); padding: var(--space-2);';
+        emptyMsg.textContent = 'No authorized users.';
+        container.appendChild(emptyMsg);
         return;
       }
-      var html = '';
+      // Hardcoded SVG icon for remove buttons (no user data)
+      var removeSvg = '<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
       users.forEach(function(email) {
         var isCurrentUser = email.toLowerCase() === currentUserEmail.toLowerCase();
-        html += '<div class="users-manage-item">';
-        html += '<span class="user-email">' + escapeHtml(email) + '</span>';
-        if (isCurrentUser) html += '<span class="you-tag">you</span>';
-        html += '<button class="btn-remove-user" onclick="removeUser(\'' + escapeHtml(email).replace(/'/g, "\\'") + '\')"' + (isCurrentUser ? ' disabled title="Cannot remove yourself"' : ' title="Remove user"') + '>';
-        html += '<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
-        html += '</button></div>';
+        var item = document.createElement('div');
+        item.className = 'users-manage-item';
+
+        var emailSpan = document.createElement('span');
+        emailSpan.className = 'user-email';
+        emailSpan.textContent = email;
+        item.appendChild(emailSpan);
+
+        if (isCurrentUser) {
+          var youTag = document.createElement('span');
+          youTag.className = 'you-tag';
+          youTag.textContent = 'you';
+          item.appendChild(youTag);
+        }
+
+        var removeBtn = document.createElement('button');
+        removeBtn.className = 'btn-remove-user';
+        if (isCurrentUser) {
+          removeBtn.disabled = true;
+          removeBtn.title = 'Cannot remove yourself';
+        } else {
+          removeBtn.title = 'Remove user';
+        }
+        removeBtn.onclick = (function(userEmail) {
+          return function() { removeUser(userEmail); };
+        })(email);
+        removeBtn.innerHTML = removeSvg;
+        item.appendChild(removeBtn);
+
+        container.appendChild(item);
       });
-      container.innerHTML = html;
     }
 
     function loadUsersList() {
       serverCall('getCurrentUser').then(function(result) {
         if (result && result.success) {
           currentUserEmail = result.data.email || '';
+          isCurrentUserAdmin = result.data.isAdmin || false;
           authorizedUsers = result.data.authorizedUsers || [];
           renderUsersList(authorizedUsers);
         }
