@@ -72,6 +72,8 @@ Every user-facing feature must work in **both** add-on and web app modes. Busine
 | `sendSingleBillCore_()` | `sendBillByOrderID()` | `sendSingleBillForWeb()` | Add-on shows confirm dialog |
 | `clearAllStatusesCore_()` | `clearAllStatuses()` | `clearAllStatusesForWeb()` | Add-on shows confirm dialog |
 | `lookupCustomerByOrderId_()` | Used by `sendBillByOrderID()` | — | Preview before send |
+| `updatePaymentStatusCore_()` | — | `updatePaymentStatusForWeb()` | Web only (inline status edit) |
+| — | — | `getCurrentUserForWeb()` | Web only (header user info) |
 | — | `testSingleMessage()` | — | Add-on only (finds first unpaid) |
 | — | — | `getCustomerStatsForWeb()` | Web only (dashboard stats) |
 

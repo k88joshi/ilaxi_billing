@@ -34,6 +34,12 @@ function handleApiRequest_(action, payload) {
       case 'clearStatuses':
         return clearAllStatusesForWeb();
 
+      case 'updatePaymentStatus':
+        return updatePaymentStatusForWeb(payload);
+
+      case 'getCurrentUser':
+        return getCurrentUserForWeb();
+
       // Settings
       case 'getSettings':
         return { success: true, data: getSettingsForUI() };
@@ -56,6 +62,16 @@ function handleApiRequest_(action, payload) {
 
       case 'getCredentialStatus':
         return getCredentialStatusForWeb();
+
+      case 'clearCredentials':
+        return clearCredentialsForWeb();
+
+      // User management
+      case 'addUser':
+        return addUserForWeb(payload);
+
+      case 'removeUser':
+        return removeUserForWeb(payload);
 
       // Template preview
       case 'previewTemplate':
@@ -272,12 +288,110 @@ function getSpreadsheetUrlForWeb() {
  *
  * @returns {Object} Result with success boolean and data containing headers/detections
  */
+/**
+ * Updates a customer's payment status in the spreadsheet.
+ *
+ * @param {Object} payload - { rowIndex, paymentStatus }
+ * @returns {Object} Result
+ * @private
+ */
+function updatePaymentStatusForWeb(payload) {
+  return updatePaymentStatusCore_({
+    rowIndex: payload?.rowIndex,
+    paymentStatus: payload?.paymentStatus
+  });
+}
+
+/**
+ * Returns the current user's email address for display in the UI.
+ *
+ * @returns {Object} Result with user email and allowed users list
+ * @private
+ */
+function getCurrentUserForWeb() {
+  try {
+    const email = getCurrentUserEmail_();
+    const allowedUsers = getAllowedUsers();
+    return {
+      success: true,
+      data: {
+        email: email,
+        activeUsers: allowedUsers
+      }
+    };
+  } catch (error) {
+    Logger.log(`getCurrentUserForWeb error: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
 function autoDetectColumnsForWeb() {
   try {
     const result = autoDetectColumns();
     return { success: true, data: result };
   } catch (error) {
     Logger.log(`autoDetectColumnsForWeb error: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Clears all stored Twilio credentials from ScriptProperties.
+ *
+ * @returns {Object} Result
+ * @private
+ */
+function clearCredentialsForWeb() {
+  try {
+    scriptProperties.deleteProperty('TWILIO_ACCOUNT_SID');
+    scriptProperties.deleteProperty('TWILIO_AUTH_TOKEN');
+    scriptProperties.deleteProperty('TWILIO_PHONE_NUMBER');
+    Logger.log('Twilio credentials cleared from web interface');
+    return { success: true };
+  } catch (error) {
+    Logger.log(`clearCredentialsForWeb error: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Adds a user to the authorized users list from the web interface.
+ *
+ * @param {Object} payload - { email }
+ * @returns {Object} Result with updated users list
+ * @private
+ */
+function addUserForWeb(payload) {
+  try {
+    const result = addAllowedUser(payload?.email);
+    if (!result.success) return result;
+    return { success: true, data: { users: getAllowedUsers() } };
+  } catch (error) {
+    Logger.log(`addUserForWeb error: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Removes a user from the authorized users list from the web interface.
+ * Prevents removing the currently logged-in user.
+ *
+ * @param {Object} payload - { email }
+ * @returns {Object} Result with updated users list
+ * @private
+ */
+function removeUserForWeb(payload) {
+  try {
+    const currentEmail = getCurrentUserEmail_();
+    const targetEmail = (payload?.email || '').trim().toLowerCase();
+    if (currentEmail && targetEmail === currentEmail.trim().toLowerCase()) {
+      return { success: false, error: 'You cannot remove yourself from the authorized users list' };
+    }
+    const result = removeAllowedUser(payload?.email);
+    if (!result.success) return result;
+    return { success: true, data: { users: getAllowedUsers() } };
+  } catch (error) {
+    Logger.log(`removeUserForWeb error: ${error.message}`);
     return { success: false, error: error.message };
   }
 }

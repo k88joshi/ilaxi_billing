@@ -269,6 +269,48 @@ function clearAllStatusesCore_() {
 }
 
 /**
+ * Updates the payment status of a customer by row index.
+ *
+ * @param {Object} params
+ * @param {number} params.rowIndex - 1-based sheet row index
+ * @param {string} params.paymentStatus - New status value ('Paid', 'Unpaid', or custom)
+ * @returns {Object} Result with {success, data: {rowIndex, paymentStatus}, error}
+ */
+function updatePaymentStatusCore_(params) {
+  try {
+    const rowIndex = params?.rowIndex;
+    const newStatus = params?.paymentStatus;
+
+    if (!rowIndex || !newStatus) {
+      return { success: false, error: 'Row index and payment status are required' };
+    }
+
+    const sheet = getTargetSheet_();
+    const settings = getSettings();
+    const cols = settings.columns;
+    const data = sheet.getDataRange().getValues();
+    const colMap = buildColumnMap_(data[settings.behavior.headerRowIndex - 1]);
+
+    const paymentStatusCol = colMap[cols.paymentStatus];
+    if (paymentStatusCol === undefined) {
+      return { success: false, error: `Payment status column "${cols.paymentStatus}" not found` };
+    }
+
+    if (rowIndex < 1 || rowIndex > data.length) {
+      return { success: false, error: 'Invalid row index' };
+    }
+
+    // Update the cell (rowIndex is 1-based, paymentStatusCol is 0-based)
+    sheet.getRange(rowIndex, paymentStatusCol + 1).setValue(newStatus);
+
+    return { success: true, data: { rowIndex: rowIndex, paymentStatus: newStatus } };
+  } catch (error) {
+    Logger.log(`updatePaymentStatusCore_ error: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * Looks up a customer by order ID and returns their data for preview.
  *
  * @param {string} orderId - The order ID to search for
