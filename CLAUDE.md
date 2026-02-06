@@ -41,7 +41,7 @@ Run `runAllSettingsManagerTests()` in Apps Script editor (defined in `settings-m
 | `billing-core.gs` | **Shared business logic** — mode-independent core functions called by both modes |
 | `settings-manager.gs` | Settings via `PropertiesService`, template processing, validation |
 | `api.gs` | Web app API router — thin wrappers that delegate to `billing-core.gs` |
-| `webapp.gs` | Web app auth (`doGet`/`doPost`), Google account whitelist |
+| `webapp.gs` | Web app auth (`doGet`/`doPost`), Google account whitelist, live user heartbeat via CacheService |
 | `webapp-main.html` | Web app main UI (customer list, messages, settings tabs) |
 | `twilio.gs` | Twilio SMS with exponential backoff retry (max 4 attempts) |
 | `spreadsheet.gs` | Sheet utilities, column mapping, **add-on UI wrappers** that delegate to `billing-core.gs` |
@@ -73,7 +73,9 @@ Every user-facing feature must work in **both** add-on and web app modes. Busine
 | `clearAllStatusesCore_()` | `clearAllStatuses()` | `clearAllStatusesForWeb()` | Add-on shows confirm dialog |
 | `lookupCustomerByOrderId_()` | Used by `sendBillByOrderID()` | — | Preview before send |
 | `updatePaymentStatusCore_()` | — | `updatePaymentStatusForWeb()` | Web only (inline status edit) |
-| — | — | `getCurrentUserForWeb()` | Web only (header user info) |
+| — | — | `getCurrentUserForWeb()` | Web only (header user info, live + authorized users) |
+| `recordHeartbeat_()` | — | `heartbeatForWeb()` | Web only (CacheService live user tracking) |
+| `getLiveUsers_()` | — | `getLiveUsersForWeb()` | Web only (read live users from cache) |
 | — | `testSingleMessage()` | — | Add-on only (finds first unpaid) |
 | — | — | `getCustomerStatsForWeb()` | Web only (dashboard stats) |
 

@@ -66,6 +66,13 @@ function handleApiRequest_(action, payload) {
       case 'clearCredentials':
         return clearCredentialsForWeb();
 
+      // Live users
+      case 'heartbeat':
+        return heartbeatForWeb();
+
+      case 'getLiveUsers':
+        return getLiveUsersForWeb();
+
       // User management
       case 'addUser':
         return addUserForWeb(payload);
@@ -303,24 +310,64 @@ function updatePaymentStatusForWeb(payload) {
 }
 
 /**
- * Returns the current user's email address for display in the UI.
+ * Returns the current user's email, live users, and authorized users for the UI.
  *
- * @returns {Object} Result with user email and allowed users list
+ * @returns {Object} Result with user email, live users, and authorized users
  * @private
  */
 function getCurrentUserForWeb() {
   try {
     const email = getCurrentUserEmail_();
-    const allowedUsers = getAllowedUsers();
+    // Record heartbeat for the current user on load
+    const liveUsers = email ? recordHeartbeat_(email) : getLiveUsers_();
+    const authorizedUsers = getAllowedUsers();
     return {
       success: true,
       data: {
         email: email,
-        activeUsers: allowedUsers
+        liveUsers: liveUsers,
+        authorizedUsers: authorizedUsers
       }
     };
   } catch (error) {
     Logger.log(`getCurrentUserForWeb error: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+// ========================================
+// LIVE USERS HANDLERS
+// ========================================
+
+/**
+ * Records a heartbeat for the current user and returns the live users list.
+ *
+ * @returns {Object} Result with live users array
+ * @private
+ */
+function heartbeatForWeb() {
+  try {
+    const email = getCurrentUserEmail_();
+    if (!email) return { success: false, error: 'No user session' };
+    const liveUsers = recordHeartbeat_(email);
+    return { success: true, data: { liveUsers: liveUsers } };
+  } catch (error) {
+    Logger.log(`heartbeatForWeb error: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Returns the list of currently live users.
+ *
+ * @returns {Object} Result with live users array
+ * @private
+ */
+function getLiveUsersForWeb() {
+  try {
+    return { success: true, data: { liveUsers: getLiveUsers_() } };
+  } catch (error) {
+    Logger.log(`getLiveUsersForWeb error: ${error.message}`);
     return { success: false, error: error.message };
   }
 }

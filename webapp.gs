@@ -304,6 +304,91 @@ function createHtmlOutput_(template, title) {
   return output;
 }
 
+// ========================================
+// LIVE USERS (CacheService Heartbeat)
+// ========================================
+
+/**
+ * Cache key for tracking live users via heartbeat.
+ * @const {string}
+ */
+const LIVE_USERS_CACHE_KEY = 'LIVE_USERS';
+
+/**
+ * How long (in seconds) before a user is considered stale.
+ * @const {number}
+ */
+const HEARTBEAT_TTL_SECONDS = 120;
+
+/**
+ * Records a heartbeat for the given email and returns the list of currently
+ * live (non-stale) user emails. Entries older than HEARTBEAT_TTL_SECONDS are pruned.
+ *
+ * @param {string} email - The email address of the user sending the heartbeat
+ * @returns {string[]} Array of currently live email addresses
+ * @private
+ */
+function recordHeartbeat_(email) {
+  const cache = CacheService.getScriptCache();
+  const now = Date.now();
+  let entries = {};
+
+  const stored = cache.get(LIVE_USERS_CACHE_KEY);
+  if (stored) {
+    try {
+      entries = JSON.parse(stored);
+    } catch (e) {
+      Logger.log('recordHeartbeat_ parse error: ' + e.message);
+    }
+  }
+
+  // Prune stale entries
+  const cutoff = now - HEARTBEAT_TTL_SECONDS * 1000;
+  const pruned = {};
+  for (const key in entries) {
+    if (entries[key] > cutoff) {
+      pruned[key] = entries[key];
+    }
+  }
+
+  // Record this user's heartbeat
+  pruned[email.toLowerCase()] = now;
+
+  // Store with a generous TTL (cache auto-expires; we prune manually)
+  cache.put(LIVE_USERS_CACHE_KEY, JSON.stringify(pruned), HEARTBEAT_TTL_SECONDS * 3);
+
+  return Object.keys(pruned);
+}
+
+/**
+ * Returns the list of currently live (non-stale) user emails from the cache.
+ *
+ * @returns {string[]} Array of currently live email addresses
+ * @private
+ */
+function getLiveUsers_() {
+  const cache = CacheService.getScriptCache();
+  const stored = cache.get(LIVE_USERS_CACHE_KEY);
+  if (!stored) return [];
+
+  let entries;
+  try {
+    entries = JSON.parse(stored);
+  } catch (e) {
+    Logger.log('getLiveUsers_ parse error: ' + e.message);
+    return [];
+  }
+
+  const cutoff = Date.now() - HEARTBEAT_TTL_SECONDS * 1000;
+  const live = [];
+  for (const key in entries) {
+    if (entries[key] > cutoff) {
+      live.push(key);
+    }
+  }
+  return live;
+}
+
 /**
  * Helper function to include HTML files (for modular templates).
  *
