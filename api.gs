@@ -67,7 +67,7 @@ function handleApiRequest_(action, payload) {
 
       // Spreadsheet link
       case 'getSpreadsheetUrl':
-        return { success: true, data: getTargetSpreadsheet_().getUrl() };
+        return getSpreadsheetUrlForWeb();
 
       default:
         return { success: false, error: `Unknown action: ${action}`, errorCode: 'UNKNOWN_ACTION' };
@@ -248,6 +248,20 @@ function getCredentialStatusForWeb() {
     };
   } catch (error) {
     Logger.log(`getCredentialStatusForWeb_ error: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Returns the URL of the target spreadsheet for the web app.
+ *
+ * @returns {Object} Result with spreadsheet URL string
+ */
+function getSpreadsheetUrlForWeb() {
+  try {
+    return { success: true, data: getTargetSpreadsheet_().getUrl() };
+  } catch (error) {
+    Logger.log(`getSpreadsheetUrlForWeb error: ${error.message}`);
     return { success: false, error: error.message };
   }
 }
