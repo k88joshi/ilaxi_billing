@@ -944,6 +944,39 @@
       gap: var(--space-2);
     }
 
+    /* Confirm dialog */
+    .confirm-modal {
+      max-width: 420px;
+      animation: confirmIn 0.15s ease-out;
+    }
+
+    @keyframes confirmIn {
+      from {
+        opacity: 0;
+        transform: scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .confirm-modal .modal-body p {
+      color: var(--color-text-secondary);
+      font-size: var(--text-sm);
+      line-height: 1.5;
+    }
+
+    .btn-destructive {
+      background: var(--color-error);
+      color: #fff;
+      border: none;
+    }
+
+    .btn-destructive:hover {
+      opacity: 0.9;
+    }
+
     /* Fullscreen preview modal */
     .preview-fullscreen-modal {
       position: fixed;
@@ -3847,6 +3880,7 @@
           'getCurrentUser': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getCurrentUserForWeb(); },
           'addUser': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).addUserForWeb(payload); },
           'removeUser': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).removeUserForWeb(payload); },
+          'clearCredentials': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).clearCredentialsForWeb(); },
           'heartbeat': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).heartbeatForWeb(); },
           'getLiveUsers': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getLiveUsersForWeb(); }
         };
@@ -4357,6 +4391,53 @@
       }, 3500);
     }
 
+    // Confirm dialog (replaces native confirm())
+    function showConfirm(opts) {
+      var title = opts.title || 'Confirm';
+      var message = opts.message || 'Are you sure?';
+      var confirmLabel = opts.confirmLabel || 'Confirm';
+      var cancelLabel = opts.cancelLabel || 'Cancel';
+      var destructive = opts.destructive || false;
+
+      var overlay = document.getElementById('confirmDialog');
+      var titleEl = document.getElementById('confirmDialogTitle');
+      var messageEl = document.getElementById('confirmDialogMessage');
+      var confirmBtn = document.getElementById('confirmDialogConfirm');
+      var cancelBtn = document.getElementById('confirmDialogCancel');
+
+      titleEl.textContent = title;
+      messageEl.textContent = message;
+      confirmBtn.textContent = confirmLabel;
+      cancelBtn.textContent = cancelLabel;
+
+      confirmBtn.className = destructive ? 'btn btn-destructive' : 'btn btn-primary';
+
+      overlay.classList.add('visible');
+      confirmBtn.focus();
+
+      return new Promise(function(resolve) {
+        function cleanup() {
+          overlay.classList.remove('visible');
+          confirmBtn.removeEventListener('click', onConfirm);
+          cancelBtn.removeEventListener('click', onCancel);
+          document.removeEventListener('keydown', onKey);
+          overlay.removeEventListener('click', onBackdrop);
+        }
+        function onConfirm() { cleanup(); resolve(true); }
+        function onCancel() { cleanup(); resolve(false); }
+        function onKey(e) {
+          if (e.key === 'Escape') { e.stopPropagation(); onCancel(); }
+        }
+        function onBackdrop(e) {
+          if (e.target === overlay) onCancel();
+        }
+        confirmBtn.addEventListener('click', onConfirm);
+        cancelBtn.addEventListener('click', onCancel);
+        document.addEventListener('keydown', onKey);
+        overlay.addEventListener('click', onBackdrop);
+      });
+    }
+
     // Payment Status Update
     function updatePaymentStatus(rowIndex, newStatus, selectEl) {
       var prevClass = selectEl.className;
@@ -4526,27 +4607,36 @@
     }
 
     // Clear Twilio credentials
+    // Note: btn.innerHTML below uses hardcoded SVG icon strings (no user data) — safe from XSS
     function clearCredentials() {
-      if (!confirm('Are you sure you want to clear all Twilio credentials? You will need to re-enter them to send messages.')) return;
-      var btn = document.getElementById('clearCredsBtn');
-      btn.disabled = true;
-      btn.textContent = 'Clearing...';
-      serverCall('clearCredentials')
-        .then(function(result) {
-          btn.disabled = false;
-          btn.innerHTML = '<svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg> Clear All Credentials';
-          if (result.success) {
-            showToast('Twilio credentials cleared', 'success');
-            loadCredentialStatus();
-          } else {
-            showToast(result.error || 'Failed to clear credentials', 'error');
-          }
-        })
-        .catch(function(err) {
-          btn.disabled = false;
-          btn.innerHTML = '<svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg> Clear All Credentials';
-          showToast(err.message || 'Failed to clear credentials', 'error');
-        });
+      showConfirm({
+        title: 'Clear Credentials',
+        message: 'Are you sure you want to clear all Twilio credentials? You will need to re-enter them to send messages.',
+        confirmLabel: 'Clear',
+        destructive: true
+      }).then(function(ok) {
+        if (!ok) return;
+        var btn = document.getElementById('clearCredsBtn');
+        var btnIcon = '<svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>';
+        btn.disabled = true;
+        btn.textContent = 'Clearing...';
+        serverCall('clearCredentials')
+          .then(function(result) {
+            btn.disabled = false;
+            btn.innerHTML = btnIcon + ' Clear All Credentials';
+            if (result.success) {
+              showToast('Twilio credentials cleared', 'success');
+              loadCredentialStatus();
+            } else {
+              showToast(result.error || 'Failed to clear credentials', 'error');
+            }
+          })
+          .catch(function(err) {
+            btn.disabled = false;
+            btn.innerHTML = btnIcon + ' Clear All Credentials';
+            showToast(err.message || 'Failed to clear credentials', 'error');
+          });
+      });
     }
 
     // User management
@@ -4640,20 +4730,27 @@
     }
 
     function removeUser(email) {
-      if (!confirm('Remove ' + email + ' from authorized users?')) return;
-      serverCall('removeUser', { email: email })
-        .then(function(result) {
-          if (result.success) {
-            renderUsersList(result.data.users);
-            loadCurrentUser();
-            showToast('User removed', 'success');
-          } else {
-            showToast(result.error || 'Failed to remove user', 'error');
-          }
-        })
-        .catch(function(err) {
-          showToast(err.message || 'Failed to remove user', 'error');
-        });
+      showConfirm({
+        title: 'Remove User',
+        message: 'Remove ' + email + ' from authorized users?',
+        confirmLabel: 'Remove',
+        destructive: true
+      }).then(function(ok) {
+        if (!ok) return;
+        serverCall('removeUser', { email: email })
+          .then(function(result) {
+            if (result.success) {
+              renderUsersList(result.data.users);
+              loadCurrentUser();
+              showToast('User removed', 'success');
+            } else {
+              showToast(result.error || 'Failed to remove user', 'error');
+            }
+          })
+          .catch(function(err) {
+            showToast(err.message || 'Failed to remove user', 'error');
+          });
+      });
     }
 
     function sendBills() {
@@ -4690,15 +4787,22 @@
     }
 
     function clearStatuses() {
-      if (!confirm('Are you sure you want to clear all message statuses?')) return;
-      serverCall('clearStatuses').then(function(result) {
-        if (result.success) {
-          alert('Cleared ' + result.data.clearedCount + ' statuses');
-          refreshCustomers();
-        } else {
-          alert('Error: ' + (result.error || 'Failed to clear statuses'));
-        }
-      }).catch(function(err) { alert('Error: ' + err.message); });
+      showConfirm({
+        title: 'Clear Statuses',
+        message: 'Are you sure you want to clear all message statuses?',
+        confirmLabel: 'Clear All',
+        destructive: true
+      }).then(function(ok) {
+        if (!ok) return;
+        serverCall('clearStatuses').then(function(result) {
+          if (result.success) {
+            showToast('Cleared ' + result.data.clearedCount + ' statuses', 'success');
+            refreshCustomers();
+          } else {
+            showToast(result.error || 'Failed to clear statuses', 'error');
+          }
+        }).catch(function(err) { showToast(err.message || 'Failed to clear statuses', 'error'); });
+      });
     }
 
     // Single Bill Modal
@@ -4746,16 +4850,16 @@
           if (result.success) {
             var msg = 'Bill sent to ' + result.data.customerName;
             if (result.data.dryRunMode) msg += ' (DRY RUN)';
-            alert(msg);
+            showToast(msg, 'success');
             refreshCustomers();
           } else {
-            alert('Error: ' + (result.error || 'Failed to send bill'));
+            showToast(result.error || 'Failed to send bill', 'error');
           }
         })
         .catch(function(err) {
           btn.disabled = false;
           btn.textContent = 'Send Bill';
-          alert('Error: ' + err.message);
+          showToast(err.message || 'Failed to send bill', 'error');
         });
     }
 
@@ -5539,20 +5643,41 @@
     }
 
     function confirmResetSettings() {
-      if (!confirm('Reset all settings to defaults? This cannot be undone.')) return;
-      serverCall('resetSettings').then(function(result) {
-        if (result && result.success) {
-          showToast('Settings reset to defaults', 'success');
-          loadSettings();
-        } else {
-          showToast((result && result.error) || 'Reset failed', 'error');
-        }
-      }).catch(function(err) {
-        showToast('Reset error: ' + err.message, 'error');
+      showConfirm({
+        title: 'Reset Settings',
+        message: 'Reset all settings to defaults? This cannot be undone.',
+        confirmLabel: 'Reset',
+        destructive: true
+      }).then(function(ok) {
+        if (!ok) return;
+        serverCall('resetSettings').then(function(result) {
+          if (result && result.success) {
+            showToast('Settings reset to defaults', 'success');
+            loadSettings();
+          } else {
+            showToast((result && result.error) || 'Reset failed', 'error');
+          }
+        }).catch(function(err) {
+          showToast('Reset error: ' + err.message, 'error');
+        });
       });
     }
 
   </script>
   <div id="toastContainer" class="toast-container"></div>
+  <div class="modal-overlay" id="confirmDialog" role="alertdialog" aria-modal="true">
+    <div class="modal confirm-modal">
+      <div class="modal-header">
+        <h3 class="modal-title" id="confirmDialogTitle"></h3>
+      </div>
+      <div class="modal-body">
+        <p id="confirmDialogMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="confirmDialogCancel">Cancel</button>
+        <button class="btn btn-primary" id="confirmDialogConfirm">Confirm</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

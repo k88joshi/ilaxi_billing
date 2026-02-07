@@ -856,6 +856,95 @@
     }
 
     /* ============================================
+       Confirm Dialog
+       ============================================ */
+    .confirm-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1100;
+      opacity: 1;
+      transition: var(--transition-base);
+    }
+
+    .confirm-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .confirm-modal {
+      background: var(--color-surface);
+      border-radius: var(--radius-xl);
+      max-width: 420px;
+      width: calc(100% - var(--space-8));
+      box-shadow: var(--shadow-lg);
+      animation: confirmIn 0.15s ease-out;
+    }
+
+    @keyframes confirmIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .confirm-modal-header {
+      padding: var(--space-4) var(--space-5) 0;
+    }
+
+    .confirm-modal-header h3 {
+      font-size: var(--text-base);
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .confirm-modal-body {
+      padding: var(--space-3) var(--space-5);
+    }
+
+    .confirm-modal-body p {
+      color: var(--color-text-secondary);
+      font-size: var(--text-sm);
+      line-height: 1.5;
+    }
+
+    .confirm-modal-footer {
+      padding: var(--space-3) var(--space-5) var(--space-4);
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--space-2);
+    }
+
+    .confirm-modal-footer .btn {
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-lg);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
+      color: var(--color-text);
+    }
+
+    .confirm-modal-footer .btn-confirm {
+      background: var(--color-primary);
+      color: #fff;
+      border-color: var(--color-primary);
+    }
+
+    .confirm-modal-footer .btn-destructive {
+      background: var(--color-error);
+      color: #fff;
+      border-color: var(--color-error);
+    }
+
+    .confirm-modal-footer .btn-destructive:hover,
+    .confirm-modal-footer .btn-confirm:hover {
+      opacity: 0.9;
+    }
+
+    /* ============================================
        Loading Overlay
        ============================================ */
     .loading-overlay {
@@ -1594,6 +1683,21 @@
 
   <!-- Toast Container -->
   <div id="toastContainer" class="toast-container" role="alert" aria-live="polite"></div>
+
+  <div class="confirm-overlay hidden" id="confirmDialog" role="alertdialog" aria-modal="true">
+    <div class="confirm-modal">
+      <div class="confirm-modal-header">
+        <h3 id="confirmDialogTitle"></h3>
+      </div>
+      <div class="confirm-modal-body">
+        <p id="confirmDialogMessage"></p>
+      </div>
+      <div class="confirm-modal-footer">
+        <button class="btn" id="confirmDialogCancel">Cancel</button>
+        <button class="btn btn-confirm" id="confirmDialogConfirm">Confirm</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Onboarding Wizard Overlay -->
   <div id="wizardOverlay" class="wizard-overlay hidden">
@@ -3142,7 +3246,13 @@
     }
 
     function confirmReset() {
-      if (confirm('Are you sure you want to reset ALL settings back to the original defaults?\n\nThis cannot be undone!')) {
+      showConfirm({
+        title: 'Reset Settings',
+        message: 'Are you sure you want to reset ALL settings back to the original defaults? This cannot be undone!',
+        confirmLabel: 'Reset All',
+        destructive: true
+      }).then(function(ok) {
+        if (!ok) return;
         showLoading(true);
         google.script.run
           .withSuccessHandler(function() {
@@ -3151,7 +3261,7 @@
           })
           .withFailureHandler(onError)
           .resetToDefaults();
-      }
+      });
     }
 
     function exportSettingsUI() {
@@ -3272,6 +3382,52 @@
           }
         }, 200);
       }, 3500);
+    }
+
+    function showConfirm(opts) {
+      var title = opts.title || 'Confirm';
+      var message = opts.message || 'Are you sure?';
+      var confirmLabel = opts.confirmLabel || 'Confirm';
+      var cancelLabel = opts.cancelLabel || 'Cancel';
+      var destructive = opts.destructive || false;
+
+      var overlay = document.getElementById('confirmDialog');
+      var titleEl = document.getElementById('confirmDialogTitle');
+      var messageEl = document.getElementById('confirmDialogMessage');
+      var confirmBtn = document.getElementById('confirmDialogConfirm');
+      var cancelBtn = document.getElementById('confirmDialogCancel');
+
+      titleEl.textContent = title;
+      messageEl.textContent = message;
+      confirmBtn.textContent = confirmLabel;
+      cancelBtn.textContent = cancelLabel;
+
+      confirmBtn.className = destructive ? 'btn btn-destructive' : 'btn btn-confirm';
+
+      overlay.classList.remove('hidden');
+      confirmBtn.focus();
+
+      return new Promise(function(resolve) {
+        function cleanup() {
+          overlay.classList.add('hidden');
+          confirmBtn.removeEventListener('click', onConfirm);
+          cancelBtn.removeEventListener('click', onCancel);
+          document.removeEventListener('keydown', onKey);
+          overlay.removeEventListener('click', onBackdrop);
+        }
+        function onConfirm() { cleanup(); resolve(true); }
+        function onCancel() { cleanup(); resolve(false); }
+        function onKey(e) {
+          if (e.key === 'Escape') { e.stopPropagation(); onCancel(); }
+        }
+        function onBackdrop(e) {
+          if (e.target === overlay) onCancel();
+        }
+        confirmBtn.addEventListener('click', onConfirm);
+        cancelBtn.addEventListener('click', onCancel);
+        document.addEventListener('keydown', onKey);
+        overlay.addEventListener('click', onBackdrop);
+      });
     }
 
     function onError(error) {
@@ -3572,10 +3728,15 @@
     }
 
     function skipWizard() {
-      if (confirm('Are you sure you want to skip the setup wizard? You can configure settings manually using the Credentials menu and Settings dialog.')) {
+      showConfirm({
+        title: 'Skip Setup',
+        message: 'Are you sure you want to skip the setup wizard? You can configure settings manually using the Credentials menu and Settings dialog.',
+        confirmLabel: 'Skip'
+      }).then(function(ok) {
+        if (!ok) return;
         hideWizard();
         google.script.run.markSetupSkipped();
-      }
+      });
     }
 
     function updateWizardUI() {
@@ -3625,18 +3786,16 @@
     }
 
     function wizardNext() {
-      if (!validateWizardStep(wizardStep)) {
-        return;
-      }
-
-      saveWizardStepData(wizardStep);
-
-      if (wizardStep < 4) {
-        wizardStep++;
-        updateWizardUI();
-      } else {
-        completeWizardSetup();
-      }
+      Promise.resolve(validateWizardStep(wizardStep)).then(function(valid) {
+        if (!valid) return;
+        saveWizardStepData(wizardStep);
+        if (wizardStep < 4) {
+          wizardStep++;
+          updateWizardUI();
+        } else {
+          completeWizardSetup();
+        }
+      });
     }
 
     function validateWizardStep(step) {
@@ -3667,7 +3826,11 @@
           }
 
           if (!wizardData.credentialsValid) {
-            return confirm('You haven\'t tested your Twilio credentials yet. Continue anyway?');
+            return showConfirm({
+              title: 'Continue Without Testing?',
+              message: 'You haven\'t tested your Twilio credentials yet. Continue anyway?',
+              confirmLabel: 'Continue Anyway'
+            });
           }
           return true;
 
