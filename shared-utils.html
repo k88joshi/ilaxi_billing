@@ -1,0 +1,113 @@
+<script>
+  /* ============================================
+     Shared UI Utilities
+     Included via <?!= include('shared-utils') ?>
+     ============================================ */
+
+  /**
+   * Shows a toast notification.
+   * Requires a #toastContainer element and toast CSS from design-tokens.html.
+   * Each file provides its own toast-container position override.
+   *
+   * @param {string} message - Text to display
+   * @param {string} [type='success'] - 'success', 'error', or 'warning'
+   */
+  function showToast(message, type) {
+    var container = document.getElementById('toastContainer');
+    while (container.firstChild) container.removeChild(container.firstChild);
+
+    var toast = document.createElement('div');
+    toast.className = 'toast toast-' + (type || 'success');
+
+    // SVG icon paths
+    var paths = {
+      success: 'M5 13l4 4L19 7',
+      error: 'M6 18L18 6M6 6l12 12',
+      warning: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z'
+    };
+
+    var iconSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    iconSvg.setAttribute('fill', 'none');
+    iconSvg.setAttribute('viewBox', '0 0 24 24');
+    iconSvg.setAttribute('stroke', 'currentColor');
+    var iconPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    iconPath.setAttribute('stroke-linecap', 'round');
+    iconPath.setAttribute('stroke-linejoin', 'round');
+    iconPath.setAttribute('stroke-width', '2');
+    iconPath.setAttribute('d', paths[type] || paths.success);
+    iconSvg.appendChild(iconPath);
+    toast.appendChild(iconSvg);
+
+    var textSpan = document.createElement('span');
+    textSpan.textContent = message;
+    toast.appendChild(textSpan);
+
+    container.appendChild(toast);
+
+    setTimeout(function() {
+      toast.classList.add('toast-out');
+      setTimeout(function() {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+      }, 250);
+    }, 3500);
+  }
+
+  /**
+   * Shows a confirm dialog. Returns a Promise that resolves to true (confirm) or false (cancel).
+   * Requires #confirmDialog overlay with #confirmDialogTitle, #confirmDialogMessage,
+   * #confirmDialogConfirm, and #confirmDialogCancel elements. CSS from design-tokens.html.
+   *
+   * @param {Object} opts
+   * @param {string} [opts.title='Confirm']
+   * @param {string} [opts.message='Are you sure?']
+   * @param {string} [opts.confirmLabel='Confirm']
+   * @param {string} [opts.cancelLabel='Cancel']
+   * @param {boolean} [opts.destructive=false]
+   * @returns {Promise<boolean>}
+   */
+  function showConfirm(opts) {
+    var title = opts.title || 'Confirm';
+    var message = opts.message || 'Are you sure?';
+    var confirmLabel = opts.confirmLabel || 'Confirm';
+    var cancelLabel = opts.cancelLabel || 'Cancel';
+    var destructive = opts.destructive || false;
+
+    var overlay = document.getElementById('confirmDialog');
+    var titleEl = document.getElementById('confirmDialogTitle');
+    var messageEl = document.getElementById('confirmDialogMessage');
+    var confirmBtn = document.getElementById('confirmDialogConfirm');
+    var cancelBtn = document.getElementById('confirmDialogCancel');
+
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    confirmBtn.textContent = confirmLabel;
+    cancelBtn.textContent = cancelLabel;
+
+    confirmBtn.className = destructive ? 'btn btn-destructive' : 'btn btn-primary';
+
+    overlay.classList.add('visible');
+    confirmBtn.focus();
+
+    return new Promise(function(resolve) {
+      function cleanup() {
+        overlay.classList.remove('visible');
+        confirmBtn.removeEventListener('click', onConfirm);
+        cancelBtn.removeEventListener('click', onCancel);
+        document.removeEventListener('keydown', onKey);
+        overlay.removeEventListener('click', onBackdrop);
+      }
+      function onConfirm() { cleanup(); resolve(true); }
+      function onCancel() { cleanup(); resolve(false); }
+      function onKey(e) {
+        if (e.key === 'Escape') { e.stopPropagation(); onCancel(); }
+      }
+      function onBackdrop(e) {
+        if (e.target === overlay) onCancel();
+      }
+      confirmBtn.addEventListener('click', onConfirm);
+      cancelBtn.addEventListener('click', onCancel);
+      document.addEventListener('keydown', onKey);
+      overlay.addEventListener('click', onBackdrop);
+    });
+  }
+</script>

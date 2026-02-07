@@ -39,7 +39,7 @@ Run `runAllSettingsManagerTests()` in Apps Script editor (defined in `settings-m
 |------|---------|
 | `main.gs` | Entry points: `onOpen()` menus, `onEdit()` auto-thank-you trigger |
 | `billing-core.gs` | **Shared business logic** — mode-independent core functions called by both modes |
-| `settings-manager.gs` | Settings via `PropertiesService`, template processing, validation |
+| `settings-manager.gs` | Settings via `PropertiesService`, template processing, validation, activity log storage |
 | `api.gs` | Web app API router — thin wrappers that delegate to `billing-core.gs` |
 | `webapp.gs` | Web app auth (`doGet`/`doPost`), Google account whitelist, live user heartbeat via CacheService |
 | `webapp-main.html` | Web app main UI (customer list, messages, settings tabs) |
@@ -58,6 +58,7 @@ Sheet Data → billing-core.gs → Settings/Templates → Twilio API → Status 
 ### Storage
 - **ScriptProperties**: Project-wide settings (web app mode, shared config)
 - **UserProperties**: User-specific settings (add-on mode)
+- **ScriptProperties sharding**: For data that may exceed ~9KB per-property limit, use two-key sharding (e.g., `ACTIVITY_LOG_A`/`ACTIVITY_LOG_B`)
 
 ### Dual-Mode Parity (IMPORTANT)
 
@@ -78,6 +79,8 @@ Every user-facing feature must work in **both** add-on and web app modes. Busine
 | `getLiveUsers_()` | — | `getLiveUsersForWeb()` | Web only (read live users from cache) |
 | — | `testSingleMessage()` | — | Add-on only (finds first unpaid) |
 | — | — | `getCustomerStatsForWeb()` | Web only (dashboard stats) |
+| `getActivityLog_()` | — | `getActivityLogForWeb()` | Web only, admin-only (both in `settings-manager.gs`) |
+| — | — | `clearActivityLogForWeb()` | Web only, admin-only (in `settings-manager.gs`) |
 
 **Shared CSS**: Design tokens live in `design-tokens.html`. Both `settings.html` and `webapp-main.html` include it via `<?!= include('design-tokens') ?>`. Dark theme overrides are webapp-only (in `webapp-main.html`).
 
@@ -85,7 +88,7 @@ Every user-facing feature must work in **both** add-on and web app modes. Busine
 1. Write core logic in `billing-core.gs` (return `{success, data, error}`)
 2. Add add-on wrapper in `spreadsheet.gs` (UI prompts/alerts around the core call)
 3. Add web wrapper in `api.gs` (extract params from payload, call core)
-4. Add API route in `handleApiRequest_()` switch statement
+4. Add API route in `handleApiRequest_()` switch statement (activity logging lives inside each function via `logEvent_()`, not centralized)
 5. Add menu item in `onOpen()` if needed
 6. Update the parity table above
 
@@ -103,6 +106,10 @@ columnRange.setValues(results);
 
 ### Cross-File Globals
 All `.gs` files compile into one namespace. Functions defined in any file are globally accessible.
+
+Key shared globals defined elsewhere:
+- `scriptProperties` (defined in `twilio.gs`) — `PropertiesService.getScriptProperties()`, used across many files
+- `safeJsonParse_(jsonString, defaultValue)` (defined in `webapp.gs`) — safe JSON parse with fallback
 
 ### Template Placeholders
 Use `processTemplate()` for: `{{businessName}}`, `{{customerName}}`, `{{balance}}`, `{{numTiffins}}`, `{{month}}`, `{{orderId}}`, `{{etransferEmail}}`, `{{phoneNumber}}`, `{{whatsappLink}}`

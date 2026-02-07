@@ -46,89 +46,152 @@ function onOpen() {
 
 
 /**
+ * Validates the edit event and checks preconditions for auto thank-you.
+ * Returns context needed for further processing, or null to abort.
+ *
+ * @param {Object} e - The event object from Google Sheets
+ * @returns {?{range: GoogleAppsScript.Spreadsheet.Range, sheet: GoogleAppsScript.Spreadsheet.Sheet, settings: Object}} Context or null
+ * @private
+ */
+function validateEditContext_(e) {
+  if (!e || !e.range) {
+    Logger.log("onEdit called without valid event object");
+    return null;
+  }
+
+  // Quick check: single-cell edit that isn't "paid" can be skipped immediately
+  if (e.value && String(e.value).toLowerCase() !== "paid") {
+    return null;
+  }
+
+  const settings = getSettings();
+  if (!settings.behavior.autoThankYouEnabled) {
+    return null;
+  }
+
+  const range = e.range;
+  if (range.getRow() <= settings.behavior.headerRowIndex) {
+    return null;
+  }
+
+  return { range, sheet: range.getSheet(), settings };
+}
+
+/**
+ * Validates that all required columns for thank-you messages exist in the header map.
+ * Returns an object with the column indices, or null if any are missing.
+ *
+ * @param {Object} columns - Column name to 0-based index map from getHeaderColumnMap()
+ * @param {Object} cols - Column name settings from settings.columns
+ * @returns {?{payment: number, name: number, phone: number, orderId: number, status: number}} Column indices or null
+ * @private
+ */
+function validateThankYouColumns_(columns, cols) {
+  const payment = columns[cols.paymentStatus];
+  const name = columns[cols.customerName];
+  const phone = columns[cols.phoneNumber];
+  const orderId = columns[cols.orderId];
+  const status = columns[cols.messageStatus];
+
+  if (payment === undefined) {
+    Logger.log(`Auto thank-you: Payment column "${cols.paymentStatus}" not found in sheet headers. Check Settings > Spreadsheet > Column Mappings.`);
+    return null;
+  }
+
+  const missingCols = [];
+  if (name === undefined) missingCols.push(`"${cols.customerName}"`);
+  if (phone === undefined) missingCols.push(`"${cols.phoneNumber}"`);
+  if (orderId === undefined) missingCols.push(`"${cols.orderId}"`);
+  if (status === undefined) missingCols.push(`"${cols.messageStatus}"`);
+  if (missingCols.length > 0) {
+    Logger.log(`Auto thank-you: Required columns not found in sheet headers: ${missingCols.join(", ")}. Check Settings > Spreadsheet > Column Mappings.`);
+    return null;
+  }
+
+  return { payment, name, phone, orderId, status };
+}
+
+/**
+ * Processes rows that have been marked as "Paid", sending thank-you messages.
+ * Returns an array of status updates for batch writing.
+ *
+ * @param {Array[]} fullData - Row data for the affected range
+ * @param {{payment: number, name: number, phone: number, orderId: number, status: number}} colIndices - Column indices
+ * @param {Object} settings - Current settings
+ * @param {number} startRow - 1-based start row in the sheet
+ * @returns {Array<{row: number, status: string, color: string}>} Status updates
+ * @private
+ */
+function processPaidRows_(fullData, colIndices, settings, startRow) {
+  const statusUpdates = [];
+
+  for (let i = 0; i < fullData.length; i++) {
+    const currentRow = startRow + i;
+    const rowData = fullData[i];
+    const paymentValue = String(rowData[colIndices.payment]).toLowerCase();
+
+    if (paymentValue !== "paid") continue;
+
+    // Duplicate-send guard
+    const existingStatus = String(rowData[colIndices.status] || "").toLowerCase();
+    if (existingStatus.includes("thank you sent")) {
+      Logger.log(`Skipping auto-thanks for row ${currentRow}: already sent (status: "${rowData[colIndices.status]}")`);
+      continue;
+    }
+
+    Logger.log(`Payment status detected as "Paid" for row ${currentRow}. Processing "Thank You" message.`);
+
+    const customerName = rowData[colIndices.name];
+    const customerPhone = rowData[colIndices.phone];
+    const orderId = rowData[colIndices.orderId];
+
+    if (!customerName || !customerPhone || !orderId) {
+      Logger.log(`Skipping auto-thanks for row ${currentRow}: missing Name, Phone, or Order ID.`);
+      statusUpdates.push({
+        row: currentRow,
+        status: "Payment 'Paid', but auto-thanks failed: Missing data",
+        color: settings.colors.error
+      });
+      continue;
+    }
+
+    const result = sendThankYouMessage_(customerPhone, customerName, orderId, settings);
+    statusUpdates.push({ row: currentRow, status: result.status, color: result.color });
+
+    Utilities.sleep(500);
+  }
+
+  return statusUpdates;
+}
+
+/**
  * Installable edit trigger handler for auto thank-you messages.
  * Must be installed via installEditTrigger() — simple onEdit() cannot call UrlFetchApp.
  *
  * @param {Object} e The event object passed by Google Sheets, containing info about the edit.
- * @property {GoogleAppsScript.Spreadsheet.Range} e.range - The cell range that was edited.
- * @property {string} e.value - The new value of the cell (only for single cell edits).
- * @property {string} e.oldValue - The value of the cell before the edit (single cell only).
  */
 function onEditInstallable(e) {
   try {
-    // Validate event object
-    if (!e || !e.range) {
-      Logger.log("onEdit called without valid event object");
-      return;
-    }
+    const ctx = validateEditContext_(e);
+    if (!ctx) return;
 
-    const range = e.range;
-    const sheet = range.getSheet();
-
-    // Optimization: Quick check if the edit is potentially relevant.
-    // If e.value is present (single cell), check if it's "paid".
-    // If e.value is NOT present (multi-cell), we must proceed to check the range.
-    if (e.value && String(e.value).toLowerCase() !== "paid") {
-      return;
-    }
-
-    // Now load settings, as we likely need to process this edit.
-    const settings = getSettings();
+    const { range, sheet, settings } = ctx;
     const cols = settings.columns;
-
-    // Check if auto thank-you is enabled
-    if (!settings.behavior.autoThankYouEnabled) {
-      return;
-    }
-
-    // Ignore edits in header or above
-    if (range.getRow() <= settings.behavior.headerRowIndex) return;
-
-    // Get column indices
     const columns = getHeaderColumnMap();
-    const paymentColIndex = columns[cols.paymentStatus]; // 0-based
 
-    // Validate payment column exists — if mapping is wrong, exit with clear log
-    if (paymentColIndex === undefined) {
-      Logger.log(`Auto thank-you: Payment column "${cols.paymentStatus}" not found in sheet headers. Check Settings > Spreadsheet > Column Mappings.`);
-      return;
-    }
-    const paymentCol = paymentColIndex + 1; // 1-based
+    const colIndices = validateThankYouColumns_(columns, cols);
+    if (!colIndices) return;
 
-    // Check if the edited range includes the Payment column
-    // range.getColumn() is start column, range.getLastColumn() is end column
+    const paymentCol = colIndices.payment + 1; // 1-based
     if (range.getColumn() > paymentCol || range.getLastColumn() < paymentCol) {
       return;
     }
 
-    // Identify the intersection of the edited range and the Payment column
-    // This handles both single cell and multi-cell pastes
     const startRow = range.getRow();
     const numRows = range.getNumRows();
 
-    // Get values for the payment column within the edited rows
-    // getRange(row, col, numRows, numCols)
+    // Quick scan for "Paid" before fetching full data
     const paymentValues = sheet.getRange(startRow, paymentCol, numRows, 1).getValues();
-
-    // Prepare to read other required data only if needed
-    const nameColIndex = columns[cols.customerName];
-    const phoneColIndex = columns[cols.phoneNumber];
-    const orderIdColIndex = columns[cols.orderId];
-    const statusColIndex = columns[cols.messageStatus];
-
-    // Validate all required columns exist
-    const missingCols = [];
-    if (nameColIndex === undefined) missingCols.push(`"${cols.customerName}"`);
-    if (phoneColIndex === undefined) missingCols.push(`"${cols.phoneNumber}"`);
-    if (orderIdColIndex === undefined) missingCols.push(`"${cols.orderId}"`);
-    if (statusColIndex === undefined) missingCols.push(`"${cols.messageStatus}"`);
-    if (missingCols.length > 0) {
-      Logger.log(`Auto thank-you: Required columns not found in sheet headers: ${missingCols.join(", ")}. Check Settings > Spreadsheet > Column Mappings.`);
-      return;
-    }
-
-    // We'll fetch the full data for these rows to get Name, Phone, OrderID
-    // Optimization: Only fetch if we find at least one "Paid"
     let hasPaid = false;
     for (let i = 0; i < paymentValues.length; i++) {
       if (String(paymentValues[i][0]).toLowerCase() === "paid") {
@@ -136,66 +199,17 @@ function onEditInstallable(e) {
         break;
       }
     }
-
     if (!hasPaid) return;
 
-    // Fetch full data for the affected rows
-    // We grab from column 1 to the last column
     const fullData = sheet.getRange(startRow, 1, numRows, sheet.getLastColumn()).getValues();
+    const statusUpdates = processPaidRows_(fullData, colIndices, settings, startRow);
 
-    // Collect status updates for batch write (per CLAUDE.md: never setValue inside loops)
-    const statusUpdates = [];
-
-    for (let i = 0; i < fullData.length; i++) {
-      const currentRow = startRow + i;
-      const rowData = fullData[i];
-      const paymentValue = String(rowData[paymentColIndex]).toLowerCase();
-
-      // Check if this specific row is "Paid"
-      if (paymentValue === "paid") {
-        // Duplicate-send guard: skip if Message Status already shows a thank-you was sent
-        const existingStatus = String(rowData[statusColIndex] || "").toLowerCase();
-        if (existingStatus.includes("thank you sent")) {
-          Logger.log(`Skipping auto-thanks for row ${currentRow}: already sent (status: "${rowData[statusColIndex]}")`);
-          continue;
-        }
-
-        Logger.log(`Payment status detected as "Paid" for row ${currentRow}. Processing "Thank You" message.`);
-
-        const customerName = rowData[nameColIndex];
-        const customerPhone = rowData[phoneColIndex];
-        const orderId = rowData[orderIdColIndex];
-
-        if (!customerName || !customerPhone || !orderId) {
-          Logger.log(`Skipping auto-thanks for row ${currentRow}: missing Name, Phone, or Order ID.`);
-          statusUpdates.push({
-            row: currentRow,
-            status: "Payment 'Paid', but auto-thanks failed: Missing data",
-            color: settings.colors.error
-          });
-          continue;
-        }
-
-        const result = sendThankYouMessage_(customerPhone, customerName, orderId, settings);
-        statusUpdates.push({
-          row: currentRow,
-          status: result.status,
-          color: result.color
-        });
-
-        // Sleep slightly to respect rate limits if processing many
-        Utilities.sleep(500);
-      }
-    }
-
-    // Batch write status updates using setValues/setBackgrounds (avoids per-cell round-trips)
+    // Batch write status updates
     if (statusUpdates.length > 0) {
-      // Read current status column for the affected row range
-      const statusCol = statusColIndex + 1; // 1-based
+      const statusCol = colIndices.status + 1; // 1-based
       const currentValues = sheet.getRange(startRow, statusCol, numRows, 1).getValues();
       const currentBgs = sheet.getRange(startRow, statusCol, numRows, 1).getBackgrounds();
 
-      // Merge updates into the arrays
       for (const update of statusUpdates) {
         const idx = update.row - startRow;
         if (idx >= 0 && idx < numRows) {
@@ -204,12 +218,10 @@ function onEditInstallable(e) {
         }
       }
 
-      // Single batch write
-      const range = sheet.getRange(startRow, statusCol, numRows, 1);
-      range.setValues(currentValues);
-      range.setBackgrounds(currentBgs);
+      const statusRange = sheet.getRange(startRow, statusCol, numRows, 1);
+      statusRange.setValues(currentValues);
+      statusRange.setBackgrounds(currentBgs);
 
-      // Show toast notification summarizing results
       const sent = statusUpdates.filter(u => u.color === settings.colors.success).length;
       const failed = statusUpdates.length - sent;
       let toastMsg = `Thank-you sent to ${sent} customer${sent !== 1 ? "s" : ""}`;
@@ -217,7 +229,6 @@ function onEditInstallable(e) {
       SpreadsheetApp.getActive().toast(toastMsg, "Auto Thank-You", 5);
     }
   } catch (error) {
-    // Log error but don't show UI alert (triggers can't reliably show UI)
     Logger.log(`ERROR in onEdit trigger: ${error.message}\nStack: ${error.stack || "N/A"}`);
   }
 }

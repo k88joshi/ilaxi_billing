@@ -19,17 +19,13 @@
 function getCustomersCore_(options) {
   try {
     const serializeDates = options?.serializeDates || false;
-    const sheet = getTargetSheet_();
-    const settings = getSettings();
+    const { settings, data, colMap } = getSheetContext_();
     const cols = settings.columns;
     const headerRowIndex = settings.behavior.headerRowIndex;
 
-    const data = sheet.getDataRange().getValues();
     if (data.length <= headerRowIndex) {
       return { success: true, data: [] };
     }
-
-    const colMap = buildColumnMap_(data[headerRowIndex - 1]);
 
     const customers = [];
     for (let i = headerRowIndex; i < data.length; i++) {
@@ -49,10 +45,10 @@ function getCustomersCore_(options) {
         phone: String(row[phoneCol] || ''),
         name: String(row[nameCol] || ''),
         balance: row[colMap[cols.balance]] || 0,
-        formattedBalance: formatBalance(row[colMap[cols.balance]]),
+        formattedBalance: formatBalance_(row[colMap[cols.balance]]),
         numTiffins: row[colMap[cols.numTiffins]] || 0,
         dueDate: dueDateValue,
-        month: getMonthFromValue(dueDateRaw),
+        month: getMonthFromValue_(dueDateRaw),
         messageStatus: String(row[colMap[cols.messageStatus]] || ''),
         orderId: String(row[colMap[cols.orderId]] || ''),
         paymentStatus: String(row[colMap[cols.paymentStatus]] || '')
@@ -88,13 +84,10 @@ function sendBillsCore_(params) {
     const templateType = params?.templateType || 'firstNotice';
     const dryRunMode = params?.dryRunMode;
 
-    const settings = getSettings();
+    const { settings, sheet, data, colMap } = getSheetContext_();
     const cols = settings.columns;
-    const sheet = getTargetSheet_();
-    const data = sheet.getDataRange().getValues();
-    const colMap = buildColumnMap_(data[settings.behavior.headerRowIndex - 1]);
 
-    const missingHeaders = validateRequiredColumns(colMap, cols);
+    const missingHeaders = validateRequiredColumns_(colMap, cols);
     if (missingHeaders.length > 0) {
       return { success: false, error: `Missing required columns: ${missingHeaders.join(', ')}` };
     }
@@ -119,7 +112,7 @@ function sendBillsCore_(params) {
         shouldProcess = true;
       } else if (filter === 'byDate' && paymentStatus === 'unpaid') {
         const dueDateStr = String(dueDate).toLowerCase();
-        const monthFromDate = getMonthFromValue(dueDate).toLowerCase();
+        const monthFromDate = getMonthFromValue_(dueDate).toLowerCase();
         const targetLower = targetDate.toLowerCase();
         if (dueDateStr.includes(targetLower) || monthFromDate.includes(targetLower)) {
           shouldProcess = true;
@@ -142,8 +135,9 @@ function sendBillsCore_(params) {
     );
 
     // Write statuses back
-    applyStatusUpdates(sheet, statusUpdates, colMap[cols.messageStatus], data.length);
+    applyStatusUpdates_(sheet, statusUpdates, colMap[cols.messageStatus], data.length);
 
+    logEvent_('billing', 'Send bills', `Sent: ${sentCount}, Errors: ${errorCount}`, true, getCurrentUserEmail_());
     return {
       success: true,
       data: {
@@ -157,6 +151,7 @@ function sendBillsCore_(params) {
     };
   } catch (error) {
     Logger.log(`sendBillsCore_ error: ${error.message}`);
+    logEvent_('billing', 'Send bills', error.message, false, getCurrentUserEmail_());
     return { success: false, error: error.message };
   }
 }
@@ -177,13 +172,10 @@ function sendSingleBillCore_(params) {
       return { success: false, error: 'Twilio credentials not configured' };
     }
 
-    const settings = getSettings();
+    const { settings, sheet, data, colMap } = getSheetContext_();
     const cols = settings.columns;
-    const sheet = getTargetSheet_();
-    const data = sheet.getDataRange().getValues();
     const templateType = params?.templateType || 'firstNotice';
     const dryRunMode = params?.dryRunMode;
-    const colMap = buildColumnMap_(data[settings.behavior.headerRowIndex - 1]);
 
     // Find target row
     let targetRow = -1;
@@ -216,6 +208,7 @@ function sendSingleBillCore_(params) {
     statusRange.setValue(result.status);
     statusRange.setBackground(result.color);
 
+    logEvent_('billing', 'Send single bill', String(name || ''), result.success, getCurrentUserEmail_());
     return {
       success: result.success,
       data: {
@@ -227,6 +220,7 @@ function sendSingleBillCore_(params) {
     };
   } catch (error) {
     Logger.log(`sendSingleBillCore_ error: ${error.message}`);
+    logEvent_('billing', 'Send single bill', error.message, false, getCurrentUserEmail_());
     return { success: false, error: error.message };
   }
 }
@@ -238,11 +232,8 @@ function sendSingleBillCore_(params) {
  */
 function clearAllStatusesCore_() {
   try {
-    const settings = getSettings();
+    const { settings, sheet, data, colMap } = getSheetContext_();
     const cols = settings.columns;
-    const sheet = getTargetSheet_();
-    const data = sheet.getDataRange().getValues();
-    const colMap = buildColumnMap_(data[settings.behavior.headerRowIndex - 1]);
 
     const statusColIndex = colMap[cols.messageStatus];
     if (statusColIndex === undefined) {
@@ -261,9 +252,11 @@ function clearAllStatusesCore_() {
       range.setBackgrounds(clearBackgrounds);
     }
 
+    logEvent_('billing', 'Clear all statuses', `Cleared: ${rowCount}`, true, getCurrentUserEmail_());
     return { success: true, data: { clearedCount: rowCount } };
   } catch (error) {
     Logger.log(`clearAllStatusesCore_ error: ${error.message}`);
+    logEvent_('billing', 'Clear all statuses', error.message, false, getCurrentUserEmail_());
     return { success: false, error: error.message };
   }
 }
@@ -294,11 +287,8 @@ function updatePaymentStatusCore_(params) {
     // Title case for display
     const titleCaseStatus = normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1);
 
-    const sheet = getTargetSheet_();
-    const settings = getSettings();
+    const { settings, sheet, data, colMap } = getSheetContext_();
     const cols = settings.columns;
-    const data = sheet.getDataRange().getValues();
-    const colMap = buildColumnMap_(data[settings.behavior.headerRowIndex - 1]);
 
     const paymentStatusCol = colMap[cols.paymentStatus];
     if (paymentStatusCol === undefined) {
@@ -312,9 +302,11 @@ function updatePaymentStatusCore_(params) {
     // Update the cell (rowIndex is 1-based, paymentStatusCol is 0-based)
     sheet.getRange(rowIndex, paymentStatusCol + 1).setValue(titleCaseStatus);
 
+    logEvent_('billing', 'Update payment', `Row ${rowIndex} → ${titleCaseStatus}`, true, getCurrentUserEmail_());
     return { success: true, data: { rowIndex: rowIndex, paymentStatus: titleCaseStatus } };
   } catch (error) {
     Logger.log(`updatePaymentStatusCore_ error: ${error.message}`);
+    logEvent_('billing', 'Update payment', error.message, false, getCurrentUserEmail_());
     return { success: false, error: error.message };
   }
 }
@@ -327,11 +319,8 @@ function updatePaymentStatusCore_(params) {
  */
 function lookupCustomerByOrderId_(orderId) {
   try {
-    const settings = getSettings();
+    const { settings, data, colMap } = getSheetContext_();
     const cols = settings.columns;
-    const sheet = getTargetSheet_();
-    const data = sheet.getDataRange().getValues();
-    const colMap = buildColumnMap_(data[settings.behavior.headerRowIndex - 1]);
 
     const orderIdColIndex = colMap[cols.orderId];
     if (orderIdColIndex === undefined) {
@@ -364,6 +353,21 @@ function lookupCustomerByOrderId_(orderId) {
 // ========================================
 // INTERNAL HELPERS
 // ========================================
+
+/**
+ * Loads the sheet, settings, data, and column map in one call.
+ * Reduces the repeated 4-line boilerplate across core functions.
+ *
+ * @returns {{settings: Object, sheet: GoogleAppsScript.Spreadsheet.Sheet, data: Array[], colMap: Object}}
+ * @private
+ */
+function getSheetContext_() {
+  const settings = getSettings();
+  const sheet = getTargetSheet_();
+  const data = sheet.getDataRange().getValues();
+  const colMap = buildColumnMap_(data[settings.behavior.headerRowIndex - 1]);
+  return { settings, sheet, data, colMap };
+}
 
 /**
  * Builds a column name to 0-based index map from a header row array.

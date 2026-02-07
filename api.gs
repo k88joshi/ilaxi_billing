@@ -6,6 +6,51 @@
 // ========================================
 
 /**
+ * Dispatch map for API actions.
+ * Each entry maps an action name to { handler, admin? }.
+ * Handlers receive (payload, userEmail) and return a result object.
+ * Activity logging lives inside each handler/core function, not here.
+ * @const {Object<string, {handler: Function, admin?: boolean}>}
+ * @private
+ */
+const API_ACTIONS_ = {
+  // Customer data
+  getCustomers:        { handler: () => getCustomersForWeb() },
+  getCustomerStats:    { handler: () => getCustomerStatsForWeb() },
+  // Billing actions
+  sendBills:           { handler: (p) => sendBillsForWeb(p) },
+  sendSingleBill:      { handler: (p) => sendSingleBillForWeb(p) },
+  clearStatuses:       { handler: () => clearAllStatusesForWeb() },
+  updatePaymentStatus: { handler: (p) => updatePaymentStatusForWeb(p) },
+  getCurrentUser:      { handler: (_p, u) => getCurrentUserForWeb(u) },
+  // Settings
+  getSettings:         { handler: () => ({ success: true, data: getSettingsForUI() }) },
+  saveSettings:        { handler: (p) => saveSettingsFromUI(p) },
+  resetSettings:       { handler: () => resetToDefaults(), admin: true },
+  importSettings:      { handler: (p) => importSettings(p), admin: true },
+  // Credentials
+  testCredentials:     { handler: () => testTwilioCredentialsFromSettings() },
+  saveCredentials:     { handler: (p) => saveCredentialsForWeb(p), admin: true },
+  getCredentialStatus: { handler: () => getCredentialStatusForWeb() },
+  clearCredentials:    { handler: () => clearCredentialsForWeb(), admin: true },
+  // Live users
+  heartbeat:           { handler: () => heartbeatForWeb() },
+  getLiveUsers:        { handler: () => getLiveUsersForWeb() },
+  // User management
+  addUser:             { handler: (p) => addUserForWeb(p), admin: true },
+  removeUser:          { handler: (p) => removeUserForWeb(p), admin: true },
+  // Template preview
+  previewTemplate:     { handler: (p) => ({ success: true, preview: previewTemplate(p?.template) }) },
+  // Column detection
+  autoDetectColumns:   { handler: () => autoDetectColumnsForWeb() },
+  // Spreadsheet link
+  getSpreadsheetUrl:   { handler: () => getSpreadsheetUrlForWeb() },
+  // Activity log (admin only)
+  getActivityLog:      { handler: () => getActivityLogForWeb(), admin: true },
+  clearActivityLog:    { handler: () => clearActivityLogForWeb(), admin: true },
+};
+
+/**
  * Routes API requests to appropriate handlers.
  * Authorization is handled by doPost before this function is called.
  *
@@ -17,93 +62,19 @@
  */
 function handleApiRequest_(action, payload, userEmail) {
   try {
-    // Admin-only actions require admin role
-    const adminActions = ['saveCredentials', 'clearCredentials', 'addUser', 'removeUser', 'resetSettings', 'importSettings'];
-    if (adminActions.indexOf(action) !== -1 && !isAdminUser_(userEmail)) {
+    const route = API_ACTIONS_[action];
+    if (!route) {
+      return { success: false, error: `Unknown action: ${action}`, errorCode: 'UNKNOWN_ACTION' };
+    }
+
+    if (route.admin && !isAdminUser_(userEmail)) {
       return { success: false, error: 'This action requires admin privileges', errorCode: 'ADMIN_REQUIRED' };
     }
 
-    switch (action) {
-      // Customer data
-      case 'getCustomers':
-        return getCustomersForWeb();
-
-      case 'getCustomerStats':
-        return getCustomerStatsForWeb();
-
-      // Billing actions
-      case 'sendBills':
-        return sendBillsForWeb(payload);
-
-      case 'sendSingleBill':
-        return sendSingleBillForWeb(payload);
-
-      case 'clearStatuses':
-        return clearAllStatusesForWeb();
-
-      case 'updatePaymentStatus':
-        return updatePaymentStatusForWeb(payload);
-
-      case 'getCurrentUser':
-        return getCurrentUserForWeb(userEmail);
-
-      // Settings
-      case 'getSettings':
-        return { success: true, data: getSettingsForUI() };
-
-      case 'saveSettings':
-        return saveSettingsFromUI(payload);
-
-      case 'resetSettings':
-        return resetToDefaults();
-
-      case 'importSettings':
-        return importSettings(payload);
-
-      // Credentials
-      case 'testCredentials':
-        return testTwilioCredentialsFromSettings();
-
-      case 'saveCredentials':
-        return saveCredentialsForWeb(payload);
-
-      case 'getCredentialStatus':
-        return getCredentialStatusForWeb();
-
-      case 'clearCredentials':
-        return clearCredentialsForWeb();
-
-      // Live users
-      case 'heartbeat':
-        return heartbeatForWeb();
-
-      case 'getLiveUsers':
-        return getLiveUsersForWeb();
-
-      // User management
-      case 'addUser':
-        return addUserForWeb(payload);
-
-      case 'removeUser':
-        return removeUserForWeb(payload);
-
-      // Template preview
-      case 'previewTemplate':
-        return { success: true, preview: previewTemplate(payload?.template) };
-
-      // Column detection
-      case 'autoDetectColumns':
-        return { success: true, data: autoDetectColumns() };
-
-      // Spreadsheet link
-      case 'getSpreadsheetUrl':
-        return getSpreadsheetUrlForWeb();
-
-      default:
-        return { success: false, error: `Unknown action: ${action}`, errorCode: 'UNKNOWN_ACTION' };
-    }
+    return route.handler(payload, userEmail);
   } catch (error) {
     Logger.log(`API Error [${action}]: ${error.message}`);
+    logEvent_('system', action, error.message, false, userEmail);
     return { success: false, error: 'An unexpected error occurred', errorCode: 'SERVER_ERROR' };
   }
 }
@@ -223,6 +194,26 @@ function clearAllStatusesForWeb() {
 }
 
 // ========================================
+// COLUMN DETECTION HANDLERS
+// ========================================
+
+/**
+ * Auto-detects column mappings from sheet headers.
+ * Wraps autoDetectColumns() with standard {success, data} response.
+ *
+ * @returns {Object} Result with headers and detections
+ */
+function autoDetectColumnsForWeb() {
+  try {
+    const result = autoDetectColumns();
+    return { success: true, data: result };
+  } catch (error) {
+    Logger.log(`autoDetectColumnsForWeb error: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+// ========================================
 // CREDENTIAL HANDLERS
 // ========================================
 
@@ -246,9 +237,11 @@ function saveCredentialsForWeb(payload) {
     }
 
     Logger.log('Twilio credentials saved from web interface');
+    logEvent_('credentials', 'Save credentials', '', true, getCurrentUserEmail_());
     return { success: true };
   } catch (error) {
     Logger.log(`saveCredentialsForWeb_ error: ${error.message}`);
+    logEvent_('credentials', 'Save credentials', error.message, false, getCurrentUserEmail_());
     return { success: false, error: error.message };
   }
 }
@@ -296,12 +289,6 @@ function getSpreadsheetUrlForWeb() {
   }
 }
 
-/**
- * Wraps autoDetectColumns for web app usage.
- * Returns the standard {success, data} format expected by the webapp.
- *
- * @returns {Object} Result with success boolean and data containing headers/detections
- */
 /**
  * Updates a customer's payment status in the spreadsheet.
  *
@@ -381,16 +368,6 @@ function getLiveUsersForWeb() {
   }
 }
 
-function autoDetectColumnsForWeb() {
-  try {
-    const result = autoDetectColumns();
-    return { success: true, data: result };
-  } catch (error) {
-    Logger.log(`autoDetectColumnsForWeb error: ${error.message}`);
-    return { success: false, error: error.message };
-  }
-}
-
 /**
  * Clears all stored Twilio credentials from ScriptProperties.
  *
@@ -403,9 +380,11 @@ function clearCredentialsForWeb() {
     scriptProperties.deleteProperty('TWILIO_AUTH_TOKEN');
     scriptProperties.deleteProperty('TWILIO_PHONE_NUMBER');
     Logger.log('Twilio credentials cleared from web interface');
+    logEvent_('credentials', 'Clear credentials', '', true, getCurrentUserEmail_());
     return { success: true };
   } catch (error) {
     Logger.log(`clearCredentialsForWeb error: ${error.message}`);
+    logEvent_('credentials', 'Clear credentials', error.message, false, getCurrentUserEmail_());
     return { success: false, error: error.message };
   }
 }
@@ -420,10 +399,12 @@ function clearCredentialsForWeb() {
 function addUserForWeb(payload) {
   try {
     const result = addAllowedUser(payload?.email);
+    logEvent_('users', 'Add user', payload?.email || '', result.success, getCurrentUserEmail_());
     if (!result.success) return result;
     return { success: true, data: { users: getAllowedUsers() } };
   } catch (error) {
     Logger.log(`addUserForWeb error: ${error.message}`);
+    logEvent_('users', 'Add user', error.message, false, getCurrentUserEmail_());
     return { success: false, error: error.message };
   }
 }
@@ -444,10 +425,12 @@ function removeUserForWeb(payload) {
       return { success: false, error: 'You cannot remove yourself from the authorized users list' };
     }
     const result = removeAllowedUser(payload?.email);
+    logEvent_('users', 'Remove user', payload?.email || '', result.success, getCurrentUserEmail_());
     if (!result.success) return result;
     return { success: true, data: { users: getAllowedUsers() } };
   } catch (error) {
     Logger.log(`removeUserForWeb error: ${error.message}`);
+    logEvent_('users', 'Remove user', error.message, false, getCurrentUserEmail_());
     return { success: false, error: error.message };
   }
 }

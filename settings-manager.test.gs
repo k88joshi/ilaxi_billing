@@ -910,52 +910,52 @@ function test_integration_thankYouTemplateProcessing() {
 // AUTO-DETECT COLUMNS TESTS
 // ========================================
 
-function test_normalizeHeader_basicNormalization() {
-  Logger.log("Testing normalizeHeader - basic normalization...");
+function test_normalizeHeader__basicNormalization() {
+  Logger.log("Testing normalizeHeader_ - basic normalization...");
 
-  TestRunner.assertEqual(normalizeHeader("Phone Number"), "phone number", "Should lowercase and preserve spaces");
-  TestRunner.assertEqual(normalizeHeader("  Customer Name  "), "customer name", "Should trim whitespace");
-  TestRunner.assertEqual(normalizeHeader("Order_ID"), "orderid", "Should remove underscores");
-  TestRunner.assertEqual(normalizeHeader("Phone #"), "phone", "Should remove special characters");
-  TestRunner.assertEqual(normalizeHeader(""), "", "Should handle empty string");
-  TestRunner.assertEqual(normalizeHeader(null), "", "Should handle null");
+  TestRunner.assertEqual(normalizeHeader_("Phone Number"), "phone number", "Should lowercase and preserve spaces");
+  TestRunner.assertEqual(normalizeHeader_("  Customer Name  "), "customer name", "Should trim whitespace");
+  TestRunner.assertEqual(normalizeHeader_("Order_ID"), "orderid", "Should remove underscores");
+  TestRunner.assertEqual(normalizeHeader_("Phone #"), "phone", "Should remove special characters");
+  TestRunner.assertEqual(normalizeHeader_(""), "", "Should handle empty string");
+  TestRunner.assertEqual(normalizeHeader_(null), "", "Should handle null");
 }
 
-function test_calculateMatchScore_exactMatch() {
-  Logger.log("Testing calculateMatchScore - exact match...");
+function test_calculateMatchScore__exactMatch() {
+  Logger.log("Testing calculateMatchScore_ - exact match...");
 
   const synonyms = ["phone", "mobile", "cell"];
-  TestRunner.assertEqual(calculateMatchScore("Phone", synonyms), 100, "Exact match (case insensitive) should be 100");
-  TestRunner.assertEqual(calculateMatchScore("phone", synonyms), 100, "Exact match should be 100");
+  TestRunner.assertEqual(calculateMatchScore_("Phone", synonyms), 100, "Exact match (case insensitive) should be 100");
+  TestRunner.assertEqual(calculateMatchScore_("phone", synonyms), 100, "Exact match should be 100");
 }
 
-function test_calculateMatchScore_startsWithMatch() {
-  Logger.log("Testing calculateMatchScore - starts with match...");
+function test_calculateMatchScore__startsWithMatch() {
+  Logger.log("Testing calculateMatchScore_ - starts with match...");
 
   const synonyms = ["phone"];
-  TestRunner.assertEqual(calculateMatchScore("Phone Number", synonyms), 90, "Header starting with synonym should be 90");
+  TestRunner.assertEqual(calculateMatchScore_("Phone Number", synonyms), 90, "Header starting with synonym should be 90");
 }
 
-function test_calculateMatchScore_containsMatch() {
-  Logger.log("Testing calculateMatchScore - contains match...");
+function test_calculateMatchScore__containsMatch() {
+  Logger.log("Testing calculateMatchScore_ - contains match...");
 
   const synonyms = ["phone"];
-  TestRunner.assertEqual(calculateMatchScore("Customer Phone", synonyms), 80, "Header containing synonym should be 80");
+  TestRunner.assertEqual(calculateMatchScore_("Customer Phone", synonyms), 80, "Header containing synonym should be 80");
 }
 
-function test_calculateMatchScore_wordMatch() {
-  Logger.log("Testing calculateMatchScore - word boundary match...");
+function test_calculateMatchScore__wordMatch() {
+  Logger.log("Testing calculateMatchScore_ - word boundary match...");
 
   const synonyms = ["name"];
-  const score = calculateMatchScore("Customer Name", synonyms);
+  const score = calculateMatchScore_("Customer Name", synonyms);
   TestRunner.assertTrue(score >= 70, "Word boundary match should be at least 70");
 }
 
-function test_calculateMatchScore_noMatch() {
-  Logger.log("Testing calculateMatchScore - no match...");
+function test_calculateMatchScore__noMatch() {
+  Logger.log("Testing calculateMatchScore_ - no match...");
 
   const synonyms = ["phone", "mobile"];
-  TestRunner.assertEqual(calculateMatchScore("Customer Name", synonyms), 0, "Non-matching header should be 0");
+  TestRunner.assertEqual(calculateMatchScore_("Customer Name", synonyms), 0, "Non-matching header should be 0");
 }
 
 function test_validateSettings_errorsHaveFieldAndTab() {
@@ -1176,12 +1176,12 @@ function runAllSettingsManagerTests() {
     test_integration_thankYouTemplateProcessing();
 
     // Auto-detect columns tests
-    test_normalizeHeader_basicNormalization();
-    test_calculateMatchScore_exactMatch();
-    test_calculateMatchScore_startsWithMatch();
-    test_calculateMatchScore_containsMatch();
-    test_calculateMatchScore_wordMatch();
-    test_calculateMatchScore_noMatch();
+    test_normalizeHeader__basicNormalization();
+    test_calculateMatchScore__exactMatch();
+    test_calculateMatchScore__startsWithMatch();
+    test_calculateMatchScore__containsMatch();
+    test_calculateMatchScore__wordMatch();
+    test_calculateMatchScore__noMatch();
 
     // Validation error structure tests
     test_validateSettings_errorsHaveFieldAndTab();

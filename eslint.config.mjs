@@ -25,6 +25,8 @@ export default [
       "no-empty": ["error", { "allowEmptyCatch": true }],
       "no-irregular-whitespace": "error",
       "valid-typeof": "error",
+      "no-var": "error",
+      "eqeqeq": ["error", "always"],
     }
   },
 ];

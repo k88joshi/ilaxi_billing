@@ -133,7 +133,7 @@ function autoDetectColumns() {
       let bestScore = 0;
 
       headers.forEach(header => {
-        const score = calculateMatchScore(header, synonyms);
+        const score = calculateMatchScore_(header, synonyms);
         if (score > bestScore) {
           bestScore = score;
           bestMatch = header;
@@ -166,16 +166,16 @@ function autoDetectColumns() {
  * @param {string[]} synonyms - Array of possible synonym strings
  * @returns {number} Match score from 0-100
  */
-function calculateMatchScore(header, synonyms) {
+function calculateMatchScore_(header, synonyms) {
   if (!header || !synonyms || !Array.isArray(synonyms)) {
     return 0;
   }
 
-  const normalizedHeader = normalizeHeader(header);
+  const normalizedHeader = normalizeHeader_(header);
   let maxScore = 0;
 
   synonyms.forEach(synonym => {
-    const normalizedSynonym = normalizeHeader(synonym);
+    const normalizedSynonym = normalizeHeader_(synonym);
     let score = 0;
 
     // Exact match = 100%
@@ -230,7 +230,7 @@ function calculateMatchScore(header, synonyms) {
  * @param {string} header - Header string to normalize
  * @returns {string} Normalized header string
  */
-function normalizeHeader(header) {
+function normalizeHeader_(header) {
   if (!header || typeof header !== "string") {
     return "";
   }
@@ -308,7 +308,7 @@ function getHeaderColumnMap() {
  * @param {string|number} phone - The phone number to format (raw from sheet).
  * @returns {string|null} Formatted E.164 phone number string or null if invalid.
  */
-function formatPhoneNumber(phone) {
+function formatPhoneNumber_(phone) {
   if (!phone) return null;
 
   const originalPhone = String(phone).trim();
@@ -350,7 +350,7 @@ function formatPhoneNumber(phone) {
  * @param {string|number} balance - The balance value (raw from sheet).
  * @returns {string} Formatted string in format "$XXX.XX".
  */
-function formatBalance(balance) {
+function formatBalance_(balance) {
   if (!balance && balance !== 0) return "$0.00";
   
   // Remove all non-numeric characters except the decimal point
@@ -374,7 +374,7 @@ function formatBalance(balance) {
  * @param {Date|string|number} monthValue - The value from the "Due Date" column.
  * @returns {string} Month name as a string (e.g., "October") or "Unknown" if invalid.
  */
-function getMonthFromValue(monthValue) {
+function getMonthFromValue_(monthValue) {
   if (!monthValue) return "Unknown";
   
   // If it's already a Date object, extract the month name
@@ -406,7 +406,7 @@ function getMonthFromValue(monthValue) {
  *
  * @returns {string|null} Template type ID ("firstNotice", "followUp", "finalNotice") or null
  */
-function promptForMessageType() {
+function promptForMessageType_() {
   const templateTypes = getBillTemplateTypes();
   const options = templateTypes.map((t, i) => `${i + 1}. ${t.name}`).join("\n");
 
@@ -436,14 +436,14 @@ function promptForMessageType() {
  * @param {Object} cols - Column name settings from settings.columns
  * @returns {string[]} Array of missing header names (empty if all present)
  */
-function validateRequiredColumns(columns, cols) {
+function validateRequiredColumns_(columns, cols) {
   // Input validation
   if (!columns || typeof columns !== "object") {
-    Logger.log("validateRequiredColumns: Invalid columns mapping");
+    Logger.log("validateRequiredColumns_: Invalid columns mapping");
     return ["Invalid column mapping provided"];
   }
   if (!cols || typeof cols !== "object") {
-    Logger.log("validateRequiredColumns: Invalid cols settings");
+    Logger.log("validateRequiredColumns_: Invalid cols settings");
     return ["Invalid column settings provided"];
   }
 
@@ -464,10 +464,10 @@ function validateRequiredColumns(columns, cols) {
  * @param {number} totalRows - Total number of rows including header
  * @returns {Object} Result with success boolean and optional error message
  */
-function applyStatusUpdates(sheet, statusUpdates, statusCol, totalRows) {
+function applyStatusUpdates_(sheet, statusUpdates, statusCol, totalRows) {
   // Input validation
   if (!sheet) {
-    const error = "applyStatusUpdates: Invalid sheet object";
+    const error = "applyStatusUpdates_: Invalid sheet object";
     Logger.log(error);
     return { success: false, error: error };
   }
@@ -475,12 +475,12 @@ function applyStatusUpdates(sheet, statusUpdates, statusCol, totalRows) {
     return { success: true, error: null }; // Nothing to update is not an error
   }
   if (typeof statusCol !== "number" || statusCol < 0) {
-    const error = "applyStatusUpdates: Invalid statusCol";
+    const error = "applyStatusUpdates_: Invalid statusCol";
     Logger.log(error);
     return { success: false, error: error };
   }
   if (typeof totalRows !== "number" || totalRows <= 0) {
-    const error = "applyStatusUpdates: Invalid totalRows";
+    const error = "applyStatusUpdates_: Invalid totalRows";
     Logger.log(error);
     return { success: false, error: error };
   }
@@ -515,7 +515,7 @@ function applyStatusUpdates(sheet, statusUpdates, statusCol, totalRows) {
 
     return { success: true, error: null };
   } catch (e) {
-    const error = `applyStatusUpdates: Failed to write updates - ${e.message}`;
+    const error = `applyStatusUpdates_: Failed to write updates - ${e.message}`;
     Logger.log(error);
     return { success: false, error: error };
   }
@@ -553,7 +553,7 @@ function promptForDryRunMode_() {
 function sendBillsToUnpaid() {
   if (!checkCredentials()) return;
 
-  const templateType = promptForMessageType();
+  const templateType = promptForMessageType_();
   if (!templateType) return;
 
   const dryRunMode = promptForDryRunMode_();
@@ -650,7 +650,7 @@ function sendUnpaidByDueDate() {
   }
   const targetDate = dateResult.getResponseText().trim();
 
-  const templateType = promptForMessageType();
+  const templateType = promptForMessageType_();
   if (!templateType) return;
 
   if (!checkCredentials()) return;
@@ -695,7 +695,7 @@ function sendBillByOrderID() {
     return;
   }
 
-  const templateType = promptForMessageType();
+  const templateType = promptForMessageType_();
   if (!templateType) return;
 
   if (!checkCredentials()) return;
@@ -709,7 +709,7 @@ function sendBillByOrderID() {
   const dryRunNote = dryRunMode ? "\n\n[TEST MODE - No actual SMS will be sent]" : "";
   const confirmResult = getUi_().alert(
     "Confirm Send by Order ID",
-    `Found Order ID ${targetOrderID}:\n\nName: ${customer.name}\nPhone: ${customer.phone}\nBalance: ${formatBalance(customer.balance)}\nMessage Type: ${templateName}\n\nContinue?${dryRunNote}`,
+    `Found Order ID ${targetOrderID}:\n\nName: ${customer.name}\nPhone: ${customer.phone}\nBalance: ${formatBalance_(customer.balance)}\nMessage Type: ${templateName}\n\nContinue?${dryRunNote}`,
     getUi_().ButtonSet.YES_NO
   );
 
@@ -738,7 +738,7 @@ function sendBillByOrderID() {
 function testSingleMessage() {
   if (!checkCredentials()) return;
 
-  const templateType = promptForMessageType();
+  const templateType = promptForMessageType_();
   if (!templateType) return;
 
   const settings = getSettings();
@@ -758,7 +758,7 @@ function testSingleMessage() {
       const templateName = getBillTemplate(templateType, settings).name;
       const confirmResult = getUi_().alert(
         "Test Message Preview",
-        `About to send a test "${templateName}" to configured test customer (Order ID: ${testOrderId}):\n\nName: ${customer.name}\nPhone: ${customer.phone}\nBalance: ${formatBalance(customer.balance)}\n\n[TEST MODE - No actual SMS will be sent]\n\nContinue?`,
+        `About to send a test "${templateName}" to configured test customer (Order ID: ${testOrderId}):\n\nName: ${customer.name}\nPhone: ${customer.phone}\nBalance: ${formatBalance_(customer.balance)}\n\n[TEST MODE - No actual SMS will be sent]\n\nContinue?`,
         getUi_().ButtonSet.YES_NO
       );
 
@@ -825,7 +825,7 @@ function testSingleMessage() {
   const templateName = getBillTemplate(templateType, settings).name;
   const confirmResult = getUi_().alert(
     "Test Message Preview",
-    `About to send a test "${templateName}" to the first UNPAID customer (row ${currentRow}):\n\nName: ${name}\nPhone: ${phone}\nBalance: ${formatBalance(balance)}\n\n[TEST MODE - No actual SMS will be sent]\n\nContinue?`,
+    `About to send a test "${templateName}" to the first UNPAID customer (row ${currentRow}):\n\nName: ${name}\nPhone: ${phone}\nBalance: ${formatBalance_(balance)}\n\n[TEST MODE - No actual SMS will be sent]\n\nContinue?`,
     getUi_().ButtonSet.YES_NO
   );
 

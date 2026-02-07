@@ -689,78 +689,19 @@
     }
 
     /* ============================================
-       Buttons
+       Settings Button Overrides
        ============================================ */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: var(--space-1);
-      padding: var(--space-2) var(--space-3);
-      font-size: var(--text-xs);
-      font-weight: 500;
-      border-radius: var(--radius-md);
-      cursor: pointer;
-      transition: var(--transition-fast);
-      border: none;
-    }
-
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
     .btn-primary {
-      background: var(--color-primary);
-      color: white;
       padding: var(--space-2) var(--space-4);
     }
 
     .btn-primary:hover:not(:disabled) {
-      background: var(--color-primary-hover);
       transform: translateY(-1px);
       box-shadow: var(--shadow-md);
     }
 
-    .btn-secondary {
-      background: var(--color-surface);
-      color: var(--color-text);
-      border: 1px solid var(--color-border);
-    }
-
     .btn-secondary:hover:not(:disabled) {
-      background: var(--color-border-light);
       border-color: #cbd5e1;
-    }
-
-    .btn-ghost {
-      background: transparent;
-      color: var(--color-text-secondary);
-    }
-
-    .btn-ghost:hover:not(:disabled) {
-      background: var(--color-border-light);
-      color: var(--color-text);
-    }
-
-    .btn-danger {
-      background: transparent;
-      color: var(--color-error);
-      border: 1px solid var(--color-error);
-    }
-
-    .btn-danger:hover:not(:disabled) {
-      background: var(--color-error-light);
-    }
-
-    .btn-sm {
-      padding: var(--space-2) var(--space-3);
-      font-size: var(--text-xs);
-    }
-
-    .btn-icon {
-      width: 16px;
-      height: 16px;
     }
 
     /* ============================================
@@ -793,155 +734,22 @@
     }
 
     /* ============================================
-       Toast Notifications
+       Settings Toast Position (top-center)
        ============================================ */
     .toast-container {
-      position: fixed;
       top: var(--space-4);
       left: 50%;
       transform: translateX(-50%);
-      z-index: 1000;
-      pointer-events: none;
     }
 
-    .toast {
-      display: flex;
-      align-items: center;
-      gap: var(--space-2);
-      padding: var(--space-3) var(--space-5);
-      background: var(--color-text);
-      color: white;
-      border-radius: var(--radius-lg);
-      font-size: var(--text-sm);
-      font-weight: 500;
-      box-shadow: var(--shadow-lg);
-      animation: toastIn var(--transition-slow) forwards;
-      pointer-events: auto;
+    .toast { animation: settingsToastIn var(--transition-slow) forwards; }
+    .toast-out { animation: settingsToastOut var(--transition-base) forwards; }
+    @keyframes settingsToastIn {
+      from { opacity: 0; transform: translateY(-16px); }
+      to { opacity: 1; transform: translateY(0); }
     }
-
-    .toast.success {
-      background: var(--color-success);
-    }
-
-    .toast.error {
-      background: var(--color-error);
-    }
-
-    .toast.hide {
-      animation: toastOut var(--transition-base) forwards;
-    }
-
-    .toast-icon {
-      width: 18px;
-      height: 18px;
-      flex-shrink: 0;
-    }
-
-    @keyframes toastIn {
-      from {
-        opacity: 0;
-        transform: translateY(-16px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    @keyframes toastOut {
-      to {
-        opacity: 0;
-        transform: translateY(-16px);
-      }
-    }
-
-    /* ============================================
-       Confirm Dialog
-       ============================================ */
-    .confirm-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1100;
-      opacity: 1;
-      transition: var(--transition-base);
-    }
-
-    .confirm-overlay.hidden {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    .confirm-modal {
-      background: var(--color-surface);
-      border-radius: var(--radius-xl);
-      max-width: 420px;
-      width: calc(100% - var(--space-8));
-      box-shadow: var(--shadow-lg);
-      animation: confirmIn 0.15s ease-out;
-    }
-
-    @keyframes confirmIn {
-      from { opacity: 0; transform: scale(0.95); }
-      to { opacity: 1; transform: scale(1); }
-    }
-
-    .confirm-modal-header {
-      padding: var(--space-4) var(--space-5) 0;
-    }
-
-    .confirm-modal-header h3 {
-      font-size: var(--text-base);
-      font-weight: 600;
-      color: var(--color-text);
-    }
-
-    .confirm-modal-body {
-      padding: var(--space-3) var(--space-5);
-    }
-
-    .confirm-modal-body p {
-      color: var(--color-text-secondary);
-      font-size: var(--text-sm);
-      line-height: 1.5;
-    }
-
-    .confirm-modal-footer {
-      padding: var(--space-3) var(--space-5) var(--space-4);
-      display: flex;
-      justify-content: flex-end;
-      gap: var(--space-2);
-    }
-
-    .confirm-modal-footer .btn {
-      padding: var(--space-2) var(--space-4);
-      border-radius: var(--radius-lg);
-      font-size: var(--text-sm);
-      font-weight: 500;
-      cursor: pointer;
-      border: 1px solid var(--color-border);
-      background: var(--color-surface);
-      color: var(--color-text);
-    }
-
-    .confirm-modal-footer .btn-confirm {
-      background: var(--color-primary);
-      color: #fff;
-      border-color: var(--color-primary);
-    }
-
-    .confirm-modal-footer .btn-destructive {
-      background: var(--color-error);
-      color: #fff;
-      border-color: var(--color-error);
-    }
-
-    .confirm-modal-footer .btn-destructive:hover,
-    .confirm-modal-footer .btn-confirm:hover {
-      opacity: 0.9;
+    @keyframes settingsToastOut {
+      to { opacity: 0; transform: translateY(-16px); }
     }
 
     /* ============================================
@@ -1684,17 +1492,17 @@
   <!-- Toast Container -->
   <div id="toastContainer" class="toast-container" role="alert" aria-live="polite"></div>
 
-  <div class="confirm-overlay hidden" id="confirmDialog" role="alertdialog" aria-modal="true">
-    <div class="confirm-modal">
-      <div class="confirm-modal-header">
-        <h3 id="confirmDialogTitle"></h3>
+  <div class="modal-overlay" id="confirmDialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmDialogTitle">
+    <div class="modal confirm-modal">
+      <div class="modal-header">
+        <h3 class="modal-title" id="confirmDialogTitle"></h3>
       </div>
-      <div class="confirm-modal-body">
+      <div class="modal-body">
         <p id="confirmDialogMessage"></p>
       </div>
-      <div class="confirm-modal-footer">
-        <button class="btn" id="confirmDialogCancel">Cancel</button>
-        <button class="btn btn-confirm" id="confirmDialogConfirm">Confirm</button>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="confirmDialogCancel">Cancel</button>
+        <button class="btn btn-primary" id="confirmDialogConfirm">Confirm</button>
       </div>
     </div>
   </div>
@@ -3349,87 +3157,6 @@
       }
     }
 
-    function showToast(message, type) {
-      var container = document.getElementById('toastContainer');
-
-      while (container.firstChild) {
-        container.removeChild(container.firstChild);
-      }
-
-      var toast = document.createElement('div');
-      toast.className = 'toast ' + type;
-
-      var iconSvg = type === 'success'
-        ? '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>'
-        : '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>';
-
-      // Parse the hardcoded SVG icon safely via a temp container
-      var iconContainer = document.createElement('div');
-      iconContainer.innerHTML = iconSvg;
-      var svgNode = iconContainer.firstChild;
-      if (svgNode) toast.appendChild(svgNode);
-      // Set message text safely via textContent (prevents XSS)
-      var msgSpan = document.createElement('span');
-      msgSpan.textContent = message;
-      toast.appendChild(msgSpan);
-      container.appendChild(toast);
-
-      setTimeout(function() {
-        toast.classList.add('hide');
-        setTimeout(function() {
-          if (toast.parentNode) {
-            toast.parentNode.removeChild(toast);
-          }
-        }, 200);
-      }, 3500);
-    }
-
-    function showConfirm(opts) {
-      var title = opts.title || 'Confirm';
-      var message = opts.message || 'Are you sure?';
-      var confirmLabel = opts.confirmLabel || 'Confirm';
-      var cancelLabel = opts.cancelLabel || 'Cancel';
-      var destructive = opts.destructive || false;
-
-      var overlay = document.getElementById('confirmDialog');
-      var titleEl = document.getElementById('confirmDialogTitle');
-      var messageEl = document.getElementById('confirmDialogMessage');
-      var confirmBtn = document.getElementById('confirmDialogConfirm');
-      var cancelBtn = document.getElementById('confirmDialogCancel');
-
-      titleEl.textContent = title;
-      messageEl.textContent = message;
-      confirmBtn.textContent = confirmLabel;
-      cancelBtn.textContent = cancelLabel;
-
-      confirmBtn.className = destructive ? 'btn btn-destructive' : 'btn btn-confirm';
-
-      overlay.classList.remove('hidden');
-      confirmBtn.focus();
-
-      return new Promise(function(resolve) {
-        function cleanup() {
-          overlay.classList.add('hidden');
-          confirmBtn.removeEventListener('click', onConfirm);
-          cancelBtn.removeEventListener('click', onCancel);
-          document.removeEventListener('keydown', onKey);
-          overlay.removeEventListener('click', onBackdrop);
-        }
-        function onConfirm() { cleanup(); resolve(true); }
-        function onCancel() { cleanup(); resolve(false); }
-        function onKey(e) {
-          if (e.key === 'Escape') { e.stopPropagation(); onCancel(); }
-        }
-        function onBackdrop(e) {
-          if (e.target === overlay) onCancel();
-        }
-        confirmBtn.addEventListener('click', onConfirm);
-        cancelBtn.addEventListener('click', onCancel);
-        document.addEventListener('keydown', onKey);
-        overlay.addEventListener('click', onBackdrop);
-      });
-    }
-
     function onError(error) {
       showLoading(false);
       showToast(error.message || 'Something went wrong. Please try again.', 'error');
@@ -4215,5 +3942,6 @@
         .saveSettingsFromUI(settings);
     };
   </script>
+  <?!= include('shared-utils') ?>
 </body>
 </html>
