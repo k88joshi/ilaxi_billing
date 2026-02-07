@@ -88,7 +88,9 @@ function manageUserList_(propertyKey, email, operation) {
  * @returns {Object} Result with success boolean
  */
 function addAdminUser(email) {
-  return manageUserList_(ADMIN_USERS_KEY, email, 'add');
+  const result = manageUserList_(ADMIN_USERS_KEY, email, 'add');
+  logEvent_('users', 'Add admin user', email || '', result.success, getCurrentUserEmail_());
+  return result;
 }
 
 /**
@@ -98,7 +100,9 @@ function addAdminUser(email) {
  * @returns {Object} Result with success boolean
  */
 function removeAdminUser(email) {
-  return manageUserList_(ADMIN_USERS_KEY, email, 'remove');
+  const result = manageUserList_(ADMIN_USERS_KEY, email, 'remove');
+  logEvent_('users', 'Remove admin user', email || '', result.success, getCurrentUserEmail_());
+  return result;
 }
 
 /**

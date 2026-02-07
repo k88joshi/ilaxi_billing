@@ -866,9 +866,12 @@ function getActivityLogForWeb() {
  */
 function clearActivityLogForWeb() {
   try {
+    const chunkA = safeJsonParse_(scriptProperties.getProperty(ACTIVITY_LOG_KEY_A), []);
+    const chunkB = safeJsonParse_(scriptProperties.getProperty(ACTIVITY_LOG_KEY_B), []);
+    const entryCount = (Array.isArray(chunkA) ? chunkA.length : 0) + (Array.isArray(chunkB) ? chunkB.length : 0);
     scriptProperties.deleteProperty(ACTIVITY_LOG_KEY_A);
     scriptProperties.deleteProperty(ACTIVITY_LOG_KEY_B);
-    logEvent_('system', 'Clear activity log', '', true, getCurrentUserEmail_());
+    logEvent_('system', 'Clear activity log', 'Cleared ' + entryCount + ' entries', true, getCurrentUserEmail_());
     return { success: true };
   } catch (error) {
     Logger.log(`clearActivityLogForWeb error: ${error.message}`);
