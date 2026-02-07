@@ -362,6 +362,53 @@
       color: var(--color-success);
     }
 
+    .log-table .log-details {
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .log-table tbody tr {
+      cursor: pointer;
+    }
+
+    .log-table tbody tr:hover td {
+      background: var(--color-surface-elevated);
+    }
+
+    .log-table .log-detail-row td {
+      padding: 0;
+      border-bottom: 1px solid var(--color-border);
+      background: var(--color-surface);
+    }
+
+    .log-table .log-detail-row:hover td {
+      background: var(--color-surface);
+    }
+
+    .log-detail-content {
+      padding: 8px 12px;
+      font-size: var(--text-xs);
+      color: var(--color-text-secondary);
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 2px 12px;
+    }
+
+    .log-detail-content dt {
+      font-weight: 600;
+      color: var(--color-text-muted);
+      white-space: nowrap;
+    }
+
+    .log-detail-content dd {
+      margin: 0;
+      word-break: break-word;
+      font-family: monospace;
+      font-size: 11px;
+    }
+
     .log-table .log-status-err {
       color: var(--color-error);
     }
@@ -3687,6 +3734,9 @@
                     <input type="checkbox" id="logAutoRefresh" onchange="toggleLogAutoRefresh()" style="margin:0;">
                     Auto
                   </label>
+                  <button class="btn btn-ghost btn-sm" onclick="downloadActivityLog()" title="Download CSV" style="padding:3px 6px;">
+                    <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:14px;height:14px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                  </button>
                   <button class="btn btn-ghost btn-danger-ghost btn-sm" onclick="clearActivityLog()" title="Clear log" style="padding:3px 6px;">
                     <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:14px;height:14px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                   </button>
@@ -4873,8 +4923,8 @@
       // Load first template
       loadSelectedTemplate();
 
-      // Auto-detect columns to populate dropdowns
-      autoDetectColumns();
+      // Auto-detect columns to populate dropdowns (auto-apply on first load if none configured)
+      autoDetectColumns(true);
 
       // Update setup checklist with loaded settings
       updateSetupChecklist();
@@ -4933,7 +4983,7 @@
     // Column Mapping
     var sheetHeaders = [];
 
-    function autoDetectColumns() {
+    function autoDetectColumns(autoApply) {
       var statusDiv = document.getElementById('columnMappingStatus');
       statusDiv.style.display = 'flex';
 
@@ -4948,7 +4998,26 @@
           var data = result.data;
           sheetHeaders = data.headers || [];
           populateColumnDropdowns(data.headers, data.detections);
-          showAlert('columnsAlert', 'success', 'Columns analyzed! ' + Object.keys(data.detections || {}).length + ' fields auto-detected.');
+          var detectedCount = Object.keys(data.detections || {}).length;
+          showAlert('columnsAlert', 'success', 'Columns analyzed! ' + detectedCount + ' fields auto-detected.');
+
+          // On first load, auto-apply detected columns if none are configured
+          if (autoApply && detectedCount > 0 && currentSettings && currentSettings.columns) {
+            var hasExisting = Object.keys(currentSettings.columns).some(function(k) { return currentSettings.columns[k]; });
+            if (!hasExisting) {
+              var columnFields = ['phoneNumber', 'customerName', 'balance', 'numTiffins', 'dueDate', 'messageStatus', 'orderId', 'paymentStatus'];
+              columnFields.forEach(function(field) {
+                var det = data.detections[field];
+                if (det && det.match) {
+                  currentSettings.columns[field] = det.match;
+                }
+              });
+              // Save auto-detected columns silently
+              serverCall('saveSettings', currentSettings).then(function() {
+                updateSetupChecklist();
+              }).catch(function() {});
+            }
+          }
         } else {
           showAlert('columnsAlert', 'error', result.error || 'Failed to detect columns');
         }
@@ -5657,9 +5726,11 @@
         tdAction.appendChild(document.createTextNode(' ' + (entry.act || '')));
         tr.appendChild(tdAction);
 
-        // Details
+        // Details (truncated, full detail on row expand)
         var tdDet = document.createElement('td');
+        tdDet.className = 'log-details';
         tdDet.textContent = entry.det || '—';
+        tdDet.title = entry.det || '';
         tr.appendChild(tdDet);
 
         // Status
@@ -5668,7 +5739,42 @@
         tdStatus.textContent = entry.ok ? 'OK' : 'Error';
         tr.appendChild(tdStatus);
 
+        // Build hidden detail row
+        var detailRow = document.createElement('tr');
+        detailRow.className = 'log-detail-row';
+        detailRow.style.display = 'none';
+        var detailTd = document.createElement('td');
+        detailTd.colSpan = 5;
+        var dl = document.createElement('dl');
+        dl.className = 'log-detail-content';
+        var fields = [
+          ['Time', new Date(entry.ts).toLocaleString()],
+          ['User', entry.user || '—'],
+          ['Category', entry.cat || 'system'],
+          ['Action', entry.act || '—'],
+          ['Details', entry.det || '—'],
+          ['Status', entry.ok ? 'OK' : 'Error']
+        ];
+        fields.forEach(function(f) {
+          var dt = document.createElement('dt');
+          dt.textContent = f[0];
+          dl.appendChild(dt);
+          var dd = document.createElement('dd');
+          dd.textContent = f[1];
+          dl.appendChild(dd);
+        });
+        detailTd.appendChild(dl);
+        detailRow.appendChild(detailTd);
+
+        // Toggle detail row on click
+        tr.addEventListener('click', function() {
+          var isVisible = detailRow.style.display !== 'none';
+          detailRow.style.display = isVisible ? 'none' : '';
+          tr.classList.toggle('active', !isVisible);
+        });
+
         tbody.appendChild(tr);
+        tbody.appendChild(detailRow);
       });
       table.appendChild(tbody);
 
@@ -5695,6 +5801,51 @@
       if (checkbox && checkbox.checked) {
         activityLogAutoRefreshTimer = setInterval(loadActivityLog, 30000);
       }
+    }
+
+    function downloadActivityLog() {
+      // Use currently filtered data
+      var filter = document.getElementById('logCategoryFilter');
+      var cat = filter ? filter.value : 'all';
+      var entries = cat === 'all'
+        ? activityLogData
+        : activityLogData.filter(function(e) { return e.cat === cat; });
+
+      if (!entries || entries.length === 0) {
+        showToast('No log entries to download', 'error');
+        return;
+      }
+
+      // Build CSV with proper escaping
+      var csvRows = [['Time', 'User', 'Category', 'Action', 'Details', 'Status']];
+      entries.forEach(function(entry) {
+        csvRows.push([
+          new Date(entry.ts).toISOString(),
+          entry.user || '',
+          entry.cat || 'system',
+          entry.act || '',
+          entry.det || '',
+          entry.ok ? 'OK' : 'Error'
+        ]);
+      });
+
+      var csv = csvRows.map(function(row) {
+        return row.map(function(cell) {
+          var str = String(cell).replace(/"/g, '""');
+          return '"' + str + '"';
+        }).join(',');
+      }).join('\n');
+
+      var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      var dateStr = new Date().toISOString().slice(0, 10);
+      a.download = 'activity-log-' + dateStr + (cat !== 'all' ? '-' + cat : '') + '.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     }
 
     function clearActivityLog() {

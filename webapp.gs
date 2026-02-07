@@ -12,6 +12,7 @@
  * @private
  */
 function safeJsonParse_(jsonString, defaultValue) {
+  if (jsonString === null || jsonString === undefined) return defaultValue;
   try { return JSON.parse(jsonString); }
   catch (e) { Logger.log('safeJsonParse_ error: ' + e.message); return defaultValue; }
 }

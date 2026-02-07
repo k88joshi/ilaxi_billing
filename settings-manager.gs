@@ -520,9 +520,11 @@ function migrateSettingsVersion(oldSettings, mergedSettings) {
  * @returns {Object} Result with success boolean
  */
 function resetToDefaults() {
+  const oldSettings = getSettings();
   const defaults = getDefaultSettings();
   const result = saveSettings(defaults);
-  logEvent_('settings', 'Reset to defaults', '', result.success, getCurrentUserEmail_());
+  const changes = describeSettingsChanges_(oldSettings, defaults);
+  logEvent_('settings', 'Reset to defaults', changes, result.success, getCurrentUserEmail_());
   return result;
 }
 
@@ -555,8 +557,10 @@ function importSettings(jsonString) {
     // Ensure version is set
     parsed.version = SETTINGS_VERSION;
 
+    const oldSettings = getSettings();
     const result = saveSettings(parsed);
-    logEvent_('settings', 'Import settings', '', result.success, getCurrentUserEmail_());
+    const changes = describeSettingsChanges_(oldSettings, parsed);
+    logEvent_('settings', 'Import settings', changes, result.success, getCurrentUserEmail_());
     return result;
   } catch (e) {
     return { success: false, error: `Failed to parse JSON: ${e.message}` };
