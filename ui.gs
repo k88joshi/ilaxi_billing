@@ -288,9 +288,68 @@ function completeFirstTimeSetup(setupData) {
  * @returns {Object} Result with success boolean and optional error message
  */
 function saveSettingsFromUI(settings) {
+  const oldSettings = getSettings();
   const result = saveSettings(settings);
-  logEvent_('settings', 'Save settings', '', result.success, getCurrentUserEmail_());
+  const changes = describeSettingsChanges_(oldSettings, settings);
+  logEvent_('settings', 'Save settings', changes, result.success, getCurrentUserEmail_());
   return result;
+}
+
+/**
+ * Compares old and new settings to produce a human-readable summary of changes.
+ *
+ * @param {Object} oldS - Previous settings object
+ * @param {Object} newS - New settings object
+ * @returns {string} Comma-separated list of changes
+ * @private
+ */
+function describeSettingsChanges_(oldS, newS) {
+  const changes = [];
+
+  // Business fields
+  const biz = { name: 'Business name', etransferEmail: 'E-transfer email', phoneNumber: 'Phone', whatsappLink: 'WhatsApp link' };
+  Object.keys(biz).forEach(function(k) {
+    const o = (oldS.business && oldS.business[k]) || '';
+    const n = (newS.business && newS.business[k]) || '';
+    if (o !== n) changes.push(biz[k] + ' → ' + n);
+  });
+
+  // Behavior fields
+  const behave = { batchSize: 'Batch size', messageDelayMs: 'Message delay', headerRowIndex: 'Header row',
+    autoThankYouEnabled: 'Auto thank-you', dryRunMode: 'Dry run' };
+  Object.keys(behave).forEach(function(k) {
+    const o = oldS.behavior ? oldS.behavior[k] : undefined;
+    const n = newS.behavior ? newS.behavior[k] : undefined;
+    if (String(o) !== String(n)) changes.push(behave[k] + ' → ' + n);
+  });
+
+  // Column mappings
+  const colLabels = { phoneNumber: 'Phone col', customerName: 'Name col', balance: 'Balance col',
+    numTiffins: 'Tiffins col', dueDate: 'Date col', messageStatus: 'Msg status col',
+    orderId: 'Order ID col', paymentStatus: 'Payment col' };
+  Object.keys(colLabels).forEach(function(k) {
+    const o = (oldS.columns && oldS.columns[k]) || '';
+    const n = (newS.columns && newS.columns[k]) || '';
+    if (o !== n) changes.push(colLabels[k] + ' → ' + n);
+  });
+
+  // Templates (just note which changed, content is too long)
+  const templateTypes = ['firstNotice', 'followUp', 'finalNotice'];
+  templateTypes.forEach(function(t) {
+    const oldMsg = oldS.templates && oldS.templates.billMessages && oldS.templates.billMessages[t];
+    const newMsg = newS.templates && newS.templates.billMessages && newS.templates.billMessages[t];
+    const oldText = (oldMsg && oldMsg.message) || '';
+    const newText = (newMsg && newMsg.message) || '';
+    if (oldText !== newText) changes.push(t + ' template updated');
+    const oldName = (oldMsg && oldMsg.name) || '';
+    const newName = (newMsg && newMsg.name) || '';
+    if (oldName !== newName) changes.push(t + ' name → ' + newName);
+  });
+  const oldTy = (oldS.templates && oldS.templates.thankYouMessage) || '';
+  const newTy = (newS.templates && newS.templates.thankYouMessage) || '';
+  if (oldTy !== newTy) changes.push('Thank-you template updated');
+
+  return changes.length > 0 ? changes.join(', ') : 'No changes detected';
 }
 
 /**
