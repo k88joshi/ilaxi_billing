@@ -3865,6 +3865,14 @@
           closeSendModal();
         }
       });
+
+      // Refresh data when tab becomes visible again
+      document.addEventListener('visibilitychange', function() {
+        if (!document.hidden && !isModalOpen_()) {
+          silentRefreshCustomers_();
+          loadStats();
+        }
+      });
     });
 
     // XSS-safe text escaping function
@@ -4049,6 +4057,22 @@
         console.error('getCustomers exception:', err);
         showTableError(container, 'Error: ' + err.message);
       });
+    }
+
+    function isModalOpen_() {
+      return document.querySelectorAll('.modal-overlay.visible').length > 0;
+    }
+
+    function silentRefreshCustomers_() {
+      serverCall('getCustomers').then(function(result) {
+        if (!result || !result.success) return;
+        var newJson = JSON.stringify(result.data);
+        var oldJson = JSON.stringify(currentCustomers);
+        if (newJson !== oldJson) {
+          currentCustomers = result.data;
+          applyCustomerFilters();
+        }
+      }).catch(function() {});
     }
 
     function showTableError(container, message) {
@@ -4400,6 +4424,7 @@
             if (customer) customer.paymentStatus = newStatus;
             showToast(newStatus + ' - status updated', 'success');
             loadStats();
+            silentRefreshCustomers_();
           } else {
             selectEl.className = prevClass;
             showToast(result.error || 'Failed to update status', 'error');
@@ -4547,6 +4572,10 @@
         serverCall('heartbeat').then(function(result) {
           if (result && result.success) {
             updateHeaderLiveUsers(result.data.liveUsers || []);
+          }
+          if (!document.hidden && !isModalOpen_()) {
+            silentRefreshCustomers_();
+            loadStats();
           }
         }).catch(function() {});
       }, 60000);

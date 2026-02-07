@@ -19,6 +19,7 @@ function setCredential_(propertyKey, promptMessage, successMessage) {
   if (result.getSelectedButton() === getUi_().Button.OK) {
     scriptProperties.setProperty(propertyKey, result.getResponseText().trim());
     getUi_().alert(successMessage);
+    logEvent_('credentials', 'Set credential', propertyKey, true, getCurrentUserEmail_());
   }
 }
 
@@ -31,6 +32,7 @@ function setCredential_(propertyKey, promptMessage, successMessage) {
 function deleteCredential_(propertyKey, successMessage) {
   scriptProperties.deleteProperty(propertyKey);
   getUi_().alert(successMessage);
+  logEvent_('credentials', 'Delete credential', propertyKey, true, getCurrentUserEmail_());
 }
 
 /** Prompts user to enter their Twilio Account SID and saves it securely. */
@@ -116,6 +118,7 @@ function isFirstTimeSetup() {
  */
 function markSetupSkipped() {
   scriptProperties.setProperty("SETUP_COMPLETED", "skipped");
+  logEvent_('system', 'Setup wizard skipped', '', true, getCurrentUserEmail_());
 }
 
 /**
@@ -214,7 +217,9 @@ function testTwilioCredentialsFromSettings() {
     };
   }
 
-  return testTwilioCredentials(accountSid, authToken, twilioPhone);
+  const result = testTwilioCredentials(accountSid, authToken, twilioPhone);
+  logEvent_('credentials', 'Test credentials', result.success ? 'Passed' : (result.error || 'Failed'), result.success, getCurrentUserEmail_());
+  return result;
 }
 
 /**
@@ -272,10 +277,17 @@ function completeFirstTimeSetup(setupData) {
     // Mark setup as completed
     scriptProperties.setProperty("SETUP_COMPLETED", new Date().toISOString());
 
+    const parts = [
+      setupData.credentials ? 'credentials' : '',
+      setupData.business ? 'business info' : '',
+      setupData.columns ? 'column mappings' : ''
+    ].filter(Boolean).join(', ');
     Logger.log("First-time setup completed successfully");
+    logEvent_('system', 'First-time setup', parts, true, getCurrentUserEmail_());
     return { success: true };
   } catch (e) {
     Logger.log(`completeFirstTimeSetup error: ${e.message}`);
+    logEvent_('system', 'First-time setup', e.message, false, getCurrentUserEmail_());
     return { success: false, error: e.message };
   }
 }

@@ -227,9 +227,11 @@ function onEditInstallable(e) {
       let toastMsg = `Thank-you sent to ${sent} customer${sent !== 1 ? "s" : ""}`;
       if (failed > 0) toastMsg += ` (${failed} failed)`;
       SpreadsheetApp.getActive().toast(toastMsg, "Auto Thank-You", 5);
+      logEvent_('billing', 'Auto thank-you', `Sent: ${sent}, Failed: ${failed}`, failed === 0, getCurrentUserEmail_());
     }
   } catch (error) {
     Logger.log(`ERROR in onEdit trigger: ${error.message}\nStack: ${error.stack || "N/A"}`);
+    logEvent_('billing', 'Auto thank-you', error.message, false, getCurrentUserEmail_());
   }
 }
 

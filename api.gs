@@ -236,8 +236,13 @@ function saveCredentialsForWeb(payload) {
       scriptProperties.setProperty('TWILIO_PHONE_NUMBER', payload.twilioPhone.trim());
     }
 
+    const saved = [
+      payload?.accountSid ? 'Account SID' : '',
+      payload?.authToken ? 'Auth Token' : '',
+      payload?.twilioPhone ? 'Phone Number' : ''
+    ].filter(Boolean).join(', ');
     Logger.log('Twilio credentials saved from web interface');
-    logEvent_('credentials', 'Save credentials', '', true, getCurrentUserEmail_());
+    logEvent_('credentials', 'Save credentials', 'Saved: ' + saved, true, getCurrentUserEmail_());
     return { success: true };
   } catch (error) {
     Logger.log(`saveCredentialsForWeb_ error: ${error.message}`);
@@ -380,7 +385,7 @@ function clearCredentialsForWeb() {
     scriptProperties.deleteProperty('TWILIO_AUTH_TOKEN');
     scriptProperties.deleteProperty('TWILIO_PHONE_NUMBER');
     Logger.log('Twilio credentials cleared from web interface');
-    logEvent_('credentials', 'Clear credentials', '', true, getCurrentUserEmail_());
+    logEvent_('credentials', 'Clear credentials', 'Cleared: Account SID, Auth Token, Phone Number', true, getCurrentUserEmail_());
     return { success: true };
   } catch (error) {
     Logger.log(`clearCredentialsForWeb error: ${error.message}`);
