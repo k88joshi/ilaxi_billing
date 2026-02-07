@@ -288,7 +288,9 @@ function completeFirstTimeSetup(setupData) {
  * @returns {Object} Result with success boolean and optional error message
  */
 function saveSettingsFromUI(settings) {
-  return saveSettings(settings);
+  const result = saveSettings(settings);
+  logEvent_('settings', 'Save settings', '', result.success, getCurrentUserEmail_());
+  return result;
 }
 
 /**

@@ -4,6 +4,19 @@
 // ========================================
 
 /**
+ * Safely parses a JSON string, returning a default value on failure.
+ *
+ * @param {string} jsonString - The JSON string to parse
+ * @param {*} defaultValue - Value to return if parsing fails
+ * @returns {*} Parsed value or defaultValue
+ * @private
+ */
+function safeJsonParse_(jsonString, defaultValue) {
+  try { return JSON.parse(jsonString); }
+  catch (e) { Logger.log('safeJsonParse_ error: ' + e.message); return defaultValue; }
+}
+
+/**
  * Property key for storing the allowed users whitelist.
  * @const {string}
  */
@@ -22,15 +35,48 @@ const ADMIN_USERS_KEY = 'ADMIN_USERS';
  */
 function getAdminUsers() {
   const stored = scriptProperties.getProperty(ADMIN_USERS_KEY);
-  if (!stored) {
-    return [];
+  return stored ? safeJsonParse_(stored, []) : [];
+}
+
+/**
+ * Generic helper to add or remove an email from a ScriptProperties-backed user list.
+ *
+ * @param {string} propertyKey - The ScriptProperties key storing the JSON array
+ * @param {string} email - The email address to add or remove
+ * @param {'add'|'remove'} operation - Whether to add or remove the email
+ * @returns {Object} Result with success boolean and message or error
+ * @private
+ */
+function manageUserList_(propertyKey, email, operation) {
+  if (!email || typeof email !== 'string') {
+    Logger.log(`manageUserList_: Invalid email provided for ${operation}`);
+    return { success: false, error: 'Invalid email provided' };
   }
-  try {
-    return JSON.parse(stored);
-  } catch (e) {
-    Logger.log(`getAdminUsers parse error: ${e.message}`);
-    return [];
+
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail.includes('@')) {
+    Logger.log(`manageUserList_: Email must contain @ for ${operation}`);
+    return { success: false, error: 'Invalid email format' };
   }
+
+  const users = safeJsonParse_(scriptProperties.getProperty(propertyKey), []);
+  const index = users.indexOf(normalizedEmail);
+
+  if (operation === 'add') {
+    if (index !== -1) {
+      return { success: true, message: `${normalizedEmail} already in list` };
+    }
+    users.push(normalizedEmail);
+  } else {
+    if (index === -1) {
+      return { success: false, error: 'User not found in list' };
+    }
+    users.splice(index, 1);
+  }
+
+  scriptProperties.setProperty(propertyKey, JSON.stringify(users));
+  Logger.log(`manageUserList_: ${operation} ${normalizedEmail} in ${propertyKey}`);
+  return { success: true, message: `${operation === 'add' ? 'Added' : 'Removed'} ${normalizedEmail}` };
 }
 
 /**
@@ -41,27 +87,7 @@ function getAdminUsers() {
  * @returns {Object} Result with success boolean
  */
 function addAdminUser(email) {
-  if (!email || typeof email !== 'string') {
-    Logger.log('addAdminUser: Invalid email provided');
-    return { success: false, error: 'Invalid email provided' };
-  }
-
-  const normalizedEmail = email.trim().toLowerCase();
-  if (!normalizedEmail.includes('@')) {
-    Logger.log('addAdminUser: Email must contain @');
-    return { success: false, error: 'Invalid email format' };
-  }
-
-  const users = getAdminUsers();
-  if (users.includes(normalizedEmail)) {
-    Logger.log(`addAdminUser: ${normalizedEmail} is already an admin`);
-    return { success: true, message: 'User is already an admin' };
-  }
-
-  users.push(normalizedEmail);
-  scriptProperties.setProperty(ADMIN_USERS_KEY, JSON.stringify(users));
-  Logger.log(`addAdminUser: Added ${normalizedEmail} to admin users`);
-  return { success: true, message: `Added ${normalizedEmail} to admin users` };
+  return manageUserList_(ADMIN_USERS_KEY, email, 'add');
 }
 
 /**
@@ -71,24 +97,7 @@ function addAdminUser(email) {
  * @returns {Object} Result with success boolean
  */
 function removeAdminUser(email) {
-  if (!email || typeof email !== 'string') {
-    Logger.log('removeAdminUser: Invalid email provided');
-    return { success: false, error: 'Invalid email provided' };
-  }
-
-  const normalizedEmail = email.trim().toLowerCase();
-  const users = getAdminUsers();
-  const index = users.indexOf(normalizedEmail);
-
-  if (index === -1) {
-    Logger.log(`removeAdminUser: ${normalizedEmail} not found in admin users`);
-    return { success: false, error: 'User not found in admin list' };
-  }
-
-  users.splice(index, 1);
-  scriptProperties.setProperty(ADMIN_USERS_KEY, JSON.stringify(users));
-  Logger.log(`removeAdminUser: Removed ${normalizedEmail} from admin users`);
-  return { success: true, message: `Removed ${normalizedEmail} from admin users` };
+  return manageUserList_(ADMIN_USERS_KEY, email, 'remove');
 }
 
 /**
@@ -189,15 +198,7 @@ function getCurrentUserEmail_() {
  */
 function getAllowedUsers() {
   const stored = scriptProperties.getProperty(ALLOWED_USERS_KEY);
-  if (!stored) {
-    return [];
-  }
-  try {
-    return JSON.parse(stored);
-  } catch (e) {
-    Logger.log(`getAllowedUsers parse error: ${e.message}`);
-    return [];
-  }
+  return stored ? safeJsonParse_(stored, []) : [];
 }
 
 /**
@@ -208,27 +209,7 @@ function getAllowedUsers() {
  * @returns {Object} Result with success boolean
  */
 function addAllowedUser(email) {
-  if (!email || typeof email !== 'string') {
-    Logger.log('addAllowedUser: Invalid email provided');
-    return { success: false, error: 'Invalid email provided' };
-  }
-
-  const normalizedEmail = email.trim().toLowerCase();
-  if (!normalizedEmail.includes('@')) {
-    Logger.log('addAllowedUser: Email must contain @');
-    return { success: false, error: 'Invalid email format' };
-  }
-
-  const users = getAllowedUsers();
-  if (users.includes(normalizedEmail)) {
-    Logger.log(`addAllowedUser: ${normalizedEmail} is already authorized`);
-    return { success: true, message: 'User already authorized' };
-  }
-
-  users.push(normalizedEmail);
-  scriptProperties.setProperty(ALLOWED_USERS_KEY, JSON.stringify(users));
-  Logger.log(`addAllowedUser: Added ${normalizedEmail} to allowed users`);
-  return { success: true, message: `Added ${normalizedEmail} to allowed users` };
+  return manageUserList_(ALLOWED_USERS_KEY, email, 'add');
 }
 
 /**
@@ -239,24 +220,7 @@ function addAllowedUser(email) {
  * @returns {Object} Result with success boolean
  */
 function removeAllowedUser(email) {
-  if (!email || typeof email !== 'string') {
-    Logger.log('removeAllowedUser: Invalid email provided');
-    return { success: false, error: 'Invalid email provided' };
-  }
-
-  const normalizedEmail = email.trim().toLowerCase();
-  const users = getAllowedUsers();
-  const index = users.indexOf(normalizedEmail);
-
-  if (index === -1) {
-    Logger.log(`removeAllowedUser: ${normalizedEmail} not found in allowed users`);
-    return { success: false, error: 'User not found in allowed list' };
-  }
-
-  users.splice(index, 1);
-  scriptProperties.setProperty(ALLOWED_USERS_KEY, JSON.stringify(users));
-  Logger.log(`removeAllowedUser: Removed ${normalizedEmail} from allowed users`);
-  return { success: true, message: `Removed ${normalizedEmail} from allowed users` };
+  return manageUserList_(ALLOWED_USERS_KEY, email, 'remove');
 }
 
 /**
@@ -425,11 +389,7 @@ function recordHeartbeat_(email) {
 
   const stored = cache.get(LIVE_USERS_CACHE_KEY);
   if (stored) {
-    try {
-      entries = JSON.parse(stored);
-    } catch (e) {
-      Logger.log('recordHeartbeat_ parse error: ' + e.message);
-    }
+    entries = safeJsonParse_(stored, {});
   }
 
   // Prune stale entries
@@ -461,13 +421,7 @@ function getLiveUsers_() {
   const stored = cache.get(LIVE_USERS_CACHE_KEY);
   if (!stored) return [];
 
-  let entries;
-  try {
-    entries = JSON.parse(stored);
-  } catch (e) {
-    Logger.log('getLiveUsers_ parse error: ' + e.message);
-    return [];
-  }
+  const entries = safeJsonParse_(stored, {});
 
   const cutoff = Date.now() - HEARTBEAT_TTL_SECONDS * 1000;
   const live = [];

@@ -242,7 +242,7 @@ function sendBill_(customerPhone, customerName, balance, numTiffins, dueDate, te
 
   const template = getBillTemplate(templateType || "firstNotice", effectiveSettings);
 
-  const formattedPhone = formatPhoneNumber(customerPhone);
+  const formattedPhone = formatPhoneNumber_(customerPhone);
   if (!formattedPhone) {
     const errorMsg = "Error: Invalid phone number format.";
     Logger.log(`✗ ${errorMsg} for ${customerName} (${customerPhone})`);
@@ -251,9 +251,9 @@ function sendBill_(customerPhone, customerName, balance, numTiffins, dueDate, te
 
   const templateData = buildBillTemplateData({
     customerName: customerName,
-    formattedBalance: formatBalance(balance),
+    formattedBalance: formatBalance_(balance),
     numTiffins: numTiffins,
-    month: getMonthFromValue(dueDate)
+    month: getMonthFromValue_(dueDate)
   }, effectiveSettings);
 
   const message = processTemplate(template.message, templateData);
@@ -282,7 +282,7 @@ function sendThankYouMessage_(customerPhone, customerName, orderId, settings) {
     }
   }
 
-  const formattedPhone = formatPhoneNumber(customerPhone);
+  const formattedPhone = formatPhoneNumber_(customerPhone);
   if (!formattedPhone) {
     Logger.log(`✗ Invalid phone for 'Thank You' msg: ${maskPhoneNumber_(customerPhone)}`);
     return { success: false, status: "Thank You Error: Invalid Phone", color: settings.colors.error };
