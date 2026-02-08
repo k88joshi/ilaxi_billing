@@ -92,7 +92,12 @@ function handleApiRequest_(action, payload, userEmail) {
  * @private
  */
 function getCustomersForWeb() {
-  return getCustomersCore_({ serializeDates: true });
+  const ctx = getSheetContext_();
+  const result = getCustomersCore_({ serializeDates: true, _ctx: ctx });
+  if (ctx.warnings && ctx.warnings.length > 0) {
+    result.columnWarnings = ctx.warnings;
+  }
+  return result;
 }
 
 /**

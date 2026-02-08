@@ -19,7 +19,7 @@
 function getCustomersCore_(options) {
   try {
     const serializeDates = options?.serializeDates || false;
-    const { settings, data, colMap } = getSheetContext_();
+    const { settings, data, colMap } = options?._ctx || getSheetContext_();
     const cols = settings.columns;
     const headerRowIndex = settings.behavior.headerRowIndex;
 
@@ -303,8 +303,14 @@ function updatePaymentStatusCore_(params) {
     // Update the cell (rowIndex is 1-based, paymentStatusCol is 0-based)
     sheet.getRange(rowIndex, paymentStatusCol + 1).setValue(titleCaseStatus);
 
+    // Auto thank-you for "Paid" status (web app equivalent of onEditInstallable)
+    let thankYouSent = null;
+    if (normalizedStatus === 'paid' && settings.behavior.autoThankYouEnabled) {
+      thankYouSent = sendAutoThankYou_(rowIndex, data, colMap, cols, settings, sheet);
+    }
+
     logEvent_('billing', 'Update payment', `Row ${rowIndex} → ${titleCaseStatus}`, true, getCurrentUserEmail_());
-    return { success: true, data: { rowIndex: rowIndex, paymentStatus: titleCaseStatus } };
+    return { success: true, data: { rowIndex: rowIndex, paymentStatus: titleCaseStatus, thankYouSent: thankYouSent } };
   } catch (error) {
     Logger.log(`updatePaymentStatusCore_ error: ${error.message}`);
     logEvent_('billing', 'Update payment', error.message, false, getCurrentUserEmail_());
@@ -444,7 +450,41 @@ function getSheetContext_() {
   const sheet = getTargetSheet_();
   const data = sheet.getDataRange().getValues();
   const colMap = buildColumnMap_(data[settings.behavior.headerRowIndex - 1]);
-  return { settings, sheet, data, colMap };
+
+  // Validate stored column settings against actual headers
+  const warnings = [];
+  const cols = settings.columns;
+  const columnKeys = ['phoneNumber', 'customerName', 'balance', 'numTiffins',
+                      'dueDate', 'messageStatus', 'orderId', 'paymentStatus'];
+
+  for (const key of columnKeys) {
+    const savedName = cols[key];
+    if (savedName && colMap[savedName] === undefined) {
+      const synonyms = COLUMN_SYNONYMS[key];
+      if (synonyms) {
+        let bestMatch = null;
+        let bestScore = 0;
+        Object.keys(colMap).forEach(header => {
+          const score = calculateMatchScore_(header, synonyms);
+          if (score > bestScore) {
+            bestScore = score;
+            bestMatch = header;
+          }
+        });
+        if (bestMatch && bestScore >= 70) {
+          // Use auto-detected column as runtime fallback (don't persist)
+          colMap[savedName] = colMap[bestMatch];
+          warnings.push({ key, saved: savedName, actual: bestMatch, confidence: bestScore, resolved: true });
+          Logger.log(`Column "${savedName}" not found; using "${bestMatch}" (score: ${bestScore})`);
+        } else {
+          warnings.push({ key, saved: savedName, actual: null, confidence: 0, resolved: false });
+          Logger.log(`WARNING: Column "${savedName}" for ${key} not found and could not be auto-resolved.`);
+        }
+      }
+    }
+  }
+
+  return { settings, sheet, data, colMap, warnings };
 }
 
 /**
@@ -487,4 +527,54 @@ function findRowByOrderId_(data, colMap, cols, headerRowIndex, orderId) {
     }
   }
   return -1;
+}
+
+/**
+ * Sends an auto thank-you message for a customer whose payment was just set to "Paid".
+ * Used by updatePaymentStatusCore_() to provide web app parity with onEditInstallable().
+ *
+ * @param {number} rowIndex - 1-based sheet row index
+ * @param {Array[]} data - Full sheet data from getDataRange().getValues()
+ * @param {Object} colMap - Column name to 0-based index map
+ * @param {Object} cols - Column name settings from settings.columns
+ * @param {Object} settings - Current settings object
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet - The target sheet
+ * @returns {boolean} true if thank-you was sent, false otherwise
+ * @private
+ */
+function sendAutoThankYou_(rowIndex, data, colMap, cols, settings, sheet) {
+  try {
+    const row = data[rowIndex - 1]; // rowIndex is 1-based, data is 0-based
+    const statusColIndex = colMap[cols.messageStatus];
+    if (statusColIndex === undefined) return false;
+
+    // Duplicate-send guard (same pattern as processPaidRows_ in main.gs)
+    const existingStatus = String(row[statusColIndex] || '').toLowerCase();
+    if (existingStatus.includes('thank you sent')) return false;
+
+    const customerName = row[colMap[cols.customerName]];
+    const customerPhone = row[colMap[cols.phoneNumber]];
+    const orderId = row[colMap[cols.orderId]];
+
+    if (!customerName || !customerPhone || !orderId) {
+      const statusRange = sheet.getRange(rowIndex, statusColIndex + 1);
+      statusRange.setValue("Payment 'Paid', but auto-thanks failed: Missing data");
+      statusRange.setBackground(settings.colors.error);
+      return false;
+    }
+
+    const result = sendThankYouMessage_(customerPhone, customerName, orderId, settings);
+
+    const statusRange = sheet.getRange(rowIndex, statusColIndex + 1);
+    statusRange.setValue(result.status);
+    statusRange.setBackground(result.color);
+
+    logEvent_('billing', 'Auto thank-you (web)',
+              result.success ? `Sent to ${customerName}` : `Failed: ${result.status}`,
+              result.success, getCurrentUserEmail_());
+    return result.success;
+  } catch (e) {
+    Logger.log('sendAutoThankYou_ error (non-fatal): ' + e.message);
+    return false;
+  }
 }

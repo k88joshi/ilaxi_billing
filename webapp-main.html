@@ -3229,6 +3229,15 @@
         </div>
       </div>
 
+      <!-- Column Mapping Warning Banner -->
+      <div class="callout callout-warn" id="columnWarningBanner" style="display: none;">
+        <svg class="callout-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        <div class="callout-content">
+          <strong id="colWarningTitle"></strong>
+          <span id="colWarningDesc"></span>
+        </div>
+      </div>
+
       <!-- Duplicate Detection Banner -->
       <div class="callout callout-warn" id="duplicateBanner" style="display: none;">
         <svg class="callout-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
@@ -4424,6 +4433,7 @@
         if (result.success) {
           currentCustomers = result.data;
           currentDuplicateSummary = result.duplicateSummary || null;
+          renderColumnWarningBanner(result.columnWarnings || []);
           renderDuplicateBanner();
           applyCustomerFilters();
         } else {
@@ -4452,6 +4462,36 @@
           applyCustomerFilters();
         }
       }).catch(function() {});
+    }
+
+    function renderColumnWarningBanner(warnings) {
+      var banner = document.getElementById('columnWarningBanner');
+      var title = document.getElementById('colWarningTitle');
+      var desc = document.getElementById('colWarningDesc');
+      if (!banner || !title || !desc) return;
+
+      if (!warnings || warnings.length === 0) {
+        banner.style.display = 'none';
+        return;
+      }
+
+      banner.style.display = 'flex';
+      var unresolved = warnings.filter(function(w) { return !w.resolved; });
+      var resolved = warnings.filter(function(w) { return w.resolved; });
+
+      if (unresolved.length > 0) {
+        title.textContent = unresolved.length + ' column mapping' + (unresolved.length !== 1 ? 's' : '') + ' broken';
+        var details = unresolved.map(function(w) { return '"' + w.saved + '" not found in sheet'; }).join('; ');
+        if (resolved.length > 0) {
+          details += '. Auto-resolved: ' + resolved.map(function(w) { return '"' + w.saved + '" \u2192 "' + w.actual + '"'; }).join(', ');
+        }
+        desc.textContent = details + '. Open Settings \u2192 Columns tab to update.';
+      } else {
+        title.textContent = resolved.length + ' column' + (resolved.length !== 1 ? 's' : '') + ' auto-resolved';
+        var resolvedDetails = resolved.map(function(w) { return '"' + w.saved + '" \u2192 "' + w.actual + '"'; }).join(', ');
+        desc.textContent = resolvedDetails + '. Open Settings \u2192 Columns tab to save the updated names.';
+        banner.className = 'callout callout-info';
+      }
     }
 
     function renderDuplicateBanner() {
@@ -4968,7 +5008,11 @@
             // Update cached data
             var customer = currentCustomers.find(function(c) { return c.rowIndex === rowIndex; });
             if (customer) customer.paymentStatus = newStatus;
-            showToast(newStatus + ' - status updated', 'success');
+            var msg = newStatus + ' - status updated';
+            if (result.data && result.data.thankYouSent === true) {
+              msg += '. Thank-you SMS sent!';
+            }
+            showToast(msg, 'success');
             loadStats();
             silentRefreshCustomers_();
           } else {
@@ -5899,11 +5943,16 @@
             }
           }
         } else if (currentValue) {
-          // Saved value doesn't match any header — show but mark
+          // Saved value doesn't match any header — warn user
+          var staleOpt = document.createElement('option');
+          staleOpt.value = currentValue;
+          staleOpt.textContent = currentValue + ' (not in sheet)';
+          select.appendChild(staleOpt);
           select.value = currentValue;
           if (badge) {
-            badge.className = 'column-detect-badge';
-            badge.style.display = 'none';
+            badge.className = 'column-detect-badge low';
+            badge.textContent = 'Not in sheet';
+            badge.style.display = '';
           }
         }
       });
