@@ -835,6 +835,11 @@
     .status-badge.paid { background: var(--color-success-light); color: #047857; }
     .status-badge.sent { background: var(--color-info-light); color: #1d4ed8; }
     .status-badge.error { background: var(--color-error-light); color: var(--color-error); }
+    .status-badge.duplicate-exact { background: var(--color-error-light); color: var(--color-error); font-size: 10px; }
+    .status-badge.duplicate-related { background: var(--color-info-light); color: #1d4ed8; font-size: 10px; }
+
+    .row-duplicate-exact { border-left: 3px solid var(--color-error); }
+    .row-duplicate-related { border-left: 3px solid var(--color-info, #60a5fa); }
 
     .form-group {
       margin-bottom: var(--space-3);
@@ -2094,11 +2099,117 @@
       .template-card-check { width: 18px; height: 18px; }
     }
 
+    /* Sortable table headers */
+    th.sortable {
+      cursor: pointer;
+      user-select: none;
+      transition: background var(--transition-fast);
+    }
+    th.sortable:hover {
+      background: var(--color-surface-elevated);
+    }
+    th.sortable .sort-arrow {
+      display: inline-block;
+      margin-left: 4px;
+      font-size: 10px;
+      color: var(--color-text-muted);
+    }
+    th.sortable.sort-active {
+      color: var(--color-primary);
+    }
+    th.sortable.sort-active .sort-arrow {
+      color: var(--color-primary);
+    }
+
+    /* SMS segment counter */
+    .sms-segment-info {
+      font-size: var(--text-xs);
+      color: var(--color-text-muted);
+      font-family: var(--font-mono);
+      padding: 2px 6px;
+    }
+
+    /* Preview fade transition */
+    .preview-sms-bubble {
+      transition: opacity var(--transition-base);
+    }
+    .preview-sms-bubble.updating {
+      opacity: 0.6;
+    }
+
+    /* Hero stat hover */
+    .hero-stat:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+      border-color: var(--color-primary-ghost);
+    }
+
+    /* Search filter input */
+    .filter-search {
+      padding: 5px var(--space-3);
+      font-size: var(--text-xs);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-full);
+      outline: none;
+      background: var(--color-bg);
+      color: var(--color-text);
+      transition: var(--transition-fast);
+      min-width: 160px;
+    }
+    .filter-search:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 2px var(--color-primary-ghost);
+    }
+
+    /* Connection test steps container */
+    .connection-test-steps {
+      display: flex;
+      gap: var(--space-2);
+      margin-bottom: var(--space-3);
+    }
+
+    /* User online dot in settings user list */
+    .users-manage-item .user-dot--live {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--color-success);
+      flex-shrink: 0;
+      animation: live-pulse 2s ease-in-out infinite;
+    }
+
     @media (max-width: 768px) {
       .header-nav { gap: 2px; }
-      .tab { padding: 4px 6px; white-space: nowrap; font-size: 10px; gap: 3px; }
+      .tab { padding: 4px 6px; white-space: nowrap; font-size: 10px; gap: 3px; min-height: 44px; }
       .tab-icon { width: 12px; height: 12px; }
       .tab .tab-label { display: none; }
+      /* Mobile tab tooltip */
+      .tab[data-tab]::after {
+        content: attr(data-tab);
+        position: absolute;
+        bottom: -24px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--color-text);
+        color: var(--color-bg);
+        padding: 2px 8px;
+        border-radius: var(--radius-sm);
+        font-size: 10px;
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity var(--transition-fast);
+        z-index: 50;
+      }
+      .tab[data-tab]:focus::after,
+      .tab[data-tab]:active::after {
+        opacity: 1;
+      }
+      .tab { position: relative; }
+      /* Touch targets */
+      .btn, .filter-select, .filter-input, .filter-search { min-height: 44px; }
+      /* Prevent iOS zoom */
+      .filter-input, .filter-search { font-size: 16px; }
       .content { padding: var(--space-4); }
       .hero-stats { grid-template-columns: 1fr; gap: var(--space-3); }
       .hero-stat { padding: var(--space-4); }
@@ -2229,6 +2340,8 @@
     .status-badge.paid { background: var(--color-success-light); color: var(--color-success-text); }
     .status-badge.sent { background: var(--color-info-light); color: var(--color-info-text); }
     .status-badge.error { background: var(--color-error-light); color: var(--color-error-text); }
+    .status-badge.duplicate-exact { background: var(--color-error-light); color: var(--color-error-text); }
+    .status-badge.duplicate-related { background: var(--color-info-light); color: var(--color-info-text); }
 
     /* Alert refinements for dark mode */
     .alert-success { background: var(--color-success-light); border-color: var(--color-success); color: var(--color-success-text); }
@@ -2875,6 +2988,7 @@
   </style>
 </head>
 <body>
+  <a href="#mainContent" class="skip-link">Skip to content</a>
   <header class="header">
     <div class="header-content">
       <h1>
@@ -2883,20 +2997,20 @@
         </svg>
         Ilaxi Billing
       </h1>
-      <nav class="header-nav">
-        <button class="tab active" data-tab="dashboard" onclick="switchTab('dashboard')">
+      <nav class="header-nav" role="tablist" aria-label="Main navigation">
+        <button class="tab active" data-tab="dashboard" role="tab" aria-selected="true" aria-controls="panel-dashboard" tabindex="0" onclick="switchTab('dashboard')">
           <svg class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
           <span class="tab-label">Dashboard</span>
         </button>
-        <button class="tab" data-tab="messages" onclick="switchTab('messages')">
+        <button class="tab" data-tab="messages" role="tab" aria-selected="false" aria-controls="panel-messages" tabindex="-1" onclick="switchTab('messages')">
           <svg class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
           <span class="tab-label">Messages</span>
         </button>
-        <button class="tab" data-tab="credentials" onclick="switchTab('credentials')">
+        <button class="tab" data-tab="credentials" role="tab" aria-selected="false" aria-controls="panel-credentials" tabindex="-1" onclick="switchTab('credentials')">
           <svg class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
           <span class="tab-label">Credentials</span>
         </button>
-        <button class="tab" data-tab="settings" onclick="switchTab('settings')">
+        <button class="tab" data-tab="settings" role="tab" aria-selected="false" aria-controls="panel-settings" tabindex="-1" onclick="switchTab('settings')">
           <svg class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
           <span class="tab-label">Settings</span>
         </button>
@@ -2914,9 +3028,9 @@
     </div>
   </header>
 
-  <main class="content">
+  <main class="content" id="mainContent">
     <!-- Dashboard Tab -->
-    <div class="tab-panel active" id="panel-dashboard">
+    <div class="tab-panel active" id="panel-dashboard" role="tabpanel" aria-labelledby="tab-dashboard">
       <div class="tab-intro">
         <div class="tab-intro-title">Dashboard</div>
         <div class="tab-intro-desc">Your billing overview at a glance. Track payments, send reminders, and manage customers.</div>
@@ -2964,7 +3078,7 @@
       </div>
 
       <!-- Hero Stats — 3 horizontal cards -->
-      <div class="hero-stats" id="statsGrid">
+      <div class="hero-stats" id="statsGrid" aria-live="polite">
         <div class="hero-stat hero-stat--outstanding">
           <div class="hero-stat-top">
             <div class="hero-stat-info">
@@ -3011,8 +3125,18 @@
         </div>
       </div>
 
+      <!-- Duplicate Detection Banner -->
+      <div class="callout callout-warn" id="duplicateBanner" style="display: none;">
+        <svg class="callout-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        <div class="callout-content">
+          <strong id="dupBannerTitle"></strong>
+          <span id="dupBannerDesc"></span>
+          <button class="btn btn-ghost btn-xs" onclick="filterByDuplicates()" style="margin-top: var(--space-1);">Show Duplicates</button>
+        </div>
+      </div>
+
       <!-- Send Action Bar (collapsible) -->
-      <div class="send-action-bar" id="sendActionBar">
+      <div class="send-action-bar" id="sendActionBar" aria-expanded="false">
         <div class="card">
           <div class="card-header">
             <h2 class="card-title">
@@ -3059,6 +3183,9 @@
               <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
               Send Bills
             </button>
+            <div class="send-progress-bar" id="sendProgressBar">
+              <div class="send-progress-bar-inner"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -3108,13 +3235,26 @@
               <input type="number" class="filter-input" id="filterBalanceMax" placeholder="Max" oninput="applyCustomerFilters()">
             </div>
           </div>
+          <div class="filter-group">
+            <label class="filter-label">Duplicates</label>
+            <select class="filter-select" id="filterDuplicates" onchange="applyCustomerFilters()">
+              <option value="">All</option>
+              <option value="exact">Exact Duplicates</option>
+              <option value="related">Multi-period</option>
+              <option value="any">Any Duplicate</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">Search</label>
+            <input type="text" class="filter-search" id="filterSearch" placeholder="Name, phone, order..." oninput="applyCustomerFilters()">
+          </div>
           <div style="margin-left:auto; display:flex; align-items:center; gap:var(--space-2);">
             <span class="filter-count" id="filterCount"></span>
             <button class="btn btn-ghost btn-xs" onclick="clearCustomerFilters()">Clear</button>
           </div>
         </div>
         <div class="card-body" style="padding: 0;">
-          <div class="table-container" id="customersTable">
+          <div class="table-container table-scroll-fade" id="customersTable" aria-live="polite">
             <div class="loading"><div class="spinner"></div>Loading customers...</div>
           </div>
         </div>
@@ -3122,7 +3262,7 @@
     </div>
 
     <!-- Messages Tab -->
-    <div class="tab-panel" id="panel-messages">
+    <div class="tab-panel" id="panel-messages" role="tabpanel" aria-labelledby="tab-messages">
       <div class="messages-page">
         <!-- Page Header -->
         <div class="messages-header">
@@ -3206,6 +3346,7 @@
             <div class="editor-section editor-section-grow">
               <div class="editor-label-row">
                 <label class="editor-label">Message Content</label>
+                <span class="sms-segment-info" id="msgSegmentInfo">0 chars · 0 segments</span>
                 <span class="editor-char-count" id="msgCharCounter">0 / 1600</span>
               </div>
               <p class="editor-hint">Write your message below. Click the tags to insert personalization.</p>
@@ -3298,7 +3439,7 @@
     </div>
 
     <!-- Credentials Tab -->
-    <div class="tab-panel" id="panel-credentials">
+    <div class="tab-panel" id="panel-credentials" role="tabpanel" aria-labelledby="tab-credentials">
       <div class="tab-intro">
         <div class="tab-intro-title">Twilio Connection</div>
         <div class="tab-intro-desc">Connect your Twilio account to send SMS messages to customers.</div>
@@ -3313,7 +3454,7 @@
       <div class="card" id="credStatusCard" style="margin-bottom: var(--space-4);">
         <div class="card-header"><h2 class="card-title">Connection Status</h2></div>
         <div class="card-body">
-          <div id="credentialStatus" class="alert alert-info" style="display: none;"></div>
+          <div id="credentialStatus" class="alert alert-info" style="display: none;" aria-live="polite"></div>
           <div id="credStatusLoading" style="font-size: var(--text-sm); color: var(--color-text-secondary);">Checking credentials...</div>
         </div>
       </div>
@@ -3326,7 +3467,8 @@
           <div class="form-group">
             <label for="accountSid">Account SID</label>
             <p style="font-size: var(--text-sm); color: var(--color-text-secondary); margin-bottom: var(--space-2);">Starts with AC, found on your Twilio dashboard</p>
-            <input type="text" id="accountSid" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+            <input type="text" id="accountSid" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" onblur="validateSidField()">
+            <div class="field-error" id="sidError">Account SID must start with "AC"</div>
           </div>
           <div class="form-group">
             <label for="authToken">Auth Token</label>
@@ -3336,11 +3478,19 @@
           <div class="form-group">
             <label for="twilioPhone">Twilio Phone Number</label>
             <p style="font-size: var(--text-sm); color: var(--color-text-secondary); margin-bottom: var(--space-2);">Your Twilio phone number in +1XXXXXXXXXX format</p>
-            <input type="text" id="twilioPhone" placeholder="+1XXXXXXXXXX">
+            <input type="text" id="twilioPhone" placeholder="+1XXXXXXXXXX" onblur="validatePhoneField()">
+            <div class="field-error" id="phoneError">Phone number must start with "+" followed by digits</div>
+          </div>
+          <div id="connectionTestSteps" class="connection-test-steps" style="display:none;">
+            <div class="step-item" id="testStep1"><span class="step-num">1</span> Connecting</div>
+            <div class="step-connector"></div>
+            <div class="step-item" id="testStep2"><span class="step-num">2</span> Authenticating</div>
+            <div class="step-connector"></div>
+            <div class="step-item" id="testStep3"><span class="step-num">3</span> Verified</div>
           </div>
           <div class="btn-group">
             <button class="btn btn-primary" id="saveCredentialsBtn" onclick="saveCredentials()">Save Credentials</button>
-            <button class="btn btn-secondary" onclick="testCredentials()">Test Connection</button>
+            <button class="btn btn-secondary" id="testConnectionBtn" onclick="testCredentials()">Test Connection</button>
           </div>
         </div>
       </div>
@@ -3352,7 +3502,7 @@
     </div>
 
     <!-- Settings Tab -->
-    <div class="tab-panel" id="panel-settings">
+    <div class="tab-panel" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings">
       <div class="settings-layout">
         <!-- Settings Navigation Sidebar -->
         <nav class="settings-nav" role="navigation" aria-label="Settings sections">
@@ -3482,6 +3632,13 @@
                 <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                 Auto-Detect Columns
               </button>
+            </div>
+
+            <div id="columnCompleteness" class="column-completeness" style="display:none;">
+              <span class="column-completeness-label" id="columnCompletenessLabel">0 of 8 mapped</span>
+              <div class="column-completeness-bar">
+                <div class="column-completeness-fill" id="columnCompletenessFill" style="width:0%;"></div>
+              </div>
             </div>
 
             <div id="columnMappingStatus" class="column-mapping-status" style="display: none;">
@@ -3814,6 +3971,7 @@
   <script>
     var currentSettings = null;
     var currentCustomers = [];
+    var currentDuplicateSummary = null;
     var selectedCustomerRow = null;
     var previewDebounceTimer = null;
     var msgPreviewDebounceTimer = null;
@@ -3865,6 +4023,36 @@
           closeSendModal();
         }
       });
+
+      // Arrow key navigation for tabs
+      var tablist = document.querySelector('[role="tablist"]');
+      if (tablist) {
+        tablist.addEventListener('keydown', function(e) {
+          var tabs = Array.from(tablist.querySelectorAll('[role="tab"]'));
+          var currentIdx = tabs.indexOf(document.activeElement);
+          if (currentIdx === -1) return;
+          var nextIdx;
+          if (e.key === 'ArrowRight') {
+            nextIdx = (currentIdx + 1) % tabs.length;
+          } else if (e.key === 'ArrowLeft') {
+            nextIdx = (currentIdx - 1 + tabs.length) % tabs.length;
+          } else {
+            return;
+          }
+          e.preventDefault();
+          tabs[nextIdx].focus();
+          tabs[nextIdx].click();
+        });
+      }
+
+      // Table scroll fade listener
+      var tableContainer = document.getElementById('customersTable');
+      if (tableContainer) {
+        tableContainer.addEventListener('scroll', function() {
+          var atEnd = tableContainer.scrollLeft + tableContainer.clientWidth >= tableContainer.scrollWidth - 5;
+          tableContainer.classList.toggle('scrolled-right', atEnd);
+        });
+      }
 
       // Refresh data when tab becomes visible again
       document.addEventListener('visibilitychange', function() {
@@ -3925,8 +4113,30 @@
 
     // Tab Navigation
     function switchTab(tabName) {
+      // Unsaved changes warning when leaving messages tab
+      var currentTab = document.querySelector('.tab.active');
+      if (currentTab && currentTab.dataset.tab === 'messages' && tabName !== 'messages') {
+        if (hasUnsavedTemplateChanges()) {
+          showConfirm({
+            title: 'Unsaved Changes',
+            message: 'You have unsaved template changes. Leave without saving?',
+            confirmLabel: 'Leave',
+            destructive: true
+          }).then(function(ok) {
+            if (ok) performTabSwitch(tabName);
+          });
+          return;
+        }
+      }
+      performTabSwitch(tabName);
+    }
+
+    function performTabSwitch(tabName) {
       document.querySelectorAll('.tab').forEach(function(tab) {
-        tab.classList.toggle('active', tab.dataset.tab === tabName);
+        var isActive = tab.dataset.tab === tabName;
+        tab.classList.toggle('active', isActive);
+        tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        tab.setAttribute('tabindex', isActive ? '0' : '-1');
       });
       document.querySelectorAll('.tab-panel').forEach(function(panel) {
         panel.classList.remove('active');
@@ -3937,6 +4147,11 @@
       if (tabName === 'messages') {
         initMessagesTab();
       }
+    }
+
+    function hasUnsavedTemplateChanges() {
+      var content = document.getElementById('msgTemplateContent');
+      return content && content.value !== msgOriginalContent && content.value.length > 0;
     }
 
     // Settings Sub-Tab Navigation
@@ -3966,10 +4181,11 @@
       var toggleBtn = document.querySelector('.settings-nav-toggle');
       if (layout) {
         layout.classList.toggle('collapsed');
-        // Update toggle button title
+        // Update toggle button title and aria
         var isCollapsed = layout.classList.contains('collapsed');
         if (toggleBtn) {
           toggleBtn.title = isCollapsed ? 'Expand sidebar' : 'Collapse sidebar';
+          toggleBtn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
         }
         // Save preference to localStorage
         localStorage.setItem('settingsNavCollapsed', isCollapsed ? 'true' : 'false');
@@ -4011,6 +4227,18 @@
       }).catch(function() {});
     }
 
+    function animateValue(elementId, newValue, prefix) {
+      var el = document.getElementById(elementId);
+      if (!el) return;
+      var current = el.textContent;
+      var display = (prefix || '') + newValue;
+      if (current !== display) {
+        el.textContent = display;
+        el.classList.add('stat-value-bump');
+        setTimeout(function() { el.classList.remove('stat-value-bump'); }, 200);
+      }
+    }
+
     function loadStats() {
       serverCall('getCustomerStats').then(function(result) {
         if (!result) {
@@ -4019,25 +4247,65 @@
         }
         if (result.success) {
           var stats = result.data;
-          setTextContent('statTotal', stats.total + ' total customers');
-          setTextContent('statUnpaid', stats.unpaid);
-          setTextContent('statPaid', stats.paid);
-          setTextContent('statBalance', '$' + stats.unpaidBalance.toFixed(2));
+          var totalText = stats.total + ' total customers';
+          if (stats.exactDuplicates > 0) {
+            totalText = stats.total + ' rows (' + stats.exactDuplicates + ' duplicate' + (stats.exactDuplicates !== 1 ? 's' : '') + ')';
+          }
+          setTextContent('statTotal', totalText);
+          animateValue('statUnpaid', stats.unpaid);
+          animateValue('statPaid', stats.paid);
+          animateValue('statBalance', stats.unpaidBalance.toFixed(2), '$');
+
+          // Stagger animate hero stat cards on first load
+          var heroStats = document.querySelectorAll('.hero-stat');
+          heroStats.forEach(function(card, i) {
+            if (!card.classList.contains('animate-in')) {
+              card.classList.add('animate-in', 'stagger-' + (i + 1));
+            }
+          });
         }
       }).catch(function(err) { console.error('Failed to load stats:', err); });
     }
 
+    function renderSkeletonTable(container, rowCount) {
+      var table = document.createElement('table');
+      var thead = document.createElement('thead');
+      var headerRow = document.createElement('tr');
+      for (var h = 0; h < 6; h++) {
+        var th = document.createElement('th');
+        var skel = document.createElement('div');
+        skel.className = 'skeleton-text';
+        skel.style.width = (40 + Math.random() * 40) + 'px';
+        skel.style.height = '12px';
+        th.appendChild(skel);
+        headerRow.appendChild(th);
+      }
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      var tbody = document.createElement('tbody');
+      for (var i = 0; i < rowCount; i++) {
+        var tr = document.createElement('tr');
+        for (var j = 0; j < 6; j++) {
+          var td = document.createElement('td');
+          var sk = document.createElement('div');
+          sk.className = 'skeleton-text';
+          sk.style.width = (50 + Math.random() * 60) + 'px';
+          sk.style.height = '14px';
+          td.appendChild(sk);
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+      container.appendChild(table);
+    }
+
     function loadCustomers() {
       var container = document.getElementById('customersTable');
-      // Clear and show loading - safe DOM manipulation
+      // Clear and show skeleton loading
       while (container.firstChild) container.removeChild(container.firstChild);
-      var loadingDiv = document.createElement('div');
-      loadingDiv.className = 'loading';
-      var spinner = document.createElement('div');
-      spinner.className = 'spinner';
-      loadingDiv.appendChild(spinner);
-      loadingDiv.appendChild(document.createTextNode('Loading customers...'));
-      container.appendChild(loadingDiv);
+      renderSkeletonTable(container, 6);
 
       serverCall('getCustomers').then(function(result) {
         console.log('getCustomers result:', result);
@@ -4048,6 +4316,8 @@
         }
         if (result.success) {
           currentCustomers = result.data;
+          currentDuplicateSummary = result.duplicateSummary || null;
+          renderDuplicateBanner();
           applyCustomerFilters();
         } else {
           console.error('getCustomers failed:', result.error);
@@ -4070,9 +4340,48 @@
         var oldJson = JSON.stringify(currentCustomers);
         if (newJson !== oldJson) {
           currentCustomers = result.data;
+          currentDuplicateSummary = result.duplicateSummary || null;
+          renderDuplicateBanner();
           applyCustomerFilters();
         }
       }).catch(function() {});
+    }
+
+    function renderDuplicateBanner() {
+      var banner = document.getElementById('duplicateBanner');
+      var title = document.getElementById('dupBannerTitle');
+      var desc = document.getElementById('dupBannerDesc');
+      if (!banner || !title || !desc) return;
+
+      if (!currentDuplicateSummary) {
+        banner.style.display = 'none';
+        return;
+      }
+
+      var s = currentDuplicateSummary;
+      if (s.exactCount > 0) {
+        banner.style.display = 'flex';
+        banner.className = 'callout callout-warn';
+        title.textContent = s.exactCount + ' exact duplicate row' + (s.exactCount !== 1 ? 's' : '') + ' detected';
+        desc.textContent = 'Same phone number + due date — likely data entry errors. These will receive multiple messages when sending.';
+      } else if (s.relatedCount > 0) {
+        banner.style.display = 'flex';
+        banner.className = 'callout callout-info';
+        title.textContent = s.relatedCount + ' multi-period entr' + (s.relatedCount !== 1 ? 'ies' : 'y') + ' found';
+        desc.textContent = 'Same phone number across different billing periods. This is informational only.';
+      } else {
+        banner.style.display = 'none';
+      }
+    }
+
+    function filterByDuplicates() {
+      var filterEl = document.getElementById('filterDuplicates');
+      if (filterEl) {
+        filterEl.value = currentDuplicateSummary && currentDuplicateSummary.exactCount > 0 ? 'exact' : 'any';
+        applyCustomerFilters();
+      }
+      var table = document.getElementById('customersTable');
+      if (table) table.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     function showTableError(container, message) {
@@ -4085,24 +4394,105 @@
 
     function refreshCustomers() { loadDashboard(); }
 
+    // Customer table sorting state
+    var customerSortField = '';
+    var customerSortAsc = true;
+
+    function sortCustomers(field) {
+      if (customerSortField === field) {
+        customerSortAsc = !customerSortAsc;
+      } else {
+        customerSortField = field;
+        customerSortAsc = true;
+      }
+      applyCustomerFilters();
+    }
+
     function renderCustomersTable(customers) {
       var container = document.getElementById('customersTable');
       while (container.firstChild) container.removeChild(container.firstChild);
 
       if (!customers || customers.length === 0) {
-        var emptyDiv = document.createElement('div');
-        emptyDiv.style.cssText = 'padding: var(--space-8) var(--space-6); text-align: center; color: var(--color-text-muted);';
-        emptyDiv.textContent = 'No customers found.';
-        container.appendChild(emptyDiv);
+        var emptyState = document.createElement('div');
+        emptyState.className = 'empty-state';
+
+        var iconWrap = document.createElement('div');
+        iconWrap.className = 'empty-state-icon';
+        var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('fill', 'none');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('stroke', 'currentColor');
+        var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('stroke-linecap', 'round');
+        path.setAttribute('stroke-linejoin', 'round');
+        path.setAttribute('stroke-width', '2');
+        path.setAttribute('d', 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z');
+        svg.appendChild(path);
+        iconWrap.appendChild(svg);
+        emptyState.appendChild(iconWrap);
+
+        var title = document.createElement('div');
+        title.className = 'empty-state-title';
+        var desc = document.createElement('div');
+        desc.className = 'empty-state-desc';
+
+        var hasFilters = document.getElementById('filterPayment').value ||
+          document.getElementById('filterNotice').value ||
+          document.getElementById('filterBalanceMin').value ||
+          document.getElementById('filterBalanceMax').value ||
+          document.getElementById('filterSearch').value ||
+          (document.getElementById('filterDuplicates') && document.getElementById('filterDuplicates').value);
+
+        if (hasFilters) {
+          title.textContent = 'No customers match your filters';
+          desc.textContent = 'Try adjusting or clearing your filters to see more results.';
+          emptyState.appendChild(title);
+          emptyState.appendChild(desc);
+          var clearBtn = document.createElement('button');
+          clearBtn.className = 'btn btn-secondary btn-sm';
+          clearBtn.textContent = 'Clear Filters';
+          clearBtn.onclick = clearCustomerFilters;
+          emptyState.appendChild(clearBtn);
+        } else {
+          title.textContent = 'No customer data yet';
+          desc.textContent = 'Customer data will appear here once your spreadsheet is set up and columns are mapped.';
+          emptyState.appendChild(title);
+          emptyState.appendChild(desc);
+        }
+
+        container.appendChild(emptyState);
         return;
       }
 
       var table = document.createElement('table');
       var thead = document.createElement('thead');
       var headerRow = document.createElement('tr');
-      ['Customer', 'Balance', 'Due Date', 'Payment', 'Status', ''].forEach(function(h) {
+      var sortableHeaders = [
+        { label: 'Customer', field: 'name' },
+        { label: 'Balance', field: 'balance' },
+        { label: 'Due Date', field: 'month' },
+        { label: 'Payment', field: 'paymentStatus' },
+        { label: 'Status', field: 'messageStatus' },
+        { label: '', field: '' }
+      ];
+      sortableHeaders.forEach(function(h) {
         var th = document.createElement('th');
-        th.textContent = h;
+        if (h.field) {
+          th.className = 'sortable' + (customerSortField === h.field ? ' sort-active' : '');
+          th.setAttribute('aria-sort', customerSortField === h.field ? (customerSortAsc ? 'ascending' : 'descending') : 'none');
+          th.onclick = function() { sortCustomers(h.field); };
+          th.textContent = h.label;
+          var arrow = document.createElement('span');
+          arrow.className = 'sort-arrow';
+          if (customerSortField === h.field) {
+            arrow.textContent = customerSortAsc ? '\u25B2' : '\u25BC';
+          } else {
+            arrow.textContent = '\u25B4\u25BE';
+          }
+          th.appendChild(arrow);
+        } else {
+          th.textContent = h.label;
+        }
         headerRow.appendChild(th);
       });
       thead.appendChild(headerRow);
@@ -4111,9 +4501,16 @@
       var tbody = document.createElement('tbody');
       customers.forEach(function(c) {
         var tr = document.createElement('tr');
+        var trClasses = [];
         if (String(c.paymentStatus).toLowerCase() === 'unpaid') {
-          tr.className = 'row-unpaid';
+          trClasses.push('row-unpaid');
         }
+        if (c.duplicateType === 'exact') {
+          trClasses.push('row-duplicate-exact');
+        } else if (c.duplicateType === 'related') {
+          trClasses.push('row-duplicate-related');
+        }
+        if (trClasses.length) tr.className = trClasses.join(' ');
 
         // Combined name + phone cell
         var tdName = document.createElement('td');
@@ -4125,6 +4522,13 @@
         phoneSmall.textContent = c.phone;
         phoneSmall.style.cssText = 'font-size: 11px; color: var(--color-text-muted);';
         tdName.appendChild(phoneSmall);
+        if (c.duplicateType) {
+          var dupBadge = document.createElement('span');
+          dupBadge.className = 'status-badge ' + (c.duplicateType === 'exact' ? 'duplicate-exact' : 'duplicate-related');
+          dupBadge.textContent = c.duplicateType === 'exact' ? 'Duplicate' : 'Multi-period';
+          dupBadge.style.marginLeft = '6px';
+          tdName.appendChild(dupBadge);
+        }
         tr.appendChild(tdName);
 
         var tdBalance = document.createElement('td');
@@ -4188,8 +4592,14 @@
       var notice = document.getElementById('filterNotice').value;
       var balMin = parseFloat(document.getElementById('filterBalanceMin').value);
       var balMax = parseFloat(document.getElementById('filterBalanceMax').value);
+      var searchTerm = (document.getElementById('filterSearch').value || '').toLowerCase().trim();
+      var dupFilter = document.getElementById('filterDuplicates') ? document.getElementById('filterDuplicates').value : '';
 
       var filtered = (currentCustomers || []).filter(function(c) {
+        if (searchTerm) {
+          var haystack = [c.name, c.phone, c.orderId, c.formattedBalance, c.month].join(' ').toLowerCase();
+          if (haystack.indexOf(searchTerm) === -1) return false;
+        }
         if (payment) {
           var ps = (c.paymentStatus || '').toLowerCase();
           if (payment === 'paid' && ps !== 'paid') return false;
@@ -4207,8 +4617,29 @@
         }
         if (!isNaN(balMin) && c.balance < balMin) return false;
         if (!isNaN(balMax) && c.balance > balMax) return false;
+        if (dupFilter) {
+          if (dupFilter === 'exact' && c.duplicateType !== 'exact') return false;
+          if (dupFilter === 'related' && c.duplicateType !== 'related') return false;
+          if (dupFilter === 'any' && !c.duplicateType) return false;
+        }
         return true;
       });
+
+      // Sort if a sort field is active
+      if (customerSortField) {
+        filtered.sort(function(a, b) {
+          var valA, valB;
+          if (customerSortField === 'balance') {
+            valA = a.balance || 0;
+            valB = b.balance || 0;
+            return customerSortAsc ? valA - valB : valB - valA;
+          }
+          valA = String(a[customerSortField] || '').toLowerCase();
+          valB = String(b[customerSortField] || '').toLowerCase();
+          var cmp = valA < valB ? -1 : valA > valB ? 1 : 0;
+          return customerSortAsc ? cmp : -cmp;
+        });
+      }
 
       renderCustomersTable(filtered);
       var countEl = document.getElementById('filterCount');
@@ -4225,6 +4656,10 @@
       document.getElementById('filterNotice').value = '';
       document.getElementById('filterBalanceMin').value = '';
       document.getElementById('filterBalanceMax').value = '';
+      document.getElementById('filterSearch').value = '';
+      if (document.getElementById('filterDuplicates')) document.getElementById('filterDuplicates').value = '';
+      customerSortField = '';
+      customerSortAsc = true;
       applyCustomerFilters();
     }
 
@@ -4233,6 +4668,7 @@
       var bar = document.getElementById('sendActionBar');
       if (bar) {
         bar.classList.add('open');
+        bar.setAttribute('aria-expanded', 'true');
         updateRecipientCount();
         bar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
@@ -4240,7 +4676,10 @@
 
     function closeSendBar() {
       var bar = document.getElementById('sendActionBar');
-      if (bar) bar.classList.remove('open');
+      if (bar) {
+        bar.classList.remove('open');
+        bar.setAttribute('aria-expanded', 'false');
+      }
     }
 
     function toggleDateInput() {
@@ -4477,6 +4916,7 @@
 
     // Current User + Live Users
     var authorizedUsers = [];
+    var currentLiveUsers = [];
 
     function loadCurrentUser() {
       serverCall('getCurrentUser').then(function(result) {
@@ -4517,6 +4957,7 @@
     }
 
     function updateHeaderLiveUsers(liveUsers) {
+      currentLiveUsers = liveUsers || [];
       var usersEl = document.getElementById('headerUsers');
       if (!usersEl) return;
 
@@ -4633,12 +5074,23 @@
         container.appendChild(emptyMsg);
         return;
       }
-      // Hardcoded SVG icon for remove buttons (no user data)
-      var removeSvg = '<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+      // Build set of live user emails for quick lookup
+      var liveSet = {};
+      (currentLiveUsers || []).forEach(function(e) { liveSet[e.toLowerCase()] = true; });
+
       users.forEach(function(email) {
         var isCurrentUser = email.toLowerCase() === currentUserEmail.toLowerCase();
+        var isLive = !!liveSet[email.toLowerCase()];
         var item = document.createElement('div');
         item.className = 'users-manage-item';
+
+        // Online status dot
+        if (isLive) {
+          var dot = document.createElement('span');
+          dot.className = 'user-dot user-dot--live';
+          dot.title = 'Online now';
+          item.appendChild(dot);
+        }
 
         var emailSpan = document.createElement('span');
         emailSpan.className = 'user-email';
@@ -4663,7 +5115,20 @@
         removeBtn.onclick = (function(userEmail) {
           return function() { removeUser(userEmail); };
         })(email);
-        removeBtn.innerHTML = removeSvg;
+        // Build remove icon with DOM (XSS-safe, no user data in SVG)
+        var removeSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        removeSvg.setAttribute('width', '16');
+        removeSvg.setAttribute('height', '16');
+        removeSvg.setAttribute('fill', 'none');
+        removeSvg.setAttribute('viewBox', '0 0 24 24');
+        removeSvg.setAttribute('stroke', 'currentColor');
+        var removePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        removePath.setAttribute('stroke-linecap', 'round');
+        removePath.setAttribute('stroke-linejoin', 'round');
+        removePath.setAttribute('stroke-width', '2');
+        removePath.setAttribute('d', 'M6 18L18 6M6 6l12 12');
+        removeSvg.appendChild(removePath);
+        removeBtn.appendChild(removeSvg);
         item.appendChild(removeBtn);
 
         container.appendChild(item);
@@ -4729,7 +5194,24 @@
     }
 
     function sendBills() {
+      // Check for duplicates before sending
+      if (currentDuplicateSummary && currentDuplicateSummary.exactCount > 0) {
+        showConfirm({
+          title: 'Duplicate Rows Detected',
+          message: currentDuplicateSummary.exactCount + ' exact duplicate row(s) found (same phone + due date). This will send multiple messages to the same number. Continue?',
+          confirmLabel: 'Send Anyway',
+          destructive: true
+        }).then(function(ok) {
+          if (ok) executeSendBills_();
+        });
+      } else {
+        executeSendBills_();
+      }
+    }
+
+    function executeSendBills_() {
       var btn = document.getElementById('sendBillsBtn');
+      var progressBar = document.getElementById('sendProgressBar');
       var filter = document.getElementById('sendFilter').value;
       var dueDate = document.getElementById('dueDate').value;
       var templateType = document.getElementById('templateType').value;
@@ -4737,12 +5219,14 @@
 
       btn.disabled = true;
       btn.textContent = 'Sending...';
+      if (progressBar) progressBar.classList.add('active');
       document.getElementById('sendAlert').textContent = '';
 
       serverCall('sendBills', { filter: filter, dueDate: dueDate, templateType: templateType, dryRunMode: dryRun })
         .then(function(result) {
           btn.disabled = false;
           btn.textContent = 'Send Bills';
+          if (progressBar) progressBar.classList.remove('active');
           if (result.success) {
             var data = result.data;
             var msg = 'Sent: ' + data.sentCount + ', Errors: ' + data.errorCount;
@@ -4757,6 +5241,7 @@
         .catch(function(err) {
           btn.disabled = false;
           btn.textContent = 'Send Bills';
+          if (progressBar) progressBar.classList.remove('active');
           showAlert('sendAlert', 'error', 'Error: ' + err.message);
         });
     }
@@ -4907,18 +5392,92 @@
     }
 
     function testCredentials() {
-      showAlert('credentialAlert', 'info', 'Testing connection...');
-      serverCall('testCredentials').then(function(result) {
-        if (!result) {
-          showAlert('credentialAlert', 'error', 'No response from server.');
-          return;
-        }
-        if (result.success) {
-          showAlert('credentialAlert', 'success', 'Connection successful! Account: ' + result.accountName);
-        } else {
-          showAlert('credentialAlert', 'error', result.error || 'Connection failed');
-        }
-      }).catch(function(err) { showAlert('credentialAlert', 'error', 'Error: ' + err.message); });
+      var stepsContainer = document.getElementById('connectionTestSteps');
+      var steps = stepsContainer ? stepsContainer.querySelectorAll('.step-item') : [];
+      var testBtn = document.getElementById('testConnectionBtn');
+
+      // Reset and show steps
+      steps.forEach(function(s) { s.className = 'step-item'; });
+      if (stepsContainer) stepsContainer.style.display = 'flex';
+      if (testBtn) testBtn.disabled = true;
+      showAlert('credentialAlert', '', '');
+
+      // Step 1: Connecting
+      if (steps[0]) steps[0].classList.add('active');
+
+      setTimeout(function() {
+        // Step 2: Authenticating
+        if (steps[0]) { steps[0].classList.remove('active'); steps[0].classList.add('done'); }
+        if (steps[1]) steps[1].classList.add('active');
+
+        setTimeout(function() {
+          // Step 3: Verifying — make actual server call
+          if (steps[1]) { steps[1].classList.remove('active'); steps[1].classList.add('done'); }
+          if (steps[2]) steps[2].classList.add('active');
+
+          serverCall('testCredentials').then(function(result) {
+            if (testBtn) testBtn.disabled = false;
+            if (!result) {
+              if (steps[2]) { steps[2].classList.remove('active'); steps[2].classList.add('error'); }
+              showAlert('credentialAlert', 'error', 'No response from server.');
+              return;
+            }
+            if (result.success) {
+              if (steps[2]) { steps[2].classList.remove('active'); steps[2].classList.add('done'); }
+              showAlert('credentialAlert', 'success', 'Connection successful! Account: ' + result.accountName);
+            } else {
+              if (steps[2]) { steps[2].classList.remove('active'); steps[2].classList.add('error'); }
+              showAlert('credentialAlert', 'error', result.error || 'Connection failed');
+            }
+          }).catch(function(err) {
+            if (testBtn) testBtn.disabled = false;
+            if (steps[2]) { steps[2].classList.remove('active'); steps[2].classList.add('error'); }
+            showAlert('credentialAlert', 'error', 'Error: ' + err.message);
+          });
+        }, 600);
+      }, 600);
+    }
+
+    // Inline credential field validation
+    function showFieldError(input, errorEl, msg) {
+      input.classList.add('input-error');
+      input.classList.remove('input-valid');
+      if (errorEl) { errorEl.textContent = msg; errorEl.classList.add('visible'); }
+    }
+
+    function hideFieldError(input, errorEl) {
+      input.classList.remove('input-error');
+      if (errorEl) { errorEl.textContent = ''; errorEl.classList.remove('visible'); }
+    }
+
+    function validateSidField() {
+      var input = document.getElementById('accountSid');
+      var errorEl = document.getElementById('sidError');
+      if (!input || !input.value.trim()) { hideFieldError(input, errorEl); return; }
+      var val = input.value.trim();
+      if (val.length < 2 || val.substring(0, 2) !== 'AC') {
+        showFieldError(input, errorEl, 'Account SID must start with "AC"');
+      } else if (val.length !== 34) {
+        showFieldError(input, errorEl, 'Account SID should be 34 characters');
+      } else {
+        hideFieldError(input, errorEl);
+        input.classList.add('input-valid');
+      }
+    }
+
+    function validatePhoneField() {
+      var input = document.getElementById('twilioPhone');
+      var errorEl = document.getElementById('phoneError');
+      if (!input || !input.value.trim()) { hideFieldError(input, errorEl); return; }
+      var val = input.value.trim();
+      if (val.charAt(0) !== '+') {
+        showFieldError(input, errorEl, 'Phone number must start with "+" (e.g., +1...)');
+      } else if (!/^\+\d{10,15}$/.test(val)) {
+        showFieldError(input, errorEl, 'Enter a valid phone number (e.g., +14155551234)');
+      } else {
+        hideFieldError(input, errorEl);
+        input.classList.add('input-valid');
+      }
     }
 
     // Settings
@@ -5110,6 +5669,34 @@
           }
         }
       });
+      updateColumnCompleteness();
+    }
+
+    function updateColumnCompleteness() {
+      var container = document.getElementById('columnCompleteness');
+      var label = document.getElementById('columnCompletenessLabel');
+      var fill = document.getElementById('columnCompletenessFill');
+      if (!container || !label || !fill) return;
+
+      var fields = ['phoneNumber', 'customerName', 'balance', 'numTiffins', 'dueDate', 'messageStatus', 'orderId', 'paymentStatus'];
+      var mapped = 0;
+      fields.forEach(function(field) {
+        var select = document.getElementById('col' + field.charAt(0).toUpperCase() + field.slice(1));
+        if (select && select.value) mapped++;
+      });
+
+      var total = fields.length;
+      var pct = Math.round((mapped / total) * 100);
+      label.textContent = mapped + ' of ' + total + ' mapped';
+      fill.style.width = pct + '%';
+
+      // Color: green (100%), yellow (50-99%), red (<50%)
+      fill.classList.remove('green', 'yellow', 'red');
+      if (pct >= 100) { fill.classList.add('green'); }
+      else if (pct >= 50) { fill.classList.add('yellow'); }
+      else { fill.classList.add('red'); }
+
+      container.style.display = '';
     }
 
     function loadColumnMappings() {
@@ -5139,7 +5726,9 @@
             select.value = currentSettings.columns[field];
           }
         }
+        if (select) select.onchange = updateColumnCompleteness;
       });
+      updateColumnCompleteness();
     }
 
     function saveColumnMappings() {
@@ -5388,14 +5977,28 @@
     var msgOriginalContent = '';
 
     function selectTemplateCard(templateType) {
-      msgCurrentTemplate = templateType;
+      if (templateType === msgCurrentTemplate) return;
 
-      // Update card UI
-      document.querySelectorAll('.template-card').forEach(function(card) {
-        card.classList.toggle('active', card.dataset.template === templateType);
-      });
+      function doSwitch() {
+        msgCurrentTemplate = templateType;
+        document.querySelectorAll('.template-card').forEach(function(card) {
+          card.classList.toggle('active', card.dataset.template === templateType);
+        });
+        loadMsgTemplate();
+      }
 
-      loadMsgTemplate();
+      if (hasUnsavedTemplateChanges()) {
+        showConfirm({
+          title: 'Unsaved Changes',
+          message: 'You have unsaved changes to this template. Discard and switch?',
+          confirmLabel: 'Discard',
+          destructive: true
+        }).then(function(ok) {
+          if (ok) doSwitch();
+        });
+      } else {
+        doSwitch();
+      }
     }
 
     function loadMsgTemplate() {
@@ -5433,12 +6036,25 @@
       var textarea = document.getElementById('msgTemplateContent');
       var counter = document.getElementById('msgCharCounter');
       var fill = document.getElementById('msgCharFill');
+      var segmentInfo = document.getElementById('msgSegmentInfo');
       var length = textarea.value.length;
       var maxLength = 1600;
       var percentage = Math.min((length / maxLength) * 100, 100);
 
       counter.textContent = length + ' / ' + maxLength;
       fill.style.width = percentage + '%';
+
+      // SMS segment calculation
+      if (segmentInfo && length > 0) {
+        // Detect Unicode: any char outside GSM 7-bit basic + extended set
+        var hasUnicode = /[^\x20-\x7E\n\r\u00A3\u00A5\u00E8\u00E9\u00F9\u00EC\u00F2\u00C7\u00D8\u00F8\u00C5\u00E5\u0394\u03A6\u0393\u039B\u03A9\u03A0\u03A8\u03A3\u0398\u039E\u00C6\u00E6\u00DF\u00C9\u00A4\u00A1\u00C4\u00D6\u00D1\u00DC\u00A7\u00BF\u00E4\u00F6\u00F1\u00FC\u00E0]/.test(textarea.value);
+        var singleLimit = hasUnicode ? 70 : 160;
+        var multiLimit = hasUnicode ? 67 : 153;
+        var segments = length <= singleLimit ? 1 : Math.ceil(length / multiLimit);
+        segmentInfo.textContent = length + ' chars \u00B7 ' + segments + ' segment' + (segments !== 1 ? 's' : '') + (hasUnicode ? ' (Unicode)' : '');
+      } else if (segmentInfo) {
+        segmentInfo.textContent = '';
+      }
 
       counter.classList.remove('warning', 'error');
       fill.classList.remove('warning', 'error');
@@ -5468,17 +6084,18 @@
         preview.textContent = 'Start typing to see your message preview...';
         preview.style.fontStyle = 'italic';
         preview.style.opacity = '0.7';
+        preview.classList.remove('updating');
         return;
       }
 
       preview.style.fontStyle = 'normal';
       preview.style.opacity = '1';
+      preview.classList.add('updating');
 
       msgPreviewDebounceTimer = setTimeout(function() {
         serverCall('previewTemplate', { template: message })
           .then(function(result) {
-            // previewTemplate() returns a plain string (the processed template),
-            // or an object with {success, preview} — handle both
+            preview.classList.remove('updating');
             if (typeof result === 'string') {
               preview.textContent = result;
             } else if (result && result.success && result.preview) {
@@ -5488,6 +6105,7 @@
             }
           })
           .catch(function() {
+            preview.classList.remove('updating');
             preview.textContent = message;
           });
       }, 500);
@@ -5702,6 +6320,21 @@
         });
     }
 
+    function relativeTime(ts) {
+      var now = Date.now();
+      var diff = now - new Date(ts).getTime();
+      if (diff < 0) return 'Just now';
+      var sec = Math.floor(diff / 1000);
+      if (sec < 60) return 'Just now';
+      var min = Math.floor(sec / 60);
+      if (min < 60) return min + 'm ago';
+      var hrs = Math.floor(min / 60);
+      if (hrs < 24) return hrs + 'h ago';
+      var days = Math.floor(hrs / 24);
+      if (days < 7) return days + 'd ago';
+      return new Date(ts).toLocaleDateString();
+    }
+
     function renderActivityLog(entries) {
       var empty = document.getElementById('activityLogEmpty');
       var tableWrap = document.getElementById('activityLogTableWrap');
@@ -5714,6 +6347,9 @@
 
       if (empty) empty.style.display = 'none';
       if (tableWrap) tableWrap.style.display = 'block';
+
+      var now = Date.now();
+      var fiveMinAgo = now - 5 * 60 * 1000;
 
       // Build table with DOM (XSS-safe)
       var table = document.createElement('table');
@@ -5730,13 +6366,23 @@
       table.appendChild(thead);
 
       var tbody = document.createElement('tbody');
-      entries.forEach(function(entry) {
+      entries.forEach(function(entry, idx) {
         var tr = document.createElement('tr');
+        var entryTime = new Date(entry.ts).getTime();
+        var isFresh = entryTime >= fiveMinAgo;
+        if (isFresh) tr.classList.add('log-fresh');
 
-        // Timestamp
+        // Stagger animation for first 10 rows
+        if (idx < 10) {
+          tr.classList.add('animate-in');
+          tr.style.animationDelay = (idx * 50) + 'ms';
+        }
+
+        // Timestamp — relative, with full timestamp on hover
         var tdTime = document.createElement('td');
         tdTime.className = 'log-timestamp';
-        tdTime.textContent = new Date(entry.ts).toLocaleString();
+        tdTime.textContent = relativeTime(entry.ts);
+        tdTime.title = new Date(entry.ts).toLocaleString();
         tr.appendChild(tdTime);
 
         // User
@@ -5902,7 +6548,7 @@
     }
 
   </script>
-  <div id="toastContainer" class="toast-container"></div>
+  <div id="toastContainer" class="toast-container" role="status" aria-live="assertive"></div>
   <div class="modal-overlay" id="confirmDialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmDialogTitle">
     <div class="modal confirm-modal">
       <div class="modal-header">

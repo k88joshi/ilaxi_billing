@@ -55,7 +55,8 @@ function getCustomersCore_(options) {
       });
     }
 
-    return { success: true, data: customers };
+    const dupResult = detectDuplicates_(customers);
+    return { success: true, data: dupResult.customers, duplicateSummary: dupResult.summary };
   } catch (error) {
     Logger.log('getCustomersCore_ error: ' + error.message + '\nStack: ' + error.stack);
     return { success: false, error: error.message };
@@ -348,6 +349,83 @@ function lookupCustomerByOrderId_(orderId) {
     Logger.log(`lookupCustomerByOrderId_ error: ${error.message}`);
     return { success: false, error: error.message };
   }
+}
+
+// ========================================
+// DUPLICATE DETECTION
+// ========================================
+
+/**
+ * Detects duplicate customers by normalized phone number.
+ * Two levels:
+ *   - 'exact': same phone + same due-date month (likely data-entry errors)
+ *   - 'related': same phone but different months (multi-period entries)
+ *
+ * Annotates each customer object in-place with:
+ *   duplicateType, duplicateGroupId, duplicateGroupSize
+ *
+ * @param {Object[]} customers - Array of customer objects from getCustomersCore_
+ * @returns {{customers: Object[], summary: Object}} Annotated customers and summary stats
+ * @private
+ */
+function detectDuplicates_(customers) {
+  const summary = { exactGroups: 0, exactCount: 0, relatedGroups: 0, relatedCount: 0 };
+  if (!customers || customers.length === 0) {
+    return { customers: customers || [], summary: summary };
+  }
+
+  // Group by normalized phone
+  const phoneGroups = {};
+  customers.forEach(function(c) {
+    const normalized = formatPhoneNumber_(c.phone);
+    if (!normalized) return;
+    if (!phoneGroups[normalized]) phoneGroups[normalized] = [];
+    phoneGroups[normalized].push(c);
+  });
+
+  let groupId = 0;
+  Object.keys(phoneGroups).forEach(function(phone) {
+    const group = phoneGroups[phone];
+    if (group.length < 2) return;
+
+    groupId++;
+    // Sub-group by month (lowercase, trimmed) to find exact duplicates
+    const monthMap = {};
+    group.forEach(function(c) {
+      const monthKey = (c.month || '').toLowerCase().trim();
+      if (!monthMap[monthKey]) monthMap[monthKey] = [];
+      monthMap[monthKey].push(c);
+    });
+
+    let hasExact = false;
+    Object.keys(monthMap).forEach(function(month) {
+      if (monthMap[month].length > 1) {
+        hasExact = true;
+        summary.exactGroups++;
+        summary.exactCount += monthMap[month].length;
+        monthMap[month].forEach(function(c) {
+          c.duplicateType = 'exact';
+          c.duplicateGroupId = groupId;
+          c.duplicateGroupSize = group.length;
+        });
+      }
+    });
+
+    // Mark remaining members as 'related' if they weren't marked as 'exact'
+    let hasRelated = false;
+    group.forEach(function(c) {
+      if (!c.duplicateType) {
+        c.duplicateType = 'related';
+        c.duplicateGroupId = groupId;
+        c.duplicateGroupSize = group.length;
+        hasRelated = true;
+        summary.relatedCount++;
+      }
+    });
+    if (hasRelated) summary.relatedGroups++;
+  });
+
+  return { customers: customers, summary: summary };
 }
 
 // ========================================
