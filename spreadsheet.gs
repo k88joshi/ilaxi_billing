@@ -553,6 +553,19 @@ function promptForDryRunMode_() {
 function sendBillsToUnpaid() {
   if (!checkCredentials()) return;
 
+  // Check for duplicates before sending
+  const dupCheck = getCustomersCore_();
+  if (dupCheck.success && dupCheck.duplicateSummary && dupCheck.duplicateSummary.exactCount > 0) {
+    const ds = dupCheck.duplicateSummary;
+    const proceed = getUi_().alert(
+      'Duplicate Rows Detected',
+      ds.exactCount + ' exact duplicate row(s) found (same phone + due date).\n' +
+      'Multiple messages will be sent to the same number.\n\nContinue anyway?',
+      getUi_().ButtonSet.YES_NO
+    );
+    if (proceed !== getUi_().Button.YES) return;
+  }
+
   const templateType = promptForMessageType_();
   if (!templateType) return;
 
@@ -567,7 +580,8 @@ function sendBillsToUnpaid() {
   }
 
   const d = result.data;
-  showSendSummary(d.sentCount, d.errorCount, d.skippedCount, d.errorDetails, "", d.dryRunMode);
+  const dupInfo = dupCheck.success ? dupCheck.duplicateSummary : null;
+  showSendSummary(d.sentCount, d.errorCount, d.skippedCount, d.errorDetails, "", d.dryRunMode, dupInfo);
 }
 
 /**
@@ -650,6 +664,19 @@ function sendUnpaidByDueDate() {
   }
   const targetDate = dateResult.getResponseText().trim();
 
+  // Check for duplicates before sending
+  const dupCheck = getCustomersCore_();
+  if (dupCheck.success && dupCheck.duplicateSummary && dupCheck.duplicateSummary.exactCount > 0) {
+    const ds = dupCheck.duplicateSummary;
+    const proceed = getUi_().alert(
+      'Duplicate Rows Detected',
+      ds.exactCount + ' exact duplicate row(s) found (same phone + due date).\n' +
+      'Multiple messages will be sent to the same number.\n\nContinue anyway?',
+      getUi_().ButtonSet.YES_NO
+    );
+    if (proceed !== getUi_().Button.YES) return;
+  }
+
   const templateType = promptForMessageType_();
   if (!templateType) return;
 
@@ -668,7 +695,8 @@ function sendUnpaidByDueDate() {
   const d = result.data;
   const settings = getSettings();
   const templateName = getBillTemplate(templateType, settings).name;
-  showSendSummary(d.sentCount, d.errorCount, d.skippedCount, d.errorDetails, `(${templateName}) for "${targetDate}"`, d.dryRunMode);
+  const dupInfo = dupCheck.success ? dupCheck.duplicateSummary : null;
+  showSendSummary(d.sentCount, d.errorCount, d.skippedCount, d.errorDetails, `(${templateName}) for "${targetDate}"`, d.dryRunMode, dupInfo);
 }
 
 /**

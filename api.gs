@@ -137,6 +137,13 @@ function getCustomerStatsForWeb() {
       }
     });
 
+    // Include duplicate stats from the enriched customer data
+    if (result.duplicateSummary) {
+      stats.exactDuplicates = result.duplicateSummary.exactCount;
+      stats.relatedDuplicates = result.duplicateSummary.relatedCount;
+      stats.duplicateGroups = result.duplicateSummary.exactGroups + result.duplicateSummary.relatedGroups;
+    }
+
     return { success: true, data: stats };
   } catch (error) {
     Logger.log(`getCustomerStatsForWeb_ error: ${error.message}`);

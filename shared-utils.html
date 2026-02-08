@@ -42,6 +42,12 @@
     textSpan.textContent = message;
     toast.appendChild(textSpan);
 
+    // Add timer bar
+    var timerBar = document.createElement('div');
+    timerBar.className = 'toast-timer';
+    toast.style.position = 'relative';
+    toast.appendChild(timerBar);
+
     container.appendChild(toast);
 
     setTimeout(function() {

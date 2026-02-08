@@ -92,11 +92,69 @@ function getSettingsForUI() {
   const settings = getSettings();
   const headers = getSheetHeaders();
   const firstTimeCheck = isFirstTimeSetup();
+  const credentialStatus = getCredentialStatusForSettings_();
   return {
     settings: settings,
     headers: headers,
-    isFirstTime: firstTimeCheck.isFirstTime  // Extract boolean from object
+    isFirstTime: firstTimeCheck.isFirstTime,  // Extract boolean from object
+    credentials: credentialStatus
   };
+}
+
+/**
+ * Gets masked credential status for the settings dialog.
+ * Returns masked values so the UI can show what's configured without exposing secrets.
+ *
+ * @returns {Object} Credential status with masked values
+ * @private
+ */
+function getCredentialStatusForSettings_() {
+  const sid = scriptProperties.getProperty('TWILIO_ACCOUNT_SID');
+  const token = scriptProperties.getProperty('TWILIO_AUTH_TOKEN');
+  const phone = scriptProperties.getProperty('TWILIO_PHONE_NUMBER');
+  return {
+    hasAccountSid: !!sid && sid !== 'placeholder',
+    hasAuthToken: !!token && token !== 'placeholder',
+    hasPhoneNumber: !!phone && phone !== 'placeholder',
+    maskedSid: sid && sid !== 'placeholder' ? sid.substring(0, 6) + '...' + sid.substring(sid.length - 4) : '',
+    maskedPhone: phone && phone !== 'placeholder' ? '***' + phone.slice(-4) : ''
+  };
+}
+
+/**
+ * Saves Twilio credentials from the settings UI.
+ * Only saves fields that contain actual new values (not masked placeholders).
+ *
+ * @param {Object} creds - Object with accountSid, authToken, twilioPhone
+ * @returns {Object} Result with success boolean
+ */
+function saveTwilioCredentialsFromUI(creds) {
+  if (!creds || typeof creds !== 'object') {
+    return { success: false, error: 'Invalid credentials data' };
+  }
+  try {
+    const saved = [];
+    if (creds.accountSid) {
+      scriptProperties.setProperty('TWILIO_ACCOUNT_SID', creds.accountSid.trim());
+      saved.push('Account SID');
+    }
+    if (creds.authToken) {
+      scriptProperties.setProperty('TWILIO_AUTH_TOKEN', creds.authToken.trim());
+      saved.push('Auth Token');
+    }
+    if (creds.twilioPhone) {
+      scriptProperties.setProperty('TWILIO_PHONE_NUMBER', creds.twilioPhone.trim());
+      saved.push('Phone Number');
+    }
+    if (saved.length > 0) {
+      logEvent_('credentials', 'Save credentials', 'Saved: ' + saved.join(', '), true, getCurrentUserEmail_());
+    }
+    return { success: true };
+  } catch (e) {
+    Logger.log('saveTwilioCredentialsFromUI error: ' + e.message);
+    logEvent_('credentials', 'Save credentials', e.message, false, getCurrentUserEmail_());
+    return { success: false, error: e.message };
+  }
 }
 
 /**
@@ -470,8 +528,9 @@ function confirmResetSettings() {
  * @param {Array<Object>} errorDetails - Array of {name, error} objects for logging.
  * @param {string} [filter=""] - Optional string describing any filter (e.g., "for October").
  * @param {boolean} [dryRunMode=false] - Whether this was a dry run send.
+ * @param {Object} [duplicateInfo] - Optional duplicate info with {exactCount, relatedCount}.
  */
-function showSendSummary(sentCount, errorCount, skippedCount, errorDetails, filter = "", dryRunMode = false) {
+function showSendSummary(sentCount, errorCount, skippedCount, errorDetails, filter = "", dryRunMode = false, duplicateInfo = null) {
   // Input validation - ensure counts are valid numbers
   sentCount = typeof sentCount === "number" && !isNaN(sentCount) ? Math.max(0, sentCount) : 0;
   errorCount = typeof errorCount === "number" && !isNaN(errorCount) ? Math.max(0, errorCount) : 0;
@@ -490,7 +549,13 @@ function showSendSummary(sentCount, errorCount, skippedCount, errorDetails, filt
   if (dryRunMode) {
     summary += `\n⚠️ TEST MODE - No actual messages were sent!\n`;
   }
-  
+
+  // Add duplicate warning if applicable
+  if (duplicateInfo && duplicateInfo.exactCount > 0) {
+    summary += `\n⚠️ DUPLICATES: ${duplicateInfo.exactCount} row(s) share the same phone + due date.\n`;
+    summary += `Some recipients may have received multiple messages.\n`;
+  }
+
   // Add error details if any errors occurred
   if (errorDetails && errorDetails.length > 0) {
     summary += `\n❌ Error Details (first 5):\n`;
