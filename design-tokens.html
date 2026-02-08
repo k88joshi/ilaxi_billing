@@ -586,5 +586,125 @@
     background: var(--color-bg);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Prevent horizontal overflow on mobile */
+    overflow-x: hidden;
+  }
+
+  /* ============================================
+     Mobile Optimizations (Shared)
+     ============================================ */
+
+  /* Smooth momentum scrolling for overflow containers */
+  .table-container,
+  .settings-nav,
+  .template-tabs,
+  .tabs {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  @media (max-width: 768px) {
+    /* Safe area insets for notched devices (iPhone X+, etc.) */
+    body {
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+    }
+
+    /* Prevent iOS zoom on input focus — all inputs need 16px minimum */
+    input, select, textarea {
+      font-size: 16px !important;
+    }
+
+    /* Larger touch targets for interactive elements */
+    .btn {
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    .btn-sm {
+      min-height: 36px;
+    }
+
+    /* Disable hover transforms on touch devices — they cause stickiness */
+    .quick-action:hover {
+      transform: none;
+    }
+
+    /* Setup checklist: always show action text (no hover on touch) */
+    .setup-check-action {
+      opacity: 1;
+    }
+
+    /* Modals: full-width on narrow screens */
+    .modal {
+      width: 100%;
+      max-width: 100%;
+      max-height: 100vh;
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      margin-top: auto;
+    }
+
+    .modal-overlay.visible {
+      align-items: flex-end;
+    }
+
+    .confirm-modal {
+      max-width: 100%;
+    }
+
+    /* Toasts: center on mobile and allow wrapping */
+    .toast-container {
+      left: var(--space-3);
+      right: var(--space-3);
+      bottom: var(--space-3);
+      align-items: center;
+    }
+
+    .toast {
+      white-space: normal;
+      text-align: center;
+      max-width: 100%;
+    }
+
+    /* Empty state: tighter on mobile */
+    .empty-state {
+      padding: var(--space-6) var(--space-4);
+    }
+
+    /* Quick actions: 2-column grid on mobile */
+    .quick-actions {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    /* Step indicators: allow scrolling if many steps */
+    .steps-bar {
+      overflow-x: auto;
+      flex-wrap: nowrap;
+      padding-bottom: var(--space-1);
+    }
+
+    .step-item {
+      flex-shrink: 0;
+    }
+  }
+
+  @media (max-width: 380px) {
+    /* Very small screens: single column quick actions */
+    .quick-actions {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* Disable hover effects on touch devices via media query */
+  @media (hover: none) {
+    .quick-action:hover,
+    .setup-check-item:hover {
+      transform: none;
+      box-shadow: none;
+    }
+
+    /* Always show setup check action on touch */
+    .setup-check-action {
+      opacity: 1;
+    }
   }
 </style>

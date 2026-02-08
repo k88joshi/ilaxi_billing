@@ -2099,14 +2099,33 @@
     @media (max-width: 900px) {
       .message-editor-container {
         grid-template-columns: 1fr;
+        min-height: auto;
       }
 
       .message-preview-side {
-        min-height: 400px;
+        min-height: 320px;
+      }
+
+      /* Editor textarea: shorter on mobile */
+      .editor-textarea {
+        min-height: 140px;
+      }
+
+      /* Messages header: stack */
+      .messages-header {
+        flex-direction: column;
       }
 
       .template-cards-grid {
         grid-template-columns: 1fr 1fr;
+      }
+
+      /* Editor actions: full width save button */
+      .editor-actions {
+        flex-direction: column;
+      }
+      .btn-save-template {
+        width: 100%;
       }
     }
 
@@ -2219,11 +2238,42 @@
     }
 
     @media (max-width: 768px) {
-      .header-nav { gap: 2px; }
-      .tab { padding: 4px 6px; white-space: nowrap; font-size: 10px; gap: 3px; min-height: 44px; }
-      .tab-icon { width: 12px; height: 12px; }
+      /* ---- Header ---- */
+      .header {
+        padding: var(--space-3) var(--space-4);
+        padding-top: calc(var(--space-3) + env(safe-area-inset-top, 0px));
+      }
+      .header h1 { font-size: var(--text-base); }
+      .header-content {
+        flex-wrap: wrap;
+        gap: var(--space-2);
+      }
+
+      /* Nav goes full-width below header on mobile */
+      .header-nav {
+        order: 3;
+        width: 100%;
+        justify-content: center;
+        gap: 2px;
+        margin-top: var(--space-1);
+        padding-top: var(--space-2);
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .tab {
+        position: relative;
+        padding: var(--space-2) var(--space-3);
+        white-space: nowrap;
+        font-size: var(--text-xs);
+        gap: var(--space-1);
+        min-height: 44px;
+        flex: 1;
+        justify-content: center;
+      }
+      .tab-icon { width: 16px; height: 16px; }
       .tab .tab-label { display: none; }
-      /* Mobile tab tooltip */
+
+      /* Show tab label below icon for clarity */
       .tab[data-tab]::after {
         content: attr(data-tab);
         position: absolute;
@@ -2245,25 +2295,260 @@
       .tab[data-tab]:active::after {
         opacity: 1;
       }
-      .tab { position: relative; }
-      /* Touch targets */
-      .btn, .filter-select, .filter-input, .filter-search { min-height: 44px; }
-      /* Prevent iOS zoom */
-      .filter-input, .filter-search { font-size: 16px; }
-      .content { padding: var(--space-4); }
-      .hero-stats { grid-template-columns: 1fr; gap: var(--space-3); }
-      .hero-stat { padding: var(--space-4); }
-      .hero-stat-value { font-size: var(--text-2xl); }
+
+      /* Header actions: compact, but keep pills accessible */
+      .header-actions {
+        gap: var(--space-1);
+      }
+
+      .header-status-pills {
+        gap: 4px;
+      }
+
+      .status-pill {
+        padding: 3px 8px;
+        font-size: 10px;
+      }
+
+      .btn-header {
+        padding: var(--space-1) var(--space-2);
+        min-width: 36px;
+        min-height: 36px;
+        justify-content: center;
+      }
+
+      /* Users popover: tap-friendly (already shows on :focus-within) */
+      .header-users {
+        padding: 4px 8px;
+        min-height: 32px;
+      }
+
+      /* ---- Content Area ---- */
+      .content {
+        padding: var(--space-3);
+        padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+      }
+
+      /* Tab intro: smaller heading */
+      .tab-intro-title {
+        font-size: var(--text-xl);
+      }
+
+      /* ---- Hero Stats ---- */
+      .hero-stats {
+        grid-template-columns: 1fr;
+        gap: var(--space-3);
+      }
+      .hero-stat {
+        padding: var(--space-4);
+      }
+      .hero-stat-value {
+        font-size: var(--text-2xl);
+      }
+      /* Make CTA buttons more prominent on mobile */
+      .hero-stat-cta {
+        padding: var(--space-2) 0;
+        font-size: var(--text-sm);
+      }
+
+      /* Disable hover lift on touch */
+      .hero-stat:hover {
+        transform: none;
+      }
+
+      /* ---- Cards ---- */
+      .card-body { padding: var(--space-3); }
+      .card-header {
+        padding: var(--space-3) var(--space-4);
+        flex-wrap: wrap;
+        gap: var(--space-2);
+      }
+      .card-title { font-size: var(--text-base); }
+
+      /* ---- Filter Bar ---- */
+      .filter-bar {
+        flex-wrap: wrap;
+        padding: var(--space-3);
+        gap: var(--space-2);
+      }
+      .filter-group {
+        min-width: calc(50% - var(--space-2));
+        flex: 1;
+      }
+      .filter-search {
+        min-width: 100%;
+      }
+      .filter-input {
+        width: 60px;
+      }
+
+      /* ---- Customer Table ---- */
+      .table-container {
+        margin: 0 calc(-1 * var(--space-3));
+      }
+      th, td {
+        padding: var(--space-2) var(--space-3);
+        font-size: var(--text-xs);
+      }
+      th {
+        font-size: 10px;
+      }
+      /* Make payment status dropdown touch-friendly */
+      .payment-status-select {
+        min-height: 36px;
+        padding: var(--space-1) 22px var(--space-1) var(--space-2);
+      }
+
+      /* ---- Send Action Bar ---- */
+      .send-form-grid {
+        grid-template-columns: 1fr;
+        gap: var(--space-3);
+      }
+      #sendBillsBtn {
+        width: 100%;
+      }
+
+      /* ---- Dashboard ---- */
+      .dashboard-toolbar {
+        flex-direction: column;
+        gap: var(--space-3);
+        align-items: stretch;
+      }
+      .dashboard-toolbar-left,
+      .dashboard-toolbar-right {
+        flex-wrap: wrap;
+      }
+
+      /* ---- Forms ---- */
       .form-row { grid-template-columns: 1fr; }
-      .header { padding: var(--space-3) var(--space-4); }
-      .header h1 { font-size: var(--text-base); }
-      .header-content { flex-wrap: wrap; gap: var(--space-2); }
-      .header-nav { order: 3; width: 100%; justify-content: center; }
-      .card-body { padding: var(--space-4); }
-      .card-header { padding: var(--space-3) var(--space-4); }
-      .filter-bar { flex-wrap: wrap; padding: var(--space-3); }
-      .filter-group { min-width: calc(50% - var(--space-2)); }
-      .dashboard-toolbar { flex-direction: column; gap: var(--space-3); align-items: stretch; }
+      .form-field-row { grid-template-columns: 1fr; }
+
+      /* ---- Toast override for webapp ---- */
+      .toast-container {
+        bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+        left: var(--space-3);
+        right: var(--space-3);
+        align-items: center;
+      }
+      .toast {
+        white-space: normal;
+        text-align: center;
+      }
+
+      /* ---- Log Table ---- */
+      .log-table .log-details { max-width: 120px; }
+      .log-table .log-user { max-width: 100px; font-size: 10px; }
+      .log-table .log-timestamp { font-size: 10px; }
+      .log-detail-content {
+        grid-template-columns: 1fr;
+        gap: var(--space-1);
+      }
+      .log-detail-content dt {
+        margin-top: var(--space-2);
+      }
+
+      /* ---- Column Mapping ---- */
+      .column-mapping-grid {
+        grid-template-columns: 1fr;
+      }
+      .column-mapping-intro {
+        flex-direction: column;
+        text-align: center;
+      }
+
+      /* ---- Advanced Settings ---- */
+      .adv-toggles { grid-template-columns: 1fr; }
+
+      /* ---- Credentials Modal ---- */
+      .credentials-modal {
+        max-width: 100%;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      }
+
+      /* ---- Fullscreen Preview ---- */
+      .preview-fullscreen-inner {
+        max-width: 100%;
+        border-radius: var(--radius-lg);
+      }
+    }
+
+    /* ---- Extra small screens (< 480px) ---- */
+    @media (max-width: 480px) {
+      .content { padding: var(--space-2); }
+
+      .hero-stat { padding: var(--space-3); }
+      .hero-stat-value { font-size: var(--text-xl); }
+
+      .card-body { padding: var(--space-2); }
+      .card-header { padding: var(--space-2) var(--space-3); }
+
+      /* Stack filter groups fully */
+      .filter-group {
+        min-width: 100%;
+      }
+
+      /* Template cards: single column */
+      .template-cards-grid {
+        grid-template-columns: 1fr;
+      }
+
+      /* Send bar: even tighter */
+      .send-action-bar .card-header { flex-wrap: wrap; }
+
+      /* Messages page heading */
+      .messages-title { font-size: var(--text-lg); }
+
+      /* Settings actions: stack buttons */
+      .settings-actions {
+        flex-direction: column;
+        gap: var(--space-2);
+      }
+      .settings-actions .btn {
+        width: 100%;
+      }
+
+      /* Placeholder tags: scroll horizontally */
+      .placeholder-tags {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding-bottom: var(--space-1);
+        -webkit-overflow-scrolling: touch;
+      }
+      .placeholder-tag {
+        flex-shrink: 0;
+      }
+
+      /* Table: smaller padding */
+      th, td {
+        padding: 6px var(--space-2);
+      }
+
+      /* Header: hide status pill text, keep dots */
+      .status-pill {
+        padding: 3px 6px;
+        font-size: 0;
+        gap: 0;
+      }
+      .status-pill-dot {
+        width: 8px;
+        height: 8px;
+      }
+    }
+
+    /* ---- Disable hover effects on touch devices ---- */
+    @media (hover: none) {
+      .hero-stat:hover {
+        transform: none;
+        box-shadow: var(--shadow-sm);
+        border-color: var(--color-border);
+      }
+      .template-card:hover {
+        transform: none;
+        box-shadow: none;
+      }
+      .quick-action:hover {
+        transform: none;
+      }
     }
 
     @media (min-width: 769px) and (max-width: 1024px) {
@@ -2478,9 +2763,6 @@
       flex: 1;
     }
 
-    @media (max-width: 480px) {
-      .adv-toggles { grid-template-columns: 1fr; }
-    }
 
     /* Template alert container */
     .template-alert-container {
@@ -3013,6 +3295,7 @@
       .settings-layout,
       .settings-layout.collapsed {
         grid-template-columns: 1fr;
+        min-height: auto;
       }
 
       .settings-nav {
@@ -3021,6 +3304,12 @@
         flex-direction: row;
         overflow-x: auto;
         padding: 0;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+
+      .settings-nav::-webkit-scrollbar {
+        display: none;
       }
 
       .settings-nav-header {
@@ -3041,6 +3330,9 @@
         white-space: nowrap;
         justify-content: center;
         font-size: 10px;
+        min-height: 44px;
+        flex: 1;
+        align-items: center;
       }
 
       .settings-nav-item.active,
@@ -3071,9 +3363,33 @@
         padding: var(--space-3);
       }
 
+      /* Settings section header: tighter */
+      .settings-section-title {
+        font-size: var(--text-base);
+      }
+
+      /* Toggle fields: better touch targets */
+      .toggle-field {
+        padding: var(--space-3);
+      }
+      .toggle-switch {
+        width: 44px;
+        height: 24px;
+      }
+
       /* Column mapping responsive */
       .column-mapping-grid {
         grid-template-columns: 1fr;
+      }
+
+      /* Form field rows: stack on mobile */
+      .form-field-row {
+        grid-template-columns: 1fr;
+      }
+
+      /* Info cards: stack on mobile */
+      .info-card {
+        flex-direction: column;
       }
 
       .settings-nav-footer {
@@ -3091,7 +3407,12 @@
         flex-direction: row;
       }
       .settings-nav-footer-actions .btn span { display: none; }
-      .settings-nav-footer-actions .btn { width: auto; padding: var(--space-2); }
+      .settings-nav-footer-actions .btn {
+        width: auto;
+        padding: var(--space-2);
+        min-width: 36px;
+        min-height: 36px;
+      }
     }
   </style>
 </head>

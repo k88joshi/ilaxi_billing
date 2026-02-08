@@ -1612,11 +1612,101 @@
 
       .wizard-container {
         max-height: 100vh;
+        max-width: 100%;
         border-radius: 0;
       }
 
       .wizard-steps {
         display: none;
+      }
+
+      /* Wizard body: more breathing room */
+      .wizard-body {
+        padding: var(--space-3);
+      }
+
+      /* Wizard footer: stack buttons on narrow screens */
+      .wizard-footer {
+        padding: var(--space-3);
+        flex-wrap: wrap;
+        gap: var(--space-2);
+      }
+
+      .wizard-footer-right {
+        flex-wrap: wrap;
+      }
+
+      .wizard-footer-right .btn {
+        flex: 1;
+        min-width: 0;
+      }
+
+      /* Fixed footer: safe area + better mobile layout */
+      .footer {
+        padding: var(--space-2) var(--space-3);
+        padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
+        gap: var(--space-2);
+      }
+
+      .footer-actions {
+        flex-wrap: wrap;
+        gap: var(--space-1);
+      }
+
+      .footer-right {
+        gap: var(--space-1);
+      }
+
+      /* Settings content area */
+      .content {
+        padding: var(--space-3);
+        padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+      }
+
+      /* Cards: tighter padding */
+      .card {
+        padding: var(--space-3);
+      }
+
+      /* Color grid: stack */
+      .color-item {
+        flex-wrap: wrap;
+      }
+
+      /* Tab navigation: scrollable */
+      .tabs {
+        padding: 0 var(--space-2);
+      }
+
+      .tab {
+        padding: var(--space-2);
+        min-height: 44px;
+      }
+
+      /* Toggle card: better touch */
+      .toggle-card {
+        padding: var(--space-3);
+      }
+
+      /* Preview section */
+      .preview-content {
+        max-height: 150px;
+      }
+    }
+
+    /* Prevent iOS zoom on input focus */
+    @media (max-width: 768px) {
+      .form-input,
+      .form-select,
+      .form-textarea {
+        font-size: 16px !important;
+      }
+
+      /* Touch targets */
+      .btn,
+      .form-select,
+      .toggle-track {
+        min-height: 44px;
       }
     }
   </style>
