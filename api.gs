@@ -39,6 +39,7 @@ const API_ACTIONS_ = {
   // User management
   addUser:             { handler: (p) => addUserForWeb(p), admin: true },
   removeUser:          { handler: (p) => removeUserForWeb(p), admin: true },
+  toggleAdmin:         { handler: (p, u) => toggleAdminForWeb(p, u), admin: true },
   // Template preview
   previewTemplate:     { handler: (p) => ({ success: true, preview: previewTemplate(p?.template) }) },
   // Column detection
@@ -334,6 +335,7 @@ function getCurrentUserForWeb(userEmail) {
         email: email,
         liveUsers: liveUsers,
         authorizedUsers: authorizedUsers,
+        adminUsers: getAdminUsers(),
         isAdmin: isAdminUser_(email)
       }
     };
@@ -443,6 +445,44 @@ function removeUserForWeb(payload) {
   } catch (error) {
     Logger.log(`removeUserForWeb error: ${error.message}`);
     logEvent_('users', 'Remove user', error.message, false, getCurrentUserEmail_());
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Toggles admin status for a user from the web interface.
+ * Prevents the calling admin from revoking their own admin status.
+ *
+ * @param {Object} payload - { email, makeAdmin }
+ * @param {string} callerEmail - The authenticated caller's email
+ * @returns {Object} Result with updated users and adminUsers lists
+ * @private
+ */
+function toggleAdminForWeb(payload, callerEmail) {
+  try {
+    const targetEmail = (payload?.email || '').trim().toLowerCase();
+    const makeAdmin = !!payload?.makeAdmin;
+    const caller = (callerEmail || getCurrentUserEmail_() || '').trim().toLowerCase();
+
+    if (!targetEmail || !targetEmail.includes('@')) {
+      return { success: false, error: 'Invalid email address' };
+    }
+
+    // Prevent self-demotion
+    if (!makeAdmin && caller === targetEmail) {
+      return { success: false, error: 'You cannot revoke your own admin privileges' };
+    }
+
+    const result = makeAdmin ? addAdminUser(targetEmail) : removeAdminUser(targetEmail);
+    if (!result.success) return result;
+
+    return {
+      success: true,
+      data: { users: getAllowedUsers(), adminUsers: getAdminUsers() }
+    };
+  } catch (error) {
+    Logger.log(`toggleAdminForWeb error: ${error.message}`);
+    logEvent_('users', 'Toggle admin', error.message, false, getCurrentUserEmail_());
     return { success: false, error: error.message };
   }
 }
