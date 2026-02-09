@@ -1,0 +1,433 @@
+<script>
+    // Template Management
+    var currentTemplateType = 'firstNotice';
+    var originalTemplateContent = '';
+
+    function switchTemplate(templateType) {
+      currentTemplateType = templateType;
+
+      // Update tab UI
+      document.querySelectorAll('.template-tab').forEach(function(tab) {
+        tab.classList.toggle('active', tab.dataset.template === templateType);
+      });
+
+      loadSelectedTemplate();
+    }
+
+    function loadSelectedTemplate() {
+      if (!currentSettings || !currentSettings.templates) {
+        return;
+      }
+
+      var templateNameGroup = document.getElementById('templateNameGroup');
+      var template;
+
+      if (currentTemplateType === 'thankYou') {
+        templateNameGroup.style.display = 'none';
+        document.getElementById('templateMessage').value = currentSettings.templates.thankYouMessage || '';
+      } else {
+        templateNameGroup.style.display = 'block';
+        template = currentSettings.templates.billMessages[currentTemplateType];
+        if (template) {
+          document.getElementById('templateName').value = template.name || '';
+          document.getElementById('templateMessage').value = template.message || '';
+        }
+      }
+
+      // Store original content for change detection
+      originalTemplateContent = document.getElementById('templateMessage').value;
+
+      // Update char count and preview
+      updateCharCount();
+      updateLivePreview();
+      updateTemplateStatus('');
+    }
+
+    function updateCharCount() {
+      var textarea = document.getElementById('templateMessage');
+      var counter = document.getElementById('charCounter');
+      var fill = document.getElementById('charCounterFill');
+      var length = textarea.value.length;
+      var maxLength = 1600;
+      var percentage = Math.min((length / maxLength) * 100, 100);
+
+      counter.textContent = length + ' / ' + maxLength;
+      fill.style.width = percentage + '%';
+
+      // Update colors based on length
+      counter.classList.remove('warning', 'error');
+      fill.classList.remove('warning', 'error');
+
+      if (length > maxLength) {
+        counter.classList.add('error');
+        fill.classList.add('error');
+      } else if (length > maxLength * 0.85) {
+        counter.classList.add('warning');
+        fill.classList.add('warning');
+      }
+
+      // Check for modifications
+      if (textarea.value !== originalTemplateContent) {
+        updateTemplateStatus('modified');
+      } else {
+        updateTemplateStatus('');
+      }
+
+      // Update live preview
+      updateLivePreview();
+    }
+
+    function updateTemplateStatus(status) {
+      var statusEl = document.getElementById('templateStatus');
+      statusEl.className = 'template-status';
+      if (status === 'modified') {
+        statusEl.textContent = 'Unsaved changes';
+        statusEl.classList.add('modified');
+      } else if (status === 'saved') {
+        statusEl.textContent = 'Saved';
+        statusEl.classList.add('saved');
+        setTimeout(function() {
+          if (statusEl.textContent === 'Saved') {
+            statusEl.textContent = '';
+            statusEl.className = 'template-status';
+          }
+        }, 2000);
+      } else {
+        statusEl.textContent = '';
+      }
+    }
+
+    function updateLivePreview() {
+      clearTimeout(previewDebounceTimer);
+      var message = document.getElementById('templateMessage').value;
+      var previewContent = document.getElementById('previewContent');
+
+      if (!message) {
+        // Clear and add placeholder using safe DOM methods
+        while (previewContent.firstChild) previewContent.removeChild(previewContent.firstChild);
+        var placeholder = document.createElement('p');
+        placeholder.className = 'preview-placeholder';
+        placeholder.textContent = 'Start typing to see preview...';
+        previewContent.appendChild(placeholder);
+        return;
+      }
+
+      previewDebounceTimer = setTimeout(function() {
+        serverCall('previewTemplate', { template: message })
+          .then(function(result) {
+            if (result.success && result.preview) {
+              previewContent.textContent = result.preview;
+            } else {
+              previewContent.textContent = message;
+            }
+          })
+          .catch(function() {
+            previewContent.textContent = message;
+          });
+      }, 500);
+    }
+
+    function insertPlaceholder(name) {
+      var textarea = document.getElementById('templateMessage');
+      var start = textarea.selectionStart;
+      var end = textarea.selectionEnd;
+      var text = textarea.value;
+      var placeholder = '{{' + name + '}}';
+
+      textarea.value = text.substring(0, start) + placeholder + text.substring(end);
+      textarea.selectionStart = textarea.selectionEnd = start + placeholder.length;
+      textarea.focus();
+
+      updateCharCount();
+    }
+
+    function saveTemplate() {
+      if (!currentSettings || !currentSettings.templates) {
+        showAlert('templatesAlert', 'error', 'Settings not loaded. Please refresh.');
+        return;
+      }
+
+      var name = document.getElementById('templateName').value.trim();
+      var message = document.getElementById('templateMessage').value;
+
+      if (!message || message.length < 50) {
+        showAlert('templatesAlert', 'error', 'Message must be at least 50 characters.');
+        return;
+      }
+      if (message.length > 1600) {
+        showAlert('templatesAlert', 'error', 'Message must be less than 1600 characters (SMS limit).');
+        return;
+      }
+
+      // Show loading state
+      var btn = document.getElementById('saveTemplateBtn');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      if (currentTemplateType === 'thankYou') {
+        currentSettings.templates.thankYouMessage = message;
+      } else {
+        if (!currentSettings.templates.billMessages[currentTemplateType]) {
+          currentSettings.templates.billMessages[currentTemplateType] = {};
+        }
+        currentSettings.templates.billMessages[currentTemplateType].name = name;
+        currentSettings.templates.billMessages[currentTemplateType].message = message;
+      }
+
+      serverCall('saveSettings', currentSettings).then(function(result) {
+        btn.disabled = false;
+        btn.textContent = 'Save Template';
+
+        if (!result) {
+          showAlert('templatesAlert', 'error', 'No response from server.');
+          return;
+        }
+        if (result.success) {
+          originalTemplateContent = message;
+          updateTemplateStatus('saved');
+          showAlert('templatesAlert', 'success', 'Template saved successfully!');
+          updateSetupChecklist();
+        } else {
+          showAlert('templatesAlert', 'error', result.error || 'Failed to save template');
+        }
+      }).catch(function(err) {
+        btn.disabled = false;
+        btn.textContent = 'Save Template';
+        showAlert('templatesAlert', 'error', 'Error: ' + err.message);
+      });
+    }
+
+    // ============================================
+    // Messages Tab - New Dedicated Template Editor
+    // ============================================
+    var msgCurrentTemplate = 'firstNotice';
+    var msgOriginalContent = '';
+
+    function selectTemplateCard(templateType) {
+      if (templateType === msgCurrentTemplate) return;
+
+      function doSwitch() {
+        msgCurrentTemplate = templateType;
+        document.querySelectorAll('.template-card').forEach(function(card) {
+          card.classList.toggle('active', card.dataset.template === templateType);
+        });
+        loadMsgTemplate();
+      }
+
+      if (hasUnsavedTemplateChanges()) {
+        showConfirm({
+          title: 'Unsaved Changes',
+          message: 'You have unsaved changes to this template. Discard and switch?',
+          confirmLabel: 'Discard',
+          destructive: true
+        }).then(function(ok) {
+          if (ok) doSwitch();
+        });
+      } else {
+        doSwitch();
+      }
+    }
+
+    function loadMsgTemplate() {
+      if (!currentSettings || !currentSettings.templates) {
+        return;
+      }
+
+      var nameInput = document.getElementById('msgTemplateName');
+      var contentArea = document.getElementById('msgTemplateContent');
+      var template;
+
+      if (msgCurrentTemplate === 'thankYou') {
+        nameInput.value = 'Thank You Message';
+        nameInput.disabled = true;
+        contentArea.value = currentSettings.templates.thankYouMessage || '';
+      } else {
+        nameInput.disabled = false;
+        template = currentSettings.templates.billMessages[msgCurrentTemplate];
+        if (template) {
+          nameInput.value = template.name || '';
+          contentArea.value = template.message || '';
+        } else {
+          nameInput.value = '';
+          contentArea.value = '';
+        }
+      }
+
+      msgOriginalContent = contentArea.value;
+      updateMsgCharCount();
+      updateMsgPreview();
+      updateMsgSaveStatus('');
+    }
+
+    function updateMsgCharCount() {
+      var textarea = document.getElementById('msgTemplateContent');
+      var counter = document.getElementById('msgCharCounter');
+      var fill = document.getElementById('msgCharFill');
+      var segmentInfo = document.getElementById('msgSegmentInfo');
+      var length = textarea.value.length;
+      var maxLength = 1600;
+      var percentage = Math.min((length / maxLength) * 100, 100);
+
+      counter.textContent = length + ' / ' + maxLength;
+      fill.style.width = percentage + '%';
+
+      // SMS segment calculation
+      if (segmentInfo && length > 0) {
+        // Detect Unicode: any char outside GSM 7-bit basic + extended set
+        var hasUnicode = /[^\x20-\x7E\n\r\u00A3\u00A5\u00E8\u00E9\u00F9\u00EC\u00F2\u00C7\u00D8\u00F8\u00C5\u00E5\u0394\u03A6\u0393\u039B\u03A9\u03A0\u03A8\u03A3\u0398\u039E\u00C6\u00E6\u00DF\u00C9\u00A4\u00A1\u00C4\u00D6\u00D1\u00DC\u00A7\u00BF\u00E4\u00F6\u00F1\u00FC\u00E0]/.test(textarea.value);
+        var singleLimit = hasUnicode ? 70 : 160;
+        var multiLimit = hasUnicode ? 67 : 153;
+        var segments = length <= singleLimit ? 1 : Math.ceil(length / multiLimit);
+        segmentInfo.textContent = length + ' chars \u00B7 ' + segments + ' segment' + (segments !== 1 ? 's' : '') + (hasUnicode ? ' (Unicode)' : '');
+      } else if (segmentInfo) {
+        segmentInfo.textContent = '';
+      }
+
+      counter.classList.remove('warning', 'error');
+      fill.classList.remove('warning', 'error');
+
+      if (length > maxLength) {
+        counter.classList.add('error');
+        fill.classList.add('error');
+      } else if (length > maxLength * 0.85) {
+        counter.classList.add('warning');
+        fill.classList.add('warning');
+      }
+
+      // Track modifications
+      if (textarea.value !== msgOriginalContent) {
+        updateMsgSaveStatus('modified');
+      } else {
+        updateMsgSaveStatus('');
+      }
+    }
+
+    function updateMsgPreview() {
+      clearTimeout(msgPreviewDebounceTimer);
+      var message = document.getElementById('msgTemplateContent').value;
+      var preview = document.getElementById('msgPreviewBubble');
+
+      if (!message.trim()) {
+        preview.textContent = 'Start typing to see your message preview...';
+        preview.style.fontStyle = 'italic';
+        preview.style.opacity = '0.7';
+        preview.classList.remove('updating');
+        return;
+      }
+
+      preview.style.fontStyle = 'normal';
+      preview.style.opacity = '1';
+      preview.classList.add('updating');
+
+      msgPreviewDebounceTimer = setTimeout(function() {
+        serverCall('previewTemplate', { template: message })
+          .then(function(result) {
+            preview.classList.remove('updating');
+            if (typeof result === 'string') {
+              preview.textContent = result;
+            } else if (result && result.success && result.preview) {
+              preview.textContent = result.preview;
+            } else {
+              preview.textContent = message;
+            }
+          })
+          .catch(function() {
+            preview.classList.remove('updating');
+            preview.textContent = message;
+          });
+      }, 500);
+    }
+
+    function insertMsgPlaceholder(placeholder) {
+      var textarea = document.getElementById('msgTemplateContent');
+      var start = textarea.selectionStart;
+      var end = textarea.selectionEnd;
+      var text = textarea.value;
+      var tag = '{{' + placeholder + '}}';
+
+      textarea.value = text.substring(0, start) + tag + text.substring(end);
+      textarea.focus();
+      textarea.selectionStart = textarea.selectionEnd = start + tag.length;
+
+      updateMsgCharCount();
+      updateMsgPreview();
+    }
+
+    function updateMsgSaveStatus(status) {
+      var statusEl = document.getElementById('globalTemplateStatus');
+      statusEl.classList.remove('visible', 'saved', 'modified');
+
+      if (status === 'saved') {
+        statusEl.textContent = 'Saved';
+        statusEl.classList.add('visible', 'saved');
+      } else if (status === 'modified') {
+        statusEl.textContent = 'Unsaved changes';
+        statusEl.classList.add('visible', 'modified');
+      }
+    }
+
+
+
+    function saveMsgTemplate() {
+      if (!currentSettings || !currentSettings.templates) {
+        showAlert('messagesTabAlert', 'error', 'Settings not loaded. Please refresh.');
+        return;
+      }
+
+      var name = document.getElementById('msgTemplateName').value.trim();
+      var message = document.getElementById('msgTemplateContent').value;
+
+      if (!message || message.length < 50) {
+        showAlert('messagesTabAlert', 'error', 'Message must be at least 50 characters.');
+        return;
+      }
+      if (message.length > 1600) {
+        showAlert('messagesTabAlert', 'error', 'Message must be less than 1600 characters (SMS limit).');
+        return;
+      }
+
+      var btn = document.getElementById('msgSaveBtn');
+      setButtonState(btn, 'loading');
+
+      if (msgCurrentTemplate === 'thankYou') {
+        currentSettings.templates.thankYouMessage = message;
+      } else {
+        if (!currentSettings.templates.billMessages[msgCurrentTemplate]) {
+          currentSettings.templates.billMessages[msgCurrentTemplate] = {};
+        }
+        currentSettings.templates.billMessages[msgCurrentTemplate].name = name;
+        currentSettings.templates.billMessages[msgCurrentTemplate].message = message;
+      }
+
+      serverCall('saveSettings', currentSettings).then(function(result) {
+        if (!result) {
+          setButtonState(btn, 'error');
+          showToast('No response from server', 'error');
+          showAlert('messagesTabAlert', 'error', 'No response from server.');
+          return;
+        }
+        if (result.success) {
+          setButtonState(btn, 'success');
+          showToast('Template saved!', 'success');
+          msgOriginalContent = message;
+          updateMsgSaveStatus('saved');
+          updateSetupChecklist();
+        } else {
+          setButtonState(btn, 'error');
+          showToast(result.error || 'Failed to save', 'error');
+          showAlert('messagesTabAlert', 'error', result.error || 'Failed to save template');
+        }
+      }).catch(function(err) {
+        setButtonState(btn, 'error');
+        showToast('Error: ' + err.message, 'error');
+        showAlert('messagesTabAlert', 'error', 'Error: ' + err.message);
+      });
+    }
+
+    // Initialize Messages tab when switching to it
+    function initMessagesTab() {
+      if (currentSettings && currentSettings.templates) {
+        loadMsgTemplate();
+      }
+    }
+</script>

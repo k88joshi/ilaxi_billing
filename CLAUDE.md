@@ -39,14 +39,26 @@ Run `runAllSettingsManagerTests()` in Apps Script editor (defined in `settings-m
 |------|---------|
 | `main.gs` | Entry points: `onOpen()` menus, `onEdit()` auto-thank-you trigger |
 | `billing-core.gs` | **Shared business logic** — mode-independent core functions called by both modes |
-| `settings-manager.gs` | Settings via `PropertiesService`, template processing, validation, activity log storage |
+| `settings-manager.gs` | Settings via `PropertiesService`, template processing, validation |
+| `activity-logger.gs` | Rolling activity log with ScriptProperties A/B sharding |
 | `api.gs` | Web app API router — thin wrappers that delegate to `billing-core.gs` |
-| `webapp.gs` | Web app auth (`doGet`/`doPost`), Google account whitelist, live user heartbeat via CacheService |
-| `webapp-main.html` | Web app main UI (customer list, messages, settings tabs) |
+| `webapp.gs` | Web app entry points (`doGet`/`doPost`), HTML output helpers, `include()` |
+| `user-manager.gs` | User/admin authorization whitelist, heartbeat live-user tracking via CacheService |
+| `webapp-main.html` | Web app main UI markup (includes CSS and JS from split files below) |
+| `webapp-styles.html` | Web app CSS (dark theme, layout, components) — included by `webapp-main.html` |
+| `webapp-core.js.html` | Web app JS: theme, API calls, tabs, alerts, init |
+| `webapp-dashboard.js.html` | Web app JS: dashboard stats, customer table, filters, send operations |
+| `webapp-messages.js.html` | Web app JS: message template editing and preview |
+| `webapp-settings.js.html` | Web app JS: settings, credentials, users, activity log UI |
 | `twilio.gs` | Twilio SMS with exponential backoff retry (max 4 attempts) |
-| `spreadsheet.gs` | Sheet utilities, column mapping, **add-on UI wrappers** that delegate to `billing-core.gs` |
-| `ui.gs` | Menu dialogs, credential management |
-| `settings.html` | Settings modal UI (tabbed interface, used by both modes) |
+| `spreadsheet.gs` | Sheet utilities, formatters, **add-on UI wrappers** that delegate to `billing-core.gs` |
+| `column-detection.gs` | Column auto-detection, header synonym matching, `getHeaderColumnMap()` |
+| `ui.gs` | Settings dialog, export/import, send summary |
+| `credential-manager.gs` | Twilio credential CRUD, testing, first-time setup wizard completion |
+| `settings.html` | Settings modal UI markup (includes CSS and JS from split files below) |
+| `settings-styles.html` | Settings modal CSS — included by `settings.html` |
+| `settings-core.js.html` | Settings JS: form management, validation, load/save |
+| `settings-wizard.html` | Settings JS: first-time setup wizard flow |
 | `design-tokens.html` | Shared CSS custom properties and reset, included via `<?!= include('design-tokens') ?>` |
 | `settings-manager.test.gs` | Unit tests - run `runAllSettingsManagerTests()` in Apps Script editor |
 

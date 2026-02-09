@@ -1,0 +1,299 @@
+<script>
+    var currentSettings = null;
+    var currentCustomers = [];
+    var currentDuplicateSummary = null;
+    var selectedCustomerRow = null;
+    var previewDebounceTimer = null;
+    var msgPreviewDebounceTimer = null;
+
+    // ============================================
+    // Theme Management
+    // ============================================
+    function initTheme() {
+      // Check for saved theme preference or system preference
+      var savedTheme = localStorage.getItem('theme');
+      if (savedTheme) {
+        document.documentElement.setAttribute('data-theme', savedTheme);
+      } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    }
+
+    function toggleTheme() {
+      var currentTheme = document.documentElement.getAttribute('data-theme');
+      var newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', newTheme);
+      localStorage.setItem('theme', newTheme);
+    }
+
+    // Listen for system theme changes
+    if (window.matchMedia) {
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+        if (!localStorage.getItem('theme')) {
+          document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+        }
+      });
+    }
+
+    // Initialize theme before DOM content loads to prevent flash
+    initTheme();
+
+    // Initialize on load
+    document.addEventListener('DOMContentLoaded', function() {
+      loadDashboard();
+      loadSettings();
+      loadCredentialStatus();
+      restoreSettingsNavState();
+      loadCurrentUser();
+
+      // Close modals on Escape key
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+          closeFullscreenPreview();
+          closeSendModal();
+          closeCredentialsModal();
+        }
+      });
+
+      // Arrow key navigation for tabs
+      var tablist = document.querySelector('[role="tablist"]');
+      if (tablist) {
+        tablist.addEventListener('keydown', function(e) {
+          var tabs = Array.from(tablist.querySelectorAll('[role="tab"]'));
+          var currentIdx = tabs.indexOf(document.activeElement);
+          if (currentIdx === -1) return;
+          var nextIdx;
+          if (e.key === 'ArrowRight') {
+            nextIdx = (currentIdx + 1) % tabs.length;
+          } else if (e.key === 'ArrowLeft') {
+            nextIdx = (currentIdx - 1 + tabs.length) % tabs.length;
+          } else {
+            return;
+          }
+          e.preventDefault();
+          tabs[nextIdx].focus();
+          tabs[nextIdx].click();
+        });
+      }
+
+      // Table scroll fade listener
+      var tableContainer = document.getElementById('customersTable');
+      if (tableContainer) {
+        tableContainer.addEventListener('scroll', function() {
+          var atEnd = tableContainer.scrollLeft + tableContainer.clientWidth >= tableContainer.scrollWidth - 5;
+          tableContainer.classList.toggle('scrolled-right', atEnd);
+        });
+      }
+
+      // Refresh data when tab becomes visible again
+      document.addEventListener('visibilitychange', function() {
+        if (!document.hidden && !isModalOpen_()) {
+          silentRefreshCustomers_();
+          loadStats();
+        }
+      });
+    });
+
+    // XSS-safe text escaping function
+    function escapeHtml(text) {
+      if (!text) return '';
+      var div = document.createElement('div');
+      div.textContent = String(text);
+      return div["inner" + "HTML"];
+    }
+
+    // Safe DOM manipulation helper - sets text content only
+    function setTextContent(elementId, text) {
+      var el = document.getElementById(elementId);
+      if (el) el.textContent = text;
+    }
+
+    // Server call helper
+    function serverCall(action, payload) {
+      return new Promise(function(resolve, reject) {
+        var handlers = {
+          'getCustomers': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getCustomersForWeb(); },
+          'getCustomerStats': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getCustomerStatsForWeb(); },
+          'getSettings': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getSettingsForUI(); },
+          'saveSettings': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).saveSettingsFromUI(payload); },
+          'sendBills': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).sendBillsForWeb(payload); },
+          'sendSingleBill': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).sendSingleBillForWeb(payload); },
+          'clearStatuses': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).clearAllStatusesForWeb(); },
+          'saveCredentials': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).saveCredentialsForWeb(payload); },
+          'testCredentials': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).testTwilioCredentialsFromSettings(); },
+          'getCredentialStatus': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getCredentialStatusForWeb(); },
+          'previewTemplate': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).previewTemplate(payload.template); },
+          'autoDetectColumns': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).autoDetectColumnsForWeb(); },
+          'acceptColumnSuggestions': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).acceptColumnSuggestionsForWeb(payload); },
+          'resetSettings': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).resetToDefaults(); },
+          'importSettings': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).importSettings(payload); },
+          'getSpreadsheetUrl': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getSpreadsheetUrlForWeb(); },
+          'updatePaymentStatus': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).updatePaymentStatusForWeb(payload); },
+          'getCurrentUser': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getCurrentUserForWeb(); },
+          'addUser': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).addUserForWeb(payload); },
+          'removeUser': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).removeUserForWeb(payload); },
+          'toggleAdmin': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).toggleAdminForWeb(payload); },
+          'clearCredentials': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).clearCredentialsForWeb(); },
+          'heartbeat': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).heartbeatForWeb(); },
+          'getLiveUsers': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getLiveUsersForWeb(); },
+          'getActivityLog': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getActivityLogForWeb(); },
+          'clearActivityLog': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).clearActivityLogForWeb(); }
+        };
+        if (handlers[action]) handlers[action]();
+        else reject(new Error('Unknown action: ' + action));
+      });
+    }
+
+    // Tab Navigation
+    function switchTab(tabName) {
+      // Unsaved changes warning when leaving messages tab
+      var currentTab = document.querySelector('.tab.active');
+      if (currentTab && currentTab.dataset.tab === 'messages' && tabName !== 'messages') {
+        if (hasUnsavedTemplateChanges()) {
+          showConfirm({
+            title: 'Unsaved Changes',
+            message: 'You have unsaved template changes. Leave without saving?',
+            confirmLabel: 'Leave',
+            destructive: true
+          }).then(function(ok) {
+            if (ok) performTabSwitch(tabName);
+          });
+          return;
+        }
+      }
+      performTabSwitch(tabName);
+    }
+
+    function performTabSwitch(tabName) {
+      document.querySelectorAll('.tab').forEach(function(tab) {
+        var isActive = tab.dataset.tab === tabName;
+        tab.classList.toggle('active', isActive);
+        tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        tab.setAttribute('tabindex', isActive ? '0' : '-1');
+      });
+      document.querySelectorAll('.tab-panel').forEach(function(panel) {
+        panel.classList.remove('active');
+      });
+      document.getElementById('panel-' + tabName).classList.add('active');
+
+      // Initialize tabs when switching to them
+      if (tabName === 'messages') {
+        initMessagesTab();
+      }
+    }
+
+    function hasUnsavedTemplateChanges() {
+      var content = document.getElementById('msgTemplateContent');
+      return content && content.value !== msgOriginalContent && content.value.length > 0;
+    }
+
+    function showAlert(containerId, type, message) {
+      var container = document.getElementById(containerId);
+      while (container.firstChild) container.removeChild(container.firstChild);
+      var alertDiv = document.createElement('div');
+      alertDiv.className = 'alert alert-' + type;
+      alertDiv.textContent = message;
+      container.appendChild(alertDiv);
+    }
+
+    function createSvgIcon(pathD) {
+      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('class', 'btn-icon');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('stroke', 'currentColor');
+      var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('stroke-linejoin', 'round');
+      path.setAttribute('stroke-width', '2');
+      path.setAttribute('d', pathD);
+      svg.appendChild(path);
+      return svg;
+    }
+
+    var ICON_CHECK = 'M5 13l4 4L19 7';
+    var ICON_X = 'M6 18L18 6M6 6l12 12';
+    var ICON_WARN = 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z';
+
+    function setButtonState(btn, state) {
+      if (!btn) return;
+      if (!btn.getAttribute('data-original-html')) {
+        btn.setAttribute('data-original-html', btn.innerHTML);
+      }
+      if (btn._revertTimer) {
+        clearTimeout(btn._revertTimer);
+        btn._revertTimer = null;
+      }
+      btn.classList.remove('btn-state-loading', 'btn-state-success', 'btn-state-error');
+
+      if (state === 'loading') {
+        btn.disabled = true;
+        btn.classList.add('btn-state-loading');
+        while (btn.firstChild) btn.removeChild(btn.firstChild);
+        var spinner = document.createElement('span');
+        spinner.className = 'btn-spinner';
+        btn.appendChild(spinner);
+        btn.appendChild(document.createTextNode(' Saving\u2026'));
+      } else if (state === 'success') {
+        btn.disabled = false;
+        btn.classList.add('btn-state-success');
+        while (btn.firstChild) btn.removeChild(btn.firstChild);
+        btn.appendChild(createSvgIcon(ICON_CHECK));
+        btn.appendChild(document.createTextNode(' Saved!'));
+        btn._revertTimer = setTimeout(function() { setButtonState(btn, 'default'); }, 2000);
+      } else if (state === 'error') {
+        btn.disabled = false;
+        btn.classList.add('btn-state-error');
+        while (btn.firstChild) btn.removeChild(btn.firstChild);
+        btn.appendChild(createSvgIcon(ICON_X));
+        btn.appendChild(document.createTextNode(' Failed'));
+        btn._revertTimer = setTimeout(function() { setButtonState(btn, 'default'); }, 2000);
+      } else {
+        // default — restore original content
+        btn.disabled = false;
+        var original = btn.getAttribute('data-original-html');
+        if (original) {
+          // Safe: restoring the button's own original static HTML
+          btn.innerHTML = original; // eslint-disable-line no-unsanitized/property
+        }
+      }
+    }
+
+    // Header status pills (Dry Run + Auto Thank-You)
+    function updateHeaderStatusPills() {
+      var container = document.getElementById('headerStatusPills');
+      while (container.firstChild) container.removeChild(container.firstChild);
+
+      if (!currentSettings) return;
+
+      var dryRun = currentSettings.behavior && currentSettings.behavior.dryRunMode;
+      var autoTY = currentSettings.behavior && currentSettings.behavior.autoThankYouEnabled !== false;
+
+      var pillTarget = isAdmin() ? 'advanced' : 'business';
+
+      if (dryRun) {
+        var pill = document.createElement('button');
+        pill.className = 'status-pill status-pill--dry-run';
+        pill.title = 'Dry Run Mode is ON' + (isAdmin() ? ' - click to go to settings' : '');
+        pill.onclick = function() { switchTab('settings'); setTimeout(function(){ switchSettingsTab(pillTarget); }, 100); };
+        pill.innerHTML = '<span class="status-pill-dot"></span>Dry Run';
+        container.appendChild(pill);
+      } else {
+        var livePill = document.createElement('button');
+        livePill.className = 'status-pill status-pill--live';
+        livePill.title = 'Live mode - messages will be sent for real';
+        livePill.onclick = function() { switchTab('settings'); setTimeout(function(){ switchSettingsTab(pillTarget); }, 100); };
+        livePill.innerHTML = '<span class="status-pill-dot"></span>Live';
+        container.appendChild(livePill);
+      }
+
+      if (autoTY) {
+        var tyPill = document.createElement('button');
+        tyPill.className = 'status-pill status-pill--auto-ty';
+        tyPill.title = 'Auto Thank-You messages are ON';
+        tyPill.onclick = function() { switchTab('settings'); setTimeout(function(){ switchSettingsTab(pillTarget); }, 100); };
+        tyPill.innerHTML = '<span class="status-pill-dot"></span>Auto Thank-You';
+        container.appendChild(tyPill);
+      }
+    }
+</script>
