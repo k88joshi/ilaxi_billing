@@ -43,7 +43,8 @@ const API_ACTIONS_ = {
   // Template preview
   previewTemplate:     { handler: (p) => ({ success: true, preview: previewTemplate(p?.template) }) },
   // Column detection
-  autoDetectColumns:   { handler: () => autoDetectColumnsForWeb() },
+  autoDetectColumns:       { handler: () => autoDetectColumnsForWeb() },
+  acceptColumnSuggestions: { handler: (p) => acceptColumnSuggestionsForWeb(p) },
   // Spreadsheet link
   getSpreadsheetUrl:   { handler: () => getSpreadsheetUrlForWeb() },
   // Activity log (admin only)
@@ -92,7 +93,12 @@ function handleApiRequest_(action, payload, userEmail) {
  * @private
  */
 function getCustomersForWeb() {
-  return getCustomersCore_({ serializeDates: true });
+  const ctx = getSheetContext_();
+  const result = getCustomersCore_({ serializeDates: true, _ctx: ctx });
+  if (ctx.warnings && ctx.warnings.length > 0) {
+    result.columnWarnings = ctx.warnings;
+  }
+  return result;
 }
 
 /**
@@ -217,6 +223,46 @@ function autoDetectColumnsForWeb() {
     return { success: true, data: result };
   } catch (error) {
     Logger.log(`autoDetectColumnsForWeb error: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Accepts user-confirmed column suggestions and persists them to settings.
+ * Called when the user clicks "Accept Suggestions" on the warning banner.
+ *
+ * @param {Object} payload - { suggestions: [{key, value}, ...] }
+ * @returns {Object} Result
+ * @private
+ */
+function acceptColumnSuggestionsForWeb(payload) {
+  try {
+    const suggestions = payload?.suggestions;
+    if (!suggestions || !Array.isArray(suggestions) || suggestions.length === 0) {
+      return { success: false, error: 'No suggestions provided' };
+    }
+
+    const settings = getSettings();
+    const applied = [];
+    for (const s of suggestions) {
+      if (s.key && s.value && settings.columns[s.key] !== undefined) {
+        settings.columns[s.key] = s.value;
+        applied.push(`${s.key}: "${s.value}"`);
+      }
+    }
+
+    if (applied.length === 0) {
+      return { success: false, error: 'No valid suggestions to apply' };
+    }
+
+    const result = saveSettings(settings);
+    if (!result.success) return result;
+
+    const details = applied.join(', ');
+    logEvent_('columns', 'Accept column suggestions', details, true, getCurrentUserEmail_());
+    return { success: true, data: { applied: applied.length } };
+  } catch (error) {
+    Logger.log(`acceptColumnSuggestionsForWeb error: ${error.message}`);
     return { success: false, error: error.message };
   }
 }

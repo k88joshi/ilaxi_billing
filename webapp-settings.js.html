@@ -1,0 +1,1345 @@
+<script>
+    // Settings Sub-Tab Navigation
+    function switchSettingsTab(tabName) {
+      if (tabName === 'advanced' && !isAdmin()) return;
+      // Update nav items
+      document.querySelectorAll('.settings-nav-item').forEach(function(item) {
+        item.classList.toggle('active', item.dataset.settingsTab === tabName);
+      });
+      // Update panels
+      document.querySelectorAll('.settings-panel').forEach(function(panel) {
+        panel.classList.remove('active');
+      });
+      var targetPanel = document.getElementById('settings-' + tabName);
+      if (targetPanel) {
+        targetPanel.classList.add('active');
+      }
+      // Initialize activity log when switching to advanced tab
+      if (tabName === 'advanced') {
+        initActivityLog();
+      }
+    }
+
+    // Toggle Settings Sidebar Collapsed State
+    function toggleSettingsNav() {
+      var layout = document.querySelector('.settings-layout');
+      var toggleBtn = document.querySelector('.settings-nav-toggle');
+      if (layout) {
+        layout.classList.toggle('collapsed');
+        // Update toggle button title and aria
+        var isCollapsed = layout.classList.contains('collapsed');
+        if (toggleBtn) {
+          toggleBtn.title = isCollapsed ? 'Expand sidebar' : 'Collapse sidebar';
+          toggleBtn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+        }
+        // Save preference to localStorage
+        localStorage.setItem('settingsNavCollapsed', isCollapsed ? 'true' : 'false');
+      }
+    }
+
+    // Restore settings nav state on load
+    function restoreSettingsNavState() {
+      var saved = localStorage.getItem('settingsNavCollapsed');
+      if (saved === 'true') {
+        var layout = document.querySelector('.settings-layout');
+        var toggleBtn = document.querySelector('.settings-nav-toggle');
+        if (layout) {
+          layout.classList.add('collapsed');
+          if (toggleBtn) {
+            toggleBtn.title = 'Expand sidebar';
+          }
+        }
+      }
+    }
+
+    // Current User + Live Users
+    var authorizedUsers = [];
+    var adminUsers = [];
+    var currentLiveUsers = [];
+
+    function loadCurrentUser() {
+      serverCall('getCurrentUser').then(function(result) {
+        if (!result || !result.success) return;
+        var data = result.data;
+        currentUserEmail = data.email || '';
+        isCurrentUserAdmin = data.isAdmin || false;
+
+        // Store authorized users and admin users for settings user management
+        authorizedUsers = data.authorizedUsers || [];
+        adminUsers = data.adminUsers || [];
+
+        // Display live users in the header
+        updateHeaderLiveUsers(data.liveUsers || []);
+
+        // Hide advanced settings tab for non-admin users
+        var advancedNav = document.querySelector('.settings-nav-item[data-settings-tab="advanced"]');
+        if (advancedNav) {
+          advancedNav.style.display = isAdmin() ? '' : 'none';
+        }
+
+        // Refresh header pills now that admin status is known
+        updateHeaderStatusPills();
+
+        // Start the heartbeat interval
+        startHeartbeat();
+      }).catch(function() {});
+    }
+
+    function buildUsersSvgIcon() {
+      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('stroke', 'currentColor');
+      var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('stroke-linejoin', 'round');
+      path.setAttribute('stroke-width', '2');
+      path.setAttribute('d', 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z');
+      svg.appendChild(path);
+      return svg;
+    }
+
+    function updateHeaderLiveUsers(liveUsers) {
+      currentLiveUsers = liveUsers || [];
+      var usersEl = document.getElementById('headerUsers');
+      if (!usersEl) return;
+
+      while (usersEl.firstChild) usersEl.removeChild(usersEl.firstChild);
+
+      var userCount = liveUsers.length;
+      if (userCount > 0) {
+        usersEl.appendChild(buildUsersSvgIcon());
+        usersEl.appendChild(document.createTextNode(userCount + ' online'));
+
+        var popover = document.createElement('div');
+        popover.className = 'users-popover';
+
+        var title = document.createElement('div');
+        title.className = 'users-popover-title';
+        title.textContent = 'Online Now';
+        popover.appendChild(title);
+
+        var myEmail = currentUserEmail.toLowerCase();
+        liveUsers.forEach(function(email) {
+          var isCurrent = email.toLowerCase() === myEmail;
+          var item = document.createElement('div');
+          item.className = 'users-popover-item' + (isCurrent ? ' current-user' : '');
+
+          var dot = document.createElement('span');
+          dot.className = 'user-dot user-dot--live';
+          item.appendChild(dot);
+
+          var emailSpan = document.createElement('span');
+          emailSpan.textContent = email;
+          item.appendChild(emailSpan);
+
+          if (isCurrent) {
+            var badge = document.createElement('span');
+            badge.className = 'you-badge';
+            badge.textContent = 'you';
+            item.appendChild(badge);
+          }
+          popover.appendChild(item);
+        });
+
+        usersEl.appendChild(popover);
+        usersEl.removeAttribute('title');
+      }
+    }
+
+    // Heartbeat - sends every 60s, updates header live users on response
+    var heartbeatIntervalId = null;
+
+    function startHeartbeat() {
+      if (heartbeatIntervalId) return;
+      heartbeatIntervalId = setInterval(function() {
+        serverCall('heartbeat').then(function(result) {
+          if (result && result.success) {
+            updateHeaderLiveUsers(result.data.liveUsers || []);
+          }
+          if (!document.hidden && !isModalOpen_()) {
+            silentRefreshCustomers_();
+            loadStats();
+          }
+        }).catch(function() {});
+      }, 60000);
+    }
+
+    // Clear Twilio credentials
+    function clearCredentials() {
+      showConfirm({
+        title: 'Clear Credentials',
+        message: 'Are you sure you want to clear all Twilio credentials? You will need to re-enter them to send messages.',
+        confirmLabel: 'Clear',
+        destructive: true
+      }).then(function(ok) {
+        if (!ok) return;
+        var btn = document.getElementById('clearCredsBtn');
+        var defaultLabel = 'Clear';
+        btn.disabled = true;
+        btn.textContent = 'Clearing...';
+        serverCall('clearCredentials')
+          .then(function(result) {
+            if (result.success) {
+              showToast('Twilio credentials cleared', 'success');
+              loadCredentialStatus();
+              closeCredentialsModal();
+            } else {
+              showToast(result.error || 'Failed to clear credentials', 'error');
+            }
+          })
+          .catch(function(err) {
+            showToast(err.message || 'Failed to clear credentials', 'error');
+          })
+          .then(function() {
+            btn.disabled = false;
+            btn.textContent = defaultLabel;
+          });
+      });
+    }
+
+    // User management
+    var currentUserEmail = '';
+    var isCurrentUserAdmin = false;
+
+    function isAdmin() {
+      return isCurrentUserAdmin;
+    }
+
+    function renderUsersList(users) {
+      var container = document.getElementById('usersList');
+      if (!container) return;
+      while (container.firstChild) container.removeChild(container.firstChild);
+      if (!users || users.length === 0) {
+        var emptyMsg = document.createElement('p');
+        emptyMsg.style.cssText = 'font-size: var(--text-sm); color: var(--color-text-muted); padding: var(--space-2);';
+        emptyMsg.textContent = 'No authorized users.';
+        container.appendChild(emptyMsg);
+        return;
+      }
+      // Build set of live user emails for quick lookup
+      var liveSet = {};
+      (currentLiveUsers || []).forEach(function(e) { liveSet[e.toLowerCase()] = true; });
+
+      users.forEach(function(email) {
+        var isCurrentUser = email.toLowerCase() === currentUserEmail.toLowerCase();
+        var isLive = !!liveSet[email.toLowerCase()];
+        var item = document.createElement('div');
+        item.className = 'users-manage-item';
+
+        // Online status dot
+        if (isLive) {
+          var dot = document.createElement('span');
+          dot.className = 'user-dot user-dot--live';
+          dot.title = 'Online now';
+          item.appendChild(dot);
+        }
+
+        var emailSpan = document.createElement('span');
+        emailSpan.className = 'user-email';
+        emailSpan.textContent = email;
+        item.appendChild(emailSpan);
+
+        if (isCurrentUser) {
+          var youTag = document.createElement('span');
+          youTag.className = 'you-tag';
+          youTag.textContent = 'you';
+          item.appendChild(youTag);
+        }
+
+        // Admin badge
+        var isUserAdmin = adminUsers.indexOf(email.toLowerCase()) !== -1;
+        if (isUserAdmin) {
+          var adminTag = document.createElement('span');
+          adminTag.className = 'admin-tag';
+          adminTag.textContent = 'Admin';
+          item.appendChild(adminTag);
+        }
+
+        // Admin toggle button (shield icon)
+        var toggleBtn = document.createElement('button');
+        toggleBtn.className = 'btn-toggle-admin' + (isUserAdmin ? ' is-admin' : '');
+        if (isCurrentUser) {
+          toggleBtn.disabled = true;
+          toggleBtn.title = 'Cannot change your own admin status';
+        } else {
+          toggleBtn.title = isUserAdmin ? 'Revoke admin' : 'Grant admin';
+        }
+        toggleBtn.onclick = (function(userEmail, userIsAdmin) {
+          return function() { toggleAdmin(userEmail, userIsAdmin); };
+        })(email, isUserAdmin);
+        // Shield SVG icon
+        var shieldSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        shieldSvg.setAttribute('width', '16');
+        shieldSvg.setAttribute('height', '16');
+        shieldSvg.setAttribute('fill', 'none');
+        shieldSvg.setAttribute('viewBox', '0 0 24 24');
+        shieldSvg.setAttribute('stroke', 'currentColor');
+        var shieldPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        shieldPath.setAttribute('stroke-linecap', 'round');
+        shieldPath.setAttribute('stroke-linejoin', 'round');
+        shieldPath.setAttribute('stroke-width', '2');
+        shieldPath.setAttribute('d', isUserAdmin
+          ? 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'
+          : 'M20.618 5.984A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z');
+        shieldSvg.appendChild(shieldPath);
+        toggleBtn.appendChild(shieldSvg);
+        item.appendChild(toggleBtn);
+
+        var removeBtn = document.createElement('button');
+        removeBtn.className = 'btn-remove-user';
+        if (isCurrentUser) {
+          removeBtn.disabled = true;
+          removeBtn.title = 'Cannot remove yourself';
+        } else {
+          removeBtn.title = 'Remove user';
+        }
+        removeBtn.onclick = (function(userEmail) {
+          return function() { removeUser(userEmail); };
+        })(email);
+        // Build remove icon with DOM (XSS-safe, no user data in SVG)
+        var removeSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        removeSvg.setAttribute('width', '16');
+        removeSvg.setAttribute('height', '16');
+        removeSvg.setAttribute('fill', 'none');
+        removeSvg.setAttribute('viewBox', '0 0 24 24');
+        removeSvg.setAttribute('stroke', 'currentColor');
+        var removePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        removePath.setAttribute('stroke-linecap', 'round');
+        removePath.setAttribute('stroke-linejoin', 'round');
+        removePath.setAttribute('stroke-width', '2');
+        removePath.setAttribute('d', 'M6 18L18 6M6 6l12 12');
+        removeSvg.appendChild(removePath);
+        removeBtn.appendChild(removeSvg);
+        item.appendChild(removeBtn);
+
+        container.appendChild(item);
+      });
+    }
+
+    function loadUsersList() {
+      serverCall('getCurrentUser').then(function(result) {
+        if (result && result.success) {
+          currentUserEmail = result.data.email || '';
+          isCurrentUserAdmin = result.data.isAdmin || false;
+          authorizedUsers = result.data.authorizedUsers || [];
+          adminUsers = result.data.adminUsers || [];
+          renderUsersList(authorizedUsers);
+        }
+      });
+    }
+
+    function addUser() {
+      var input = document.getElementById('newUserEmail');
+      var email = (input.value || '').trim();
+      if (!email || !email.includes('@')) {
+        showToast('Please enter a valid email address', 'error');
+        return;
+      }
+      serverCall('addUser', { email: email })
+        .then(function(result) {
+          if (result.success) {
+            input.value = '';
+            renderUsersList(result.data.users);
+            loadCurrentUser();
+            showToast('User added successfully', 'success');
+          } else {
+            showToast(result.error || 'Failed to add user', 'error');
+          }
+        })
+        .catch(function(err) {
+          showToast(err.message || 'Failed to add user', 'error');
+        });
+    }
+
+    function removeUser(email) {
+      showConfirm({
+        title: 'Remove User',
+        message: 'Remove ' + email + ' from authorized users?',
+        confirmLabel: 'Remove',
+        destructive: true
+      }).then(function(ok) {
+        if (!ok) return;
+        serverCall('removeUser', { email: email })
+          .then(function(result) {
+            if (result.success) {
+              renderUsersList(result.data.users);
+              loadCurrentUser();
+              showToast('User removed', 'success');
+            } else {
+              showToast(result.error || 'Failed to remove user', 'error');
+            }
+          })
+          .catch(function(err) {
+            showToast(err.message || 'Failed to remove user', 'error');
+          });
+      });
+    }
+
+    function toggleAdmin(email, isCurrentlyAdmin) {
+      var action = isCurrentlyAdmin ? 'Revoke admin from' : 'Grant admin to';
+      showConfirm({
+        title: (isCurrentlyAdmin ? 'Revoke' : 'Grant') + ' Admin',
+        message: action + ' ' + email + '?',
+        confirmLabel: isCurrentlyAdmin ? 'Revoke' : 'Grant',
+        destructive: isCurrentlyAdmin
+      }).then(function(ok) {
+        if (!ok) return;
+        serverCall('toggleAdmin', { email: email, makeAdmin: !isCurrentlyAdmin })
+          .then(function(result) {
+            if (result.success) {
+              adminUsers = result.data.adminUsers || [];
+              authorizedUsers = result.data.users || authorizedUsers;
+              renderUsersList(authorizedUsers);
+              loadCurrentUser();
+              showToast(isCurrentlyAdmin ? 'Admin revoked' : 'Admin granted', 'success');
+            } else {
+              showToast(result.error || 'Failed to toggle admin', 'error');
+            }
+          })
+          .catch(function(err) {
+            showToast(err.message || 'Failed to toggle admin', 'error');
+          });
+      });
+    }
+
+    // Credentials Modal
+    function openCredentialsModal() {
+      loadCredentialStatus();
+      document.getElementById('credentialsModal').classList.add('visible');
+    }
+
+    function closeCredentialsModal() {
+      document.getElementById('credentialsModal').classList.remove('visible');
+      // Reset form fields
+      document.getElementById('accountSid').value = '';
+      document.getElementById('authToken').value = '';
+      document.getElementById('twilioPhone').value = '';
+      document.getElementById('connectionTestSteps').style.display = 'none';
+      var alertEl = document.getElementById('credentialAlert');
+      if (alertEl) alertEl.textContent = '';
+      // Reset test steps
+      ['testStep1', 'testStep2', 'testStep3'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) { el.classList.remove('active', 'done', 'fail'); }
+      });
+      // Reset field errors
+      var sidErr = document.getElementById('sidError');
+      var phoneErr = document.getElementById('phoneError');
+      if (sidErr) sidErr.classList.remove('visible');
+      if (phoneErr) phoneErr.classList.remove('visible');
+    }
+
+    // Credentials
+    var credentialsConfigured = false;
+
+    function loadCredentialStatus() {
+      serverCall('getCredentialStatus').then(function(result) {
+        var loadingEl = document.getElementById('credStatusLoading');
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (!result) {
+          console.error('Failed to load credential status: No response from server');
+          return;
+        }
+        if (result.success) {
+          var data = result.data;
+          credentialsConfigured = !!data.allSet;
+          var statusDiv = document.getElementById('credentialStatus');
+          while (statusDiv.firstChild) statusDiv.removeChild(statusDiv.firstChild);
+          if (data.allSet) {
+            statusDiv.className = 'alert alert-success';
+            statusDiv.textContent = 'Credentials configured. SID: ' + data.maskedSid + ', Phone: ' + data.maskedPhone;
+          } else {
+            statusDiv.className = 'alert alert-warning';
+            statusDiv.textContent = 'Some credentials are not set. Please configure all fields.';
+          }
+          statusDiv.style.display = 'flex';
+          // Update inline badge in Advanced Settings
+          var badge = document.getElementById('credStatusBadge');
+          if (badge) {
+            if (data.allSet) {
+              badge.textContent = 'Connected';
+              badge.style.background = 'var(--color-success-bg, #dcfce7)';
+              badge.style.color = 'var(--color-success-text, #166534)';
+            } else {
+              badge.textContent = 'Not configured';
+              badge.style.background = 'var(--color-warning-bg, #fef9c3)';
+              badge.style.color = 'var(--color-warning-text, #854d0e)';
+            }
+          }
+          updateSetupChecklist();
+        }
+      }).catch(function(err) { console.error('Failed to load credential status:', err); });
+    }
+
+    function saveCredentials() {
+      var btn = document.getElementById('saveCredentialsBtn');
+      var sid = document.getElementById('accountSid').value.trim();
+      var token = document.getElementById('authToken').value.trim();
+      var phone = document.getElementById('twilioPhone').value.trim();
+
+      if (!sid && !token && !phone) {
+        showAlert('credentialAlert', 'warning', 'Please enter at least one credential to save.');
+        return;
+      }
+
+      setButtonState(btn, 'loading');
+      serverCall('saveCredentials', { accountSid: sid || undefined, authToken: token || undefined, twilioPhone: phone || undefined })
+        .then(function(result) {
+          if (result.success) {
+            setButtonState(btn, 'success');
+            showToast('Credentials saved!', 'success');
+            showAlert('credentialAlert', 'success', 'Credentials saved successfully!');
+            document.getElementById('accountSid').value = '';
+            document.getElementById('authToken').value = '';
+            document.getElementById('twilioPhone').value = '';
+            loadCredentialStatus();
+          } else {
+            setButtonState(btn, 'error');
+            showToast(result.error || 'Failed to save', 'error');
+            showAlert('credentialAlert', 'error', result.error || 'Failed to save');
+          }
+        })
+        .catch(function(err) {
+          setButtonState(btn, 'error');
+          showToast('Error: ' + err.message, 'error');
+          showAlert('credentialAlert', 'error', 'Error: ' + err.message);
+        });
+    }
+
+    function testCredentials() {
+      var stepsContainer = document.getElementById('connectionTestSteps');
+      var steps = stepsContainer ? stepsContainer.querySelectorAll('.step-item') : [];
+      var testBtn = document.getElementById('testConnectionBtn');
+
+      // Reset and show steps
+      steps.forEach(function(s) { s.className = 'step-item'; });
+      if (stepsContainer) stepsContainer.style.display = 'flex';
+      if (testBtn) testBtn.disabled = true;
+      showAlert('credentialAlert', '', '');
+
+      // Step 1: Connecting
+      if (steps[0]) steps[0].classList.add('active');
+
+      setTimeout(function() {
+        // Step 2: Authenticating
+        if (steps[0]) { steps[0].classList.remove('active'); steps[0].classList.add('done'); }
+        if (steps[1]) steps[1].classList.add('active');
+
+        setTimeout(function() {
+          // Step 3: Verifying — make actual server call
+          if (steps[1]) { steps[1].classList.remove('active'); steps[1].classList.add('done'); }
+          if (steps[2]) steps[2].classList.add('active');
+
+          serverCall('testCredentials').then(function(result) {
+            if (testBtn) testBtn.disabled = false;
+            if (!result) {
+              if (steps[2]) { steps[2].classList.remove('active'); steps[2].classList.add('error'); }
+              showAlert('credentialAlert', 'error', 'No response from server.');
+              return;
+            }
+            if (result.success) {
+              if (steps[2]) { steps[2].classList.remove('active'); steps[2].classList.add('done'); }
+              showAlert('credentialAlert', 'success', 'Connection successful! Account: ' + result.accountName);
+            } else {
+              if (steps[2]) { steps[2].classList.remove('active'); steps[2].classList.add('error'); }
+              showAlert('credentialAlert', 'error', result.error || 'Connection failed');
+            }
+          }).catch(function(err) {
+            if (testBtn) testBtn.disabled = false;
+            if (steps[2]) { steps[2].classList.remove('active'); steps[2].classList.add('error'); }
+            showAlert('credentialAlert', 'error', 'Error: ' + err.message);
+          });
+        }, 600);
+      }, 600);
+    }
+
+    // Inline credential field validation
+    function showFieldError(input, errorEl, msg) {
+      input.classList.add('input-error');
+      input.classList.remove('input-valid');
+      if (errorEl) { errorEl.textContent = msg; errorEl.classList.add('visible'); }
+    }
+
+    function hideFieldError(input, errorEl) {
+      input.classList.remove('input-error');
+      if (errorEl) { errorEl.textContent = ''; errorEl.classList.remove('visible'); }
+    }
+
+    function validateSidField() {
+      var input = document.getElementById('accountSid');
+      var errorEl = document.getElementById('sidError');
+      if (!input || !input.value.trim()) { hideFieldError(input, errorEl); return; }
+      var val = input.value.trim();
+      if (val.length < 2 || val.substring(0, 2) !== 'AC') {
+        showFieldError(input, errorEl, 'Account SID must start with "AC"');
+      } else if (val.length !== 34) {
+        showFieldError(input, errorEl, 'Account SID should be 34 characters');
+      } else {
+        hideFieldError(input, errorEl);
+        input.classList.add('input-valid');
+      }
+    }
+
+    function validatePhoneField() {
+      var input = document.getElementById('twilioPhone');
+      var errorEl = document.getElementById('phoneError');
+      if (!input || !input.value.trim()) { hideFieldError(input, errorEl); return; }
+      var val = input.value.trim();
+      if (val.charAt(0) !== '+') {
+        showFieldError(input, errorEl, 'Phone number must start with "+" (e.g., +1...)');
+      } else if (!/^\+\d{10,15}$/.test(val)) {
+        showFieldError(input, errorEl, 'Enter a valid phone number (e.g., +14155551234)');
+      } else {
+        hideFieldError(input, errorEl);
+        input.classList.add('input-valid');
+      }
+    }
+
+    // Settings
+    function loadSettings() {
+      serverCall('getSettings').then(function(result) {
+        if (!result) {
+          console.error('Failed to load settings: No response from server');
+          showAlert('settingsAlert', 'error', 'Failed to load settings. Please refresh the page.');
+          return;
+        }
+        if (result.settings) {
+          currentSettings = result.settings;
+          populateSettingsForm(result.settings);
+        }
+      }).catch(function(err) { console.error('Failed to load settings:', err); });
+      loadUsersList();
+    }
+
+    function populateSettingsForm(settings) {
+      document.getElementById('businessName').value = settings.business.name || '';
+      document.getElementById('etransferEmail').value = settings.business.etransferEmail || '';
+      document.getElementById('businessPhone').value = settings.business.phoneNumber || '';
+      document.getElementById('whatsappLink').value = settings.business.whatsappLink || '';
+      document.getElementById('batchSize').value = settings.behavior.batchSize || 75;
+      document.getElementById('messageDelay').value = settings.behavior.messageDelayMs || 1000;
+      document.getElementById('headerRow').value = settings.behavior.headerRowIndex || 1;
+      document.getElementById('testOrderId').value = settings.behavior.testOrderId || '';
+      document.getElementById('autoThankYouEnabled').checked = settings.behavior.autoThankYouEnabled !== false;
+      document.getElementById('dryRunCheckbox').checked = !!settings.behavior.dryRunMode;
+
+      // Load first template
+      loadSelectedTemplate();
+
+      // Auto-detect columns to populate dropdowns (auto-apply on first load if none configured)
+      autoDetectColumns(true);
+
+      // Update setup checklist with loaded settings
+      updateSetupChecklist();
+
+      // Update header status pills
+      updateHeaderStatusPills();
+      updateSendReview();
+      updateTestDataBadge();
+    }
+
+    function saveSettings(btn) {
+      if (!currentSettings) {
+        showAlert('settingsAlert', 'error', 'Settings not loaded. Please refresh.');
+        return;
+      }
+      currentSettings.business.name = document.getElementById('businessName').value;
+      currentSettings.business.etransferEmail = document.getElementById('etransferEmail').value;
+      currentSettings.business.phoneNumber = document.getElementById('businessPhone').value;
+      currentSettings.business.whatsappLink = document.getElementById('whatsappLink').value;
+      currentSettings.behavior.batchSize = parseInt(document.getElementById('batchSize').value) || 75;
+      currentSettings.behavior.messageDelayMs = parseInt(document.getElementById('messageDelay').value) || 1000;
+      currentSettings.behavior.headerRowIndex = parseInt(document.getElementById('headerRow').value) || 1;
+      currentSettings.behavior.testOrderId = document.getElementById('testOrderId').value.trim();
+      currentSettings.behavior.autoThankYouEnabled = document.getElementById('autoThankYouEnabled').checked;
+      currentSettings.behavior.dryRunMode = document.getElementById('dryRunCheckbox').checked;
+
+      setButtonState(btn, 'loading');
+      serverCall('saveSettings', currentSettings).then(function(result) {
+        if (!result) {
+          setButtonState(btn, 'error');
+          showToast('No response from server', 'error');
+          showAlert('settingsAlert', 'error', 'No response from server.');
+          return;
+        }
+        if (result.success) {
+          if (result.warning) {
+            setButtonState(btn, 'success');
+            showToast('Settings saved with warning', 'warning');
+            showAlert('settingsAlert', 'warning', result.warning);
+          } else {
+            setButtonState(btn, 'success');
+            showToast('Settings saved!', 'success');
+            showAlert('settingsAlert', 'success', 'Settings saved successfully!');
+          }
+          updateSetupChecklist();
+          updateHeaderStatusPills();
+        } else {
+          setButtonState(btn, 'error');
+          showToast(result.error || 'Failed to save', 'error');
+          showAlert('settingsAlert', 'error', result.error || 'Failed to save');
+        }
+      }).catch(function(err) {
+        setButtonState(btn, 'error');
+        showToast('Error: ' + err.message, 'error');
+        showAlert('settingsAlert', 'error', 'Error: ' + err.message);
+      });
+    }
+
+    // Column Mapping
+    var sheetHeaders = [];
+
+    function autoDetectColumns(autoApply) {
+      var statusDiv = document.getElementById('columnMappingStatus');
+      statusDiv.style.display = 'flex';
+
+      serverCall('autoDetectColumns').then(function(result) {
+        statusDiv.style.display = 'none';
+
+        if (!result) {
+          showAlert('columnsAlert', 'error', 'No response from server.');
+          return;
+        }
+        if (result.success) {
+          var data = result.data;
+          sheetHeaders = data.headers || [];
+          populateColumnDropdowns(data.headers, data.detections);
+
+          // Sync dropdown state back to currentSettings so checklist sees actual values
+          if (currentSettings && currentSettings.columns) {
+            var columnFields = ['phoneNumber', 'customerName', 'balance', 'numTiffins', 'dueDate', 'messageStatus', 'orderId', 'paymentStatus'];
+            columnFields.forEach(function(field) {
+              var select = document.getElementById('col' + field.charAt(0).toUpperCase() + field.slice(1));
+              if (select) {
+                currentSettings.columns[field] = select.value || '';
+              }
+            });
+          }
+          updateSetupChecklist();
+
+          var detectedCount = Object.keys(data.detections || {}).length;
+          showAlert('columnsAlert', 'success', 'Columns analyzed! ' + detectedCount + ' fields auto-detected.');
+
+          // On first load, auto-apply detected columns if none are configured
+          if (autoApply && detectedCount > 0 && currentSettings && currentSettings.columns) {
+            var hasExisting = Object.keys(currentSettings.columns).some(function(k) { return currentSettings.columns[k]; });
+            if (!hasExisting) {
+              var columnFields = ['phoneNumber', 'customerName', 'balance', 'numTiffins', 'dueDate', 'messageStatus', 'orderId', 'paymentStatus'];
+              columnFields.forEach(function(field) {
+                var det = data.detections[field];
+                if (det && det.match) {
+                  currentSettings.columns[field] = det.match;
+                }
+              });
+              // Save auto-detected columns silently
+              serverCall('saveSettings', currentSettings).then(function() {
+                updateSetupChecklist();
+              }).catch(function() {});
+            }
+          }
+        } else {
+          showAlert('columnsAlert', 'error', result.error || 'Failed to detect columns');
+        }
+      }).catch(function(err) {
+        statusDiv.style.display = 'none';
+        showAlert('columnsAlert', 'error', 'Error: ' + err.message);
+      });
+    }
+
+    function populateColumnDropdowns(headers, detections) {
+      var columnFields = ['phoneNumber', 'customerName', 'balance', 'numTiffins', 'dueDate', 'messageStatus', 'orderId', 'paymentStatus'];
+
+      columnFields.forEach(function(field) {
+        var select = document.getElementById('col' + field.charAt(0).toUpperCase() + field.slice(1));
+        var badge = document.getElementById('badge' + field.charAt(0).toUpperCase() + field.slice(1));
+        if (!select) return;
+
+        // Clear existing options
+        while (select.firstChild) select.removeChild(select.firstChild);
+
+        // Add default option
+        var defaultOpt = document.createElement('option');
+        defaultOpt.value = '';
+        defaultOpt.textContent = '-- Select column --';
+        select.appendChild(defaultOpt);
+
+        // Add header options
+        headers.forEach(function(header) {
+          var opt = document.createElement('option');
+          opt.value = header;
+          opt.textContent = header;
+          select.appendChild(opt);
+        });
+
+        // Apply saved setting (priority) or auto-detection (fallback)
+        var detection = detections ? detections[field] : null;
+        var currentValue = currentSettings && currentSettings.columns ? currentSettings.columns[field] : '';
+
+        if (currentValue && headers.indexOf(currentValue) !== -1) {
+          // Saved setting exists and matches a sheet header — use it
+          select.value = currentValue;
+          if (badge) {
+            badge.className = 'column-detect-badge';
+            badge.textContent = 'Saved';
+            badge.classList.add('high');
+          }
+        } else if (detection && detection.match) {
+          select.value = detection.match;
+
+          // Show confidence badge
+          if (badge) {
+            badge.className = 'column-detect-badge';
+            if (detection.confidence >= 90) {
+              badge.textContent = 'Auto-detected';
+              badge.classList.add('high');
+            } else if (detection.confidence >= 70) {
+              badge.textContent = 'Please verify';
+              badge.classList.add('medium');
+            } else {
+              badge.textContent = 'Low confidence';
+              badge.classList.add('low');
+            }
+          }
+        } else if (currentValue) {
+          // Saved value doesn't match any header — warn user
+          var staleOpt = document.createElement('option');
+          staleOpt.value = currentValue;
+          staleOpt.textContent = currentValue + ' (not in sheet)';
+          select.appendChild(staleOpt);
+          select.value = currentValue;
+          if (badge) {
+            badge.className = 'column-detect-badge low';
+            badge.textContent = 'Not in sheet';
+            badge.style.display = '';
+          }
+        }
+      });
+      updateColumnCompleteness();
+    }
+
+    function updateColumnCompleteness() {
+      var container = document.getElementById('columnCompleteness');
+      var label = document.getElementById('columnCompletenessLabel');
+      var fill = document.getElementById('columnCompletenessFill');
+      if (!container || !label || !fill) return;
+
+      var fields = ['phoneNumber', 'customerName', 'balance', 'numTiffins', 'dueDate', 'messageStatus', 'orderId', 'paymentStatus'];
+      var mapped = 0;
+      fields.forEach(function(field) {
+        var select = document.getElementById('col' + field.charAt(0).toUpperCase() + field.slice(1));
+        if (select && select.value) mapped++;
+      });
+
+      var total = fields.length;
+      var pct = Math.round((mapped / total) * 100);
+      label.textContent = mapped + ' of ' + total + ' mapped';
+      fill.style.width = pct + '%';
+
+      // Color: green (100%), yellow (50-99%), red (<50%)
+      fill.classList.remove('green', 'yellow', 'red');
+      if (pct >= 100) { fill.classList.add('green'); }
+      else if (pct >= 50) { fill.classList.add('yellow'); }
+      else { fill.classList.add('red'); }
+
+      container.style.display = '';
+    }
+
+    function loadColumnMappings() {
+      if (!currentSettings || !currentSettings.columns) return;
+
+      var columnFields = ['phoneNumber', 'customerName', 'balance', 'numTiffins', 'dueDate', 'messageStatus', 'orderId', 'paymentStatus'];
+
+      columnFields.forEach(function(field) {
+        var select = document.getElementById('col' + field.charAt(0).toUpperCase() + field.slice(1));
+        if (select && currentSettings.columns[field]) {
+          // Check if value exists in options
+          var found = false;
+          for (var i = 0; i < select.options.length; i++) {
+            if (select.options[i].value === currentSettings.columns[field]) {
+              found = true;
+              break;
+            }
+          }
+          if (found) {
+            select.value = currentSettings.columns[field];
+          } else if (currentSettings.columns[field]) {
+            // Add missing option
+            var opt = document.createElement('option');
+            opt.value = currentSettings.columns[field];
+            opt.textContent = currentSettings.columns[field] + ' (not in sheet)';
+            select.appendChild(opt);
+            select.value = currentSettings.columns[field];
+          }
+        }
+        if (select) select.onchange = updateColumnCompleteness;
+      });
+      updateColumnCompleteness();
+    }
+
+    function saveColumnMappings() {
+      var btn = document.getElementById('saveColumnsBtn');
+      if (!currentSettings) {
+        showAlert('columnsAlert', 'error', 'Settings not loaded. Please refresh.');
+        return;
+      }
+
+      var columnFields = ['phoneNumber', 'customerName', 'balance', 'numTiffins', 'dueDate', 'messageStatus', 'orderId', 'paymentStatus'];
+
+      columnFields.forEach(function(field) {
+        var select = document.getElementById('col' + field.charAt(0).toUpperCase() + field.slice(1));
+        if (select && select.value) {
+          currentSettings.columns[field] = select.value;
+        }
+      });
+
+      setButtonState(btn, 'loading');
+      serverCall('saveSettings', currentSettings).then(function(result) {
+        if (!result) {
+          setButtonState(btn, 'error');
+          showToast('No response from server', 'error');
+          showAlert('columnsAlert', 'error', 'No response from server.');
+          return;
+        }
+        if (result.success) {
+          setButtonState(btn, 'success');
+          showToast('Column mappings saved!', 'success');
+          showAlert('columnsAlert', 'success', 'Column mappings saved successfully!');
+          updateSetupChecklist();
+        } else {
+          setButtonState(btn, 'error');
+          showToast(result.error || 'Failed to save', 'error');
+          showAlert('columnsAlert', 'error', result.error || 'Failed to save');
+        }
+      }).catch(function(err) {
+        setButtonState(btn, 'error');
+        showToast('Error: ' + err.message, 'error');
+        showAlert('columnsAlert', 'error', 'Error: ' + err.message);
+      });
+    }
+
+    // Settings Management
+    function exportSettingsUI() {
+      if (!currentSettings) {
+        showToast('Settings not loaded. Please refresh.', 'error');
+        return;
+      }
+      try {
+        var json = JSON.stringify(currentSettings, null, 2);
+        var blob = new Blob([json], { type: 'application/json' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'billing-settings-backup.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('Settings exported', 'success');
+      } catch (err) {
+        showToast('Export failed: ' + err.message, 'error');
+      }
+    }
+
+    function importSettingsUI() {
+      var input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.onchange = function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+          try {
+            JSON.parse(ev.target.result); // validate JSON
+          } catch (err) {
+            showToast('Invalid JSON file', 'error');
+            return;
+          }
+          serverCall('importSettings', ev.target.result).then(function(result) {
+            if (result && result.success) {
+              showToast('Settings imported', 'success');
+              loadSettings();
+            } else {
+              showToast((result && result.error) || 'Import failed', 'error');
+            }
+          }).catch(function(err) {
+            showToast('Import error: ' + err.message, 'error');
+          });
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    }
+
+    function confirmResetSettings() {
+      showConfirm({
+        title: 'Reset Settings',
+        message: 'Reset all settings to defaults? This cannot be undone.',
+        confirmLabel: 'Reset',
+        destructive: true
+      }).then(function(ok) {
+        if (!ok) return;
+        serverCall('resetSettings')
+          .then(function(result) {
+            if (result && result.success) {
+              showToast('Settings reset to defaults', 'success');
+              loadSettings();
+            } else {
+              showToast((result && result.error) || 'Reset failed', 'error');
+            }
+          })
+          .catch(function(err) {
+            showToast('Reset error: ' + err.message, 'error');
+          });
+      });
+    }
+
+    // ========================================
+    // ACTIVITY LOG
+    // ========================================
+
+    var activityLogData = [];
+    var activityLogAutoRefreshTimer = null;
+    var activityLogInitialized = false;
+
+    function initActivityLog() {
+      if (!activityLogInitialized) {
+        activityLogInitialized = true;
+        loadActivityLog();
+      }
+    }
+
+    function loadActivityLog() {
+      var loading = document.getElementById('activityLogLoading');
+      var empty = document.getElementById('activityLogEmpty');
+      var tableWrap = document.getElementById('activityLogTableWrap');
+      if (loading) loading.style.display = 'block';
+      if (empty) empty.style.display = 'none';
+      if (tableWrap) tableWrap.style.display = 'none';
+
+      serverCall('getActivityLog')
+        .then(function(result) {
+          if (loading) loading.style.display = 'none';
+          if (result && result.success) {
+            activityLogData = result.data || [];
+            applyLogCategoryFilter();
+          } else {
+            showAlert('activityLogAlert', 'error', (result && result.error) || 'Failed to load activity log');
+          }
+        })
+        .catch(function(err) {
+          if (loading) loading.style.display = 'none';
+          showAlert('activityLogAlert', 'error', 'Error: ' + err.message);
+        });
+    }
+
+    function relativeTime(ts) {
+      var now = Date.now();
+      var diff = now - new Date(ts).getTime();
+      if (diff < 0) return 'Just now';
+      var sec = Math.floor(diff / 1000);
+      if (sec < 60) return 'Just now';
+      var min = Math.floor(sec / 60);
+      if (min < 60) return min + 'm ago';
+      var hrs = Math.floor(min / 60);
+      if (hrs < 24) return hrs + 'h ago';
+      var days = Math.floor(hrs / 24);
+      if (days < 7) return days + 'd ago';
+      return new Date(ts).toLocaleDateString();
+    }
+
+    function renderActivityLog(entries) {
+      var empty = document.getElementById('activityLogEmpty');
+      var tableWrap = document.getElementById('activityLogTableWrap');
+
+      if (!entries || entries.length === 0) {
+        if (empty) empty.style.display = 'block';
+        if (tableWrap) tableWrap.style.display = 'none';
+        return;
+      }
+
+      if (empty) empty.style.display = 'none';
+      if (tableWrap) tableWrap.style.display = 'block';
+
+      var now = Date.now();
+      var fiveMinAgo = now - 5 * 60 * 1000;
+
+      // Build table with DOM (XSS-safe)
+      var table = document.createElement('table');
+      table.className = 'log-table';
+
+      var thead = document.createElement('thead');
+      var headRow = document.createElement('tr');
+      ['Time', 'User', 'Action', 'Details', 'Status'].forEach(function(h) {
+        var th = document.createElement('th');
+        th.textContent = h;
+        headRow.appendChild(th);
+      });
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+
+      var tbody = document.createElement('tbody');
+      entries.forEach(function(entry, idx) {
+        var tr = document.createElement('tr');
+        var entryTime = new Date(entry.ts).getTime();
+        var isFresh = entryTime >= fiveMinAgo;
+        if (isFresh) tr.classList.add('log-fresh');
+
+        // Stagger animation for first 10 rows
+        if (idx < 10) {
+          tr.classList.add('animate-in');
+          tr.style.animationDelay = (idx * 50) + 'ms';
+        }
+
+        // Timestamp — relative, with full timestamp on hover
+        var tdTime = document.createElement('td');
+        tdTime.className = 'log-timestamp';
+        tdTime.textContent = relativeTime(entry.ts);
+        tdTime.title = new Date(entry.ts).toLocaleString();
+        tr.appendChild(tdTime);
+
+        // User
+        var tdUser = document.createElement('td');
+        tdUser.className = 'log-user';
+        tdUser.textContent = entry.user || '—';
+        tdUser.title = entry.user || '';
+        tr.appendChild(tdUser);
+
+        // Action (with category badge)
+        var tdAction = document.createElement('td');
+        var badge = document.createElement('span');
+        badge.className = 'log-cat-badge log-cat-' + (entry.cat || 'system');
+        badge.textContent = entry.cat || 'system';
+        tdAction.appendChild(badge);
+        tdAction.appendChild(document.createTextNode(' ' + (entry.act || '')));
+        tr.appendChild(tdAction);
+
+        // Details (truncated, full detail on row expand)
+        var tdDet = document.createElement('td');
+        tdDet.className = 'log-details';
+        tdDet.textContent = entry.det || '—';
+        tdDet.title = entry.det || '';
+        tr.appendChild(tdDet);
+
+        // Status
+        var tdStatus = document.createElement('td');
+        tdStatus.className = entry.ok ? 'log-status-ok' : 'log-status-err';
+        tdStatus.textContent = entry.ok ? 'OK' : 'Error';
+        tr.appendChild(tdStatus);
+
+        // Build hidden detail row
+        var detailRow = document.createElement('tr');
+        detailRow.className = 'log-detail-row';
+        detailRow.style.display = 'none';
+        var detailTd = document.createElement('td');
+        detailTd.colSpan = 5;
+        var dl = document.createElement('dl');
+        dl.className = 'log-detail-content';
+        var fields = [
+          ['Time', new Date(entry.ts).toLocaleString()],
+          ['User', entry.user || '—'],
+          ['Category', entry.cat || 'system'],
+          ['Action', entry.act || '—'],
+          ['Details', entry.det || '—'],
+          ['Status', entry.ok ? 'OK' : 'Error']
+        ];
+        fields.forEach(function(f) {
+          var dt = document.createElement('dt');
+          dt.textContent = f[0];
+          dl.appendChild(dt);
+          var dd = document.createElement('dd');
+          dd.textContent = f[1];
+          dl.appendChild(dd);
+        });
+        detailTd.appendChild(dl);
+        detailRow.appendChild(detailTd);
+
+        // Toggle detail row on click
+        tr.addEventListener('click', function() {
+          var isVisible = detailRow.style.display !== 'none';
+          detailRow.style.display = isVisible ? 'none' : '';
+          tr.classList.toggle('active', !isVisible);
+        });
+
+        tbody.appendChild(tr);
+        tbody.appendChild(detailRow);
+      });
+      table.appendChild(tbody);
+
+      // Replace content
+      while (tableWrap.firstChild) tableWrap.removeChild(tableWrap.firstChild);
+      tableWrap.appendChild(table);
+    }
+
+    function applyLogCategoryFilter() {
+      var filter = document.getElementById('logCategoryFilter');
+      var cat = filter ? filter.value : 'all';
+      var filtered = cat === 'all'
+        ? activityLogData
+        : activityLogData.filter(function(e) { return e.cat === cat; });
+      renderActivityLog(filtered);
+    }
+
+    function toggleLogAutoRefresh() {
+      if (activityLogAutoRefreshTimer) {
+        clearInterval(activityLogAutoRefreshTimer);
+        activityLogAutoRefreshTimer = null;
+      }
+      var checkbox = document.getElementById('logAutoRefresh');
+      if (checkbox && checkbox.checked) {
+        activityLogAutoRefreshTimer = setInterval(loadActivityLog, 30000);
+      }
+    }
+
+    function downloadActivityLog() {
+      // Use currently filtered data
+      var filter = document.getElementById('logCategoryFilter');
+      var cat = filter ? filter.value : 'all';
+      var entries = cat === 'all'
+        ? activityLogData
+        : activityLogData.filter(function(e) { return e.cat === cat; });
+
+      if (!entries || entries.length === 0) {
+        showToast('No log entries to download', 'error');
+        return;
+      }
+
+      // Build CSV with proper escaping
+      var csvRows = [['Time', 'User', 'Category', 'Action', 'Details', 'Status']];
+      entries.forEach(function(entry) {
+        csvRows.push([
+          new Date(entry.ts).toISOString(),
+          entry.user || '',
+          entry.cat || 'system',
+          entry.act || '',
+          entry.det || '',
+          entry.ok ? 'OK' : 'Error'
+        ]);
+      });
+
+      var csv = csvRows.map(function(row) {
+        return row.map(function(cell) {
+          var str = String(cell).replace(/"/g, '""');
+          return '"' + str + '"';
+        }).join(',');
+      }).join('\n');
+
+      var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      var dateStr = new Date().toISOString().slice(0, 10);
+      a.download = 'activity-log-' + dateStr + (cat !== 'all' ? '-' + cat : '') + '.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // ========================================
+    // TEST DATA MODAL
+    // ========================================
+
+    function openTestDataModal() {
+      var td = (currentSettings && currentSettings.testData) || {};
+      document.getElementById('tdCustomerName').value = td.customerName || '';
+      document.getElementById('tdBalance').value = td.balance || '';
+      document.getElementById('tdNumTiffins').value = td.numTiffins || '';
+      document.getElementById('tdMonth').value = td.month || '';
+      document.getElementById('tdOrderId').value = td.orderId || '';
+      document.getElementById('testDataModal').classList.add('visible');
+    }
+
+    function closeTestDataModal() {
+      document.getElementById('testDataModal').classList.remove('visible');
+    }
+
+    function saveTestData() {
+      if (!currentSettings) return;
+      currentSettings.testData = {
+        customerName: document.getElementById('tdCustomerName').value.trim(),
+        balance: document.getElementById('tdBalance').value.trim(),
+        numTiffins: document.getElementById('tdNumTiffins').value.trim(),
+        month: document.getElementById('tdMonth').value.trim(),
+        orderId: document.getElementById('tdOrderId').value.trim()
+      };
+      var btn = document.getElementById('saveTestDataBtn');
+      setButtonState(btn, 'loading');
+      serverCall('saveSettings', currentSettings).then(function(result) {
+        if (result && result.success) {
+          setButtonState(btn, 'success');
+          showToast('Test data saved', 'success');
+          updateTestDataBadge();
+          closeTestDataModal();
+        } else {
+          setButtonState(btn, 'error');
+          showToast((result && result.error) || 'Failed to save', 'error');
+        }
+      }).catch(function(err) {
+        setButtonState(btn, 'error');
+        showToast('Error: ' + err.message, 'error');
+      });
+    }
+
+    function autoPopulateTestData() {
+      var names = ['Priya Patel', 'Raj Sharma', 'Anika Desai', 'Vikram Singh', 'Meera Joshi', 'Arjun Mehta', 'Neha Gupta', 'Sanjay Kumar'];
+      var months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      var amount = (Math.floor(Math.random() * 46) + 5) * 10; // $50-$500 in steps of 10
+      var tiffins = Math.floor(Math.random() * 56) + 5; // 5-60
+      var ordNum = Math.floor(Math.random() * 900) + 100; // 100-999
+      document.getElementById('tdCustomerName').value = names[Math.floor(Math.random() * names.length)];
+      document.getElementById('tdBalance').value = '$' + amount + '.00';
+      document.getElementById('tdNumTiffins').value = String(tiffins);
+      document.getElementById('tdMonth').value = months[Math.floor(Math.random() * months.length)];
+      document.getElementById('tdOrderId').value = 'ORD-2025-' + ordNum;
+    }
+
+    function clearTestData() {
+      document.getElementById('tdCustomerName').value = '';
+      document.getElementById('tdBalance').value = '';
+      document.getElementById('tdNumTiffins').value = '';
+      document.getElementById('tdMonth').value = '';
+      document.getElementById('tdOrderId').value = '';
+    }
+
+    function updateTestDataBadge() {
+      var badge = document.getElementById('testDataBadge');
+      if (!badge) return;
+      var td = (currentSettings && currentSettings.testData) || {};
+      var hasCustom = Object.keys(td).some(function(k) { return td[k] && td[k].trim(); });
+      if (hasCustom) {
+        badge.textContent = 'Custom';
+        badge.style.background = 'var(--color-success-bg, #dcfce7)';
+        badge.style.color = 'var(--color-success-text, #166534)';
+      } else {
+        badge.textContent = 'Default';
+        badge.style.background = 'var(--color-bg-tertiary)';
+        badge.style.color = 'var(--color-text-secondary)';
+      }
+    }
+
+    function clearActivityLog() {
+      showConfirm({
+        title: 'Clear Activity Log',
+        message: 'Delete all activity log entries? This cannot be undone.',
+        confirmLabel: 'Clear',
+        destructive: true
+      }).then(function(ok) {
+        if (!ok) return;
+        serverCall('clearActivityLog')
+          .then(function(result) {
+            if (result && result.success) {
+              activityLogData = [];
+              renderActivityLog([]);
+              showToast('Activity log cleared', 'success');
+            } else {
+              showToast((result && result.error) || 'Failed to clear log', 'error');
+            }
+          })
+          .catch(function(err) {
+            showToast('Error: ' + err.message, 'error');
+          });
+      });
+    }
+</script>

@@ -1,0 +1,449 @@
+<script>
+    // ============================================
+    // Onboarding Wizard
+    // ============================================
+    function checkFirstTimeSetup() {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result && result.isFirstTime) {
+            isFirstTimeUser = true;
+            showWizard();
+          }
+        })
+        .withFailureHandler(function() {
+          console.log('First-time check failed, proceeding normally');
+        })
+        .isFirstTimeSetup();
+    }
+
+    function showWizard() {
+      document.getElementById('wizardOverlay').classList.remove('hidden');
+      wizardStep = 1;
+      updateWizardUI();
+    }
+
+    function hideWizard() {
+      document.getElementById('wizardOverlay').classList.add('hidden');
+    }
+
+    function skipWizard() {
+      showConfirm({
+        title: 'Skip Setup',
+        message: 'Are you sure you want to skip the setup wizard? You can configure settings manually using the Credentials menu and Settings dialog.',
+        confirmLabel: 'Skip'
+      }).then(function(ok) {
+        if (!ok) return;
+        hideWizard();
+        google.script.run.markSetupSkipped();
+      });
+    }
+
+    function updateWizardUI() {
+      var progress = (wizardStep / 4) * 100;
+      document.getElementById('wizardProgressFill').style.width = progress + '%';
+
+      document.querySelectorAll('.wizard-step').forEach(function(step) {
+        var stepNum = parseInt(step.dataset.step);
+        step.classList.remove('active', 'completed');
+        if (stepNum < wizardStep) {
+          step.classList.add('completed');
+        } else if (stepNum === wizardStep) {
+          step.classList.add('active');
+        }
+      });
+
+      for (var i = 1; i <= 4; i++) {
+        var panel = document.getElementById('wizardStep' + i);
+        if (panel) {
+          panel.classList.toggle('active', i === wizardStep);
+        }
+      }
+
+      document.getElementById('wizardBackBtn').style.display = wizardStep > 1 ? 'inline-flex' : 'none';
+      document.getElementById('wizardSkipBtn').style.display = wizardStep === 1 ? 'inline-flex' : 'none';
+      document.getElementById('wizardTestBtn').style.display = wizardStep === 1 ? 'inline-flex' : 'none';
+
+      var nextBtn = document.getElementById('wizardNextBtn');
+      if (wizardStep === 4) {
+        nextBtn.textContent = 'Complete Setup';
+      } else {
+        nextBtn.textContent = 'Next Step';
+      }
+
+      if (wizardStep === 3) {
+        wizardLoadColumns();
+      } else if (wizardStep === 4) {
+        wizardUpdateSummary();
+      }
+    }
+
+    function wizardBack() {
+      if (wizardStep > 1) {
+        wizardStep--;
+        updateWizardUI();
+      }
+    }
+
+    function wizardNext() {
+      Promise.resolve(validateWizardStep(wizardStep)).then(function(valid) {
+        if (!valid) return;
+        saveWizardStepData(wizardStep);
+        if (wizardStep < 4) {
+          wizardStep++;
+          updateWizardUI();
+        } else {
+          completeWizardSetup();
+        }
+      });
+    }
+
+    function validateWizardStep(step) {
+      switch (step) {
+        case 1:
+          var accountSid = document.getElementById('wizardAccountSid').value.trim();
+          var authToken = document.getElementById('wizardAuthToken').value.trim();
+          var twilioPhone = document.getElementById('wizardTwilioPhone').value.trim();
+
+          var hasErrors = false;
+
+          if (!accountSid || !/^AC[a-f0-9]{32}$/i.test(accountSid)) {
+            setWizardFieldState('wizardAccountSid', 'error', 'Account SID should start with "AC" and be 34 characters');
+            hasErrors = true;
+          }
+          if (!authToken || !/^[a-f0-9]{32}$/i.test(authToken)) {
+            setWizardFieldState('wizardAuthToken', 'error', 'Auth Token should be 32 characters');
+            hasErrors = true;
+          }
+          if (!twilioPhone) {
+            setWizardFieldState('wizardTwilioPhone', 'error', 'Phone number is required');
+            hasErrors = true;
+          }
+
+          if (hasErrors) {
+            showToast('Please fix the errors above before continuing', 'error');
+            return false;
+          }
+
+          if (!wizardData.credentialsValid) {
+            return showConfirm({
+              title: 'Continue Without Testing?',
+              message: 'You haven\'t tested your Twilio credentials yet. Continue anyway?',
+              confirmLabel: 'Continue Anyway'
+            });
+          }
+          return true;
+
+        case 2:
+          var businessName = document.getElementById('wizardBusinessName').value.trim();
+          var etransferEmail = document.getElementById('wizardEtransferEmail').value.trim();
+          var phoneNumber = document.getElementById('wizardPhoneNumber').value.trim();
+
+          var hasErrors = false;
+
+          if (!businessName) {
+            setWizardFieldState('wizardBusinessName', 'error', 'Business name is required');
+            hasErrors = true;
+          }
+          if (!etransferEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(etransferEmail)) {
+            setWizardFieldState('wizardEtransferEmail', 'error', 'Valid email is required');
+            hasErrors = true;
+          }
+          if (!phoneNumber) {
+            setWizardFieldState('wizardPhoneNumber', 'error', 'Phone number is required');
+            hasErrors = true;
+          }
+
+          if (hasErrors) {
+            showToast('Please fix the errors above before continuing', 'error');
+            return false;
+          }
+          return true;
+
+        case 3:
+          var requiredColumns = ['phoneNumber', 'customerName', 'balance', 'paymentStatus'];
+          var missingColumns = [];
+
+          requiredColumns.forEach(function(col) {
+            if (!wizardData.columns[col]) {
+              missingColumns.push(col);
+            }
+          });
+
+          if (missingColumns.length > 0) {
+            showToast('Please select columns for: ' + missingColumns.join(', '), 'error');
+            return false;
+          }
+          return true;
+
+        default:
+          return true;
+      }
+    }
+
+    function setWizardFieldState(fieldId, type, message) {
+      var input = document.getElementById(fieldId);
+      var validationEl = document.getElementById(fieldId + 'Validation');
+
+      if (input) {
+        input.classList.remove('valid', 'invalid');
+        input.classList.add(type === 'success' ? 'valid' : 'invalid');
+      }
+
+      if (validationEl) {
+        validationEl.className = 'field-validation ' + type;
+        validationEl.textContent = message;
+        validationEl.classList.remove('hidden');
+      }
+    }
+
+    function saveWizardStepData(step) {
+      switch (step) {
+        case 1:
+          wizardData.accountSid = document.getElementById('wizardAccountSid').value.trim();
+          wizardData.authToken = document.getElementById('wizardAuthToken').value.trim();
+          wizardData.twilioPhone = document.getElementById('wizardTwilioPhone').value.trim();
+          break;
+        case 2:
+          wizardData.businessName = document.getElementById('wizardBusinessName').value.trim();
+          wizardData.etransferEmail = document.getElementById('wizardEtransferEmail').value.trim();
+          wizardData.phoneNumber = document.getElementById('wizardPhoneNumber').value.trim();
+          wizardData.whatsappLink = document.getElementById('wizardWhatsappLink').value.trim();
+          break;
+      }
+    }
+
+    function wizardTestCredentials() {
+      var accountSid = document.getElementById('wizardAccountSid').value.trim();
+      var authToken = document.getElementById('wizardAuthToken').value.trim();
+      var twilioPhone = document.getElementById('wizardTwilioPhone').value.trim();
+
+      if (!accountSid || !authToken) {
+        showToast('Please enter your Account SID and Auth Token first', 'error');
+        return;
+      }
+
+      var statusEl = document.getElementById('wizardCredentialStatus');
+      statusEl.className = 'credential-test-status testing';
+      statusEl.textContent = 'Testing connection...';
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            statusEl.className = 'credential-test-status success';
+            statusEl.textContent = 'Connection successful! ' + (result.accountName || '');
+            wizardData.credentialsValid = true;
+            showToast('Twilio credentials verified!', 'success');
+          } else {
+            statusEl.className = 'credential-test-status error';
+            statusEl.textContent = 'Connection failed: ' + result.error;
+            wizardData.credentialsValid = false;
+          }
+        })
+        .withFailureHandler(function(error) {
+          statusEl.className = 'credential-test-status error';
+          statusEl.textContent = 'Connection test failed: ' + (error.message || 'Unknown error');
+          wizardData.credentialsValid = false;
+        })
+        .testTwilioCredentials(accountSid, authToken, twilioPhone);
+    }
+
+    function wizardLoadColumns() {
+      var statusEl = document.getElementById('wizardColumnStatus');
+      var containerEl = document.getElementById('wizardColumnsContainer');
+      var emptyEl = document.getElementById('wizardColumnsEmpty');
+
+      statusEl.classList.remove('hidden');
+      statusEl.className = 'credential-test-status testing';
+      statusEl.textContent = 'Analyzing your spreadsheet...';
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          statusEl.classList.add('hidden');
+
+          if (!result.headers || result.headers.length === 0) {
+            containerEl.classList.add('hidden');
+            emptyEl.classList.remove('hidden');
+            return;
+          }
+
+          emptyEl.classList.add('hidden');
+          containerEl.classList.remove('hidden');
+
+          wizardData.columnDetections = result.detections || {};
+          buildWizardColumnUI(result.headers, result.detections);
+        })
+        .withFailureHandler(function(error) {
+          statusEl.className = 'credential-test-status error';
+          statusEl.textContent = 'Could not read spreadsheet: ' + (error.message || 'Unknown error');
+        })
+        .autoDetectColumns();
+    }
+
+    function buildWizardColumnUI(headers, detections) {
+      var containerEl = document.getElementById('wizardColumnsContainer');
+      containerEl.textContent = '';
+
+      var columnDefs = [
+        { id: 'phoneNumber', label: 'Customer Phone Number' },
+        { id: 'customerName', label: 'Customer Name' },
+        { id: 'balance', label: 'Amount Owed' },
+        { id: 'numTiffins', label: 'Number of Tiffins' },
+        { id: 'dueDate', label: 'Due Date / Month' },
+        { id: 'messageStatus', label: 'Message Status' },
+        { id: 'orderId', label: 'Order ID' },
+        { id: 'paymentStatus', label: 'Payment Status' }
+      ];
+
+      var grid = document.createElement('div');
+      grid.className = 'form-grid';
+
+      columnDefs.forEach(function(col) {
+        var detection = detections[col.id];
+        var selectedValue = detection ? detection.match : '';
+        var confidence = detection ? detection.confidence : 0;
+
+        var confidenceClass = 'low';
+        var confidenceLabel = 'Not found';
+        if (confidence >= 90) {
+          confidenceClass = 'high';
+          confidenceLabel = 'Auto-detected';
+        } else if (confidence >= 70) {
+          confidenceClass = 'medium';
+          confidenceLabel = 'Please verify';
+        }
+
+        if (selectedValue) {
+          wizardData.columns[col.id] = selectedValue;
+        }
+
+        var group = document.createElement('div');
+        group.className = 'form-group';
+
+        var label = document.createElement('label');
+        label.className = 'form-label';
+        label.setAttribute('for', 'wizardCol' + col.id);
+        label.textContent = col.label + ' ';
+
+        if (confidence > 0) {
+          var badge = document.createElement('span');
+          badge.className = 'column-detect-status ' + confidenceClass;
+          badge.textContent = confidenceLabel;
+          label.appendChild(badge);
+        }
+
+        var select = document.createElement('select');
+        select.className = 'form-select';
+        select.id = 'wizardCol' + col.id;
+
+        var defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = '-- Choose a column --';
+        select.appendChild(defaultOption);
+
+        headers.forEach(function(header) {
+          var option = document.createElement('option');
+          option.value = header;
+          option.textContent = header;
+          if (header === selectedValue) {
+            option.selected = true;
+          }
+          select.appendChild(option);
+        });
+
+        select.addEventListener('change', function() {
+          wizardData.columns[col.id] = this.value;
+        });
+
+        group.appendChild(label);
+        group.appendChild(select);
+        grid.appendChild(group);
+      });
+
+      containerEl.appendChild(grid);
+    }
+
+    function wizardRefreshColumns() {
+      wizardLoadColumns();
+    }
+
+    function wizardUpdateSummary() {
+      document.getElementById('wizardSummaryTwilioStatus').textContent = wizardData.credentialsValid ? 'Connected' : 'Not Tested';
+      document.getElementById('wizardSummaryTwilioStatus').className = 'summary-value ' + (wizardData.credentialsValid ? 'success' : 'warning');
+      document.getElementById('wizardSummaryTwilioPhone').textContent = wizardData.twilioPhone || 'Not set';
+
+      document.getElementById('wizardSummaryBusinessName').textContent = wizardData.businessName || 'Not set';
+      document.getElementById('wizardSummaryEmail').textContent = wizardData.etransferEmail || 'Not set';
+
+      var columnsContainer = document.getElementById('wizardSummaryColumns');
+      columnsContainer.textContent = '';
+
+      var columnLabels = {
+        phoneNumber: 'Phone',
+        customerName: 'Name',
+        balance: 'Balance',
+        numTiffins: 'Tiffins',
+        dueDate: 'Due Date',
+        messageStatus: 'Status',
+        orderId: 'Order ID',
+        paymentStatus: 'Payment'
+      };
+
+      Object.keys(columnLabels).forEach(function(key) {
+        var value = wizardData.columns[key];
+
+        var item = document.createElement('div');
+        item.className = 'summary-item';
+
+        var labelSpan = document.createElement('span');
+        labelSpan.className = 'summary-label';
+        labelSpan.textContent = columnLabels[key];
+
+        var valueSpan = document.createElement('span');
+        valueSpan.className = 'summary-value';
+        valueSpan.textContent = value || 'Not set';
+        if (!value) {
+          valueSpan.style.color = 'var(--color-text-muted)';
+        }
+
+        item.appendChild(labelSpan);
+        item.appendChild(valueSpan);
+        columnsContainer.appendChild(item);
+      });
+    }
+
+    function completeWizardSetup() {
+      showLoading(true);
+
+      var setupData = {
+        credentials: {
+          accountSid: wizardData.accountSid,
+          authToken: wizardData.authToken,
+          twilioPhone: wizardData.twilioPhone
+        },
+        business: {
+          name: wizardData.businessName,
+          etransferEmail: wizardData.etransferEmail,
+          phoneNumber: wizardData.phoneNumber,
+          whatsappLink: wizardData.whatsappLink
+        },
+        columns: wizardData.columns
+      };
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          showLoading(false);
+          if (result.success) {
+            hideWizard();
+            loadSettings();
+            showToast('Setup complete! Your billing system is ready.', 'success');
+          } else {
+            showToast('Setup failed: ' + result.error, 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showLoading(false);
+          showToast('Setup failed: ' + (error.message || 'Unknown error'), 'error');
+        })
+        .completeFirstTimeSetup(setupData);
+    }
+</script>
