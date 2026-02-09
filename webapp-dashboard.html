@@ -1,0 +1,1169 @@
+<script>
+    // ============================================
+    // Dashboard: Stats, Customers, Filters, Send Bar
+    // ============================================
+    function loadDashboard() {
+      loadStats();
+      loadCustomers();
+      updateSetupChecklist();
+      loadSpreadsheetUrl();
+    }
+
+    function loadSpreadsheetUrl() {
+      if (spreadsheetUrl) return;
+      serverCall('getSpreadsheetUrl').then(function(result) {
+        if (result && result.success) {
+          spreadsheetUrl = result.data;
+          document.getElementById('openSpreadsheetAction').href = spreadsheetUrl;
+        }
+      }).catch(function() {});
+    }
+
+    function animateValue(elementId, newValue, prefix) {
+      var el = document.getElementById(elementId);
+      if (!el) return;
+      var current = el.textContent;
+      var display = (prefix || '') + newValue;
+      if (current !== display) {
+        el.textContent = display;
+        el.classList.add('stat-value-bump');
+        setTimeout(function() { el.classList.remove('stat-value-bump'); }, 200);
+      }
+    }
+
+    function loadStats() {
+      serverCall('getCustomerStats').then(function(result) {
+        if (!result) {
+          console.error('Failed to load stats: No response from server');
+          return;
+        }
+        if (result.success) {
+          var stats = result.data;
+          var totalText = stats.total + ' total customers';
+          if (stats.exactDuplicates > 0) {
+            totalText = stats.total + ' rows (' + stats.exactDuplicates + ' duplicate' + (stats.exactDuplicates !== 1 ? 's' : '') + ')';
+          }
+          setTextContent('statTotal', totalText);
+          animateValue('statUnpaid', stats.unpaid);
+          animateValue('statPaid', stats.paid);
+          animateValue('statBalance', stats.unpaidBalance.toFixed(2), '$');
+
+          // Stagger animate hero stat cards on first load
+          var heroStats = document.querySelectorAll('.hero-stat');
+          heroStats.forEach(function(card, i) {
+            if (!card.classList.contains('animate-in')) {
+              card.classList.add('animate-in', 'stagger-' + (i + 1));
+            }
+          });
+        }
+      }).catch(function(err) { console.error('Failed to load stats:', err); });
+    }
+
+    function renderSkeletonTable(container, rowCount) {
+      var table = document.createElement('table');
+      var thead = document.createElement('thead');
+      var headerRow = document.createElement('tr');
+      for (var h = 0; h < 6; h++) {
+        var th = document.createElement('th');
+        var skel = document.createElement('div');
+        skel.className = 'skeleton-text';
+        skel.style.width = (40 + Math.random() * 40) + 'px';
+        skel.style.height = '12px';
+        th.appendChild(skel);
+        headerRow.appendChild(th);
+      }
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      var tbody = document.createElement('tbody');
+      for (var i = 0; i < rowCount; i++) {
+        var tr = document.createElement('tr');
+        for (var j = 0; j < 6; j++) {
+          var td = document.createElement('td');
+          var sk = document.createElement('div');
+          sk.className = 'skeleton-text';
+          sk.style.width = (50 + Math.random() * 60) + 'px';
+          sk.style.height = '14px';
+          td.appendChild(sk);
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+      container.appendChild(table);
+    }
+
+    function loadCustomers() {
+      var container = document.getElementById('customersTable');
+      // Clear and show skeleton loading
+      while (container.firstChild) container.removeChild(container.firstChild);
+      renderSkeletonTable(container, 6);
+
+      serverCall('getCustomers').then(function(result) {
+        console.log('getCustomers result:', result);
+        if (!result) {
+          console.error('getCustomers returned falsy value:', result);
+          showTableError(container, 'No response from server. Please refresh the page or check the Apps Script deployment.');
+          return;
+        }
+        if (result.success) {
+          currentCustomers = result.data;
+          currentDuplicateSummary = result.duplicateSummary || null;
+          renderColumnWarningBanner(result.columnWarnings || []);
+          renderDuplicateBanner();
+          applyCustomerFilters();
+        } else {
+          console.error('getCustomers failed:', result.error);
+          showTableError(container, result.error || 'Failed to load customers');
+        }
+      }).catch(function(err) {
+        console.error('getCustomers exception:', err);
+        showTableError(container, 'Error: ' + err.message);
+      });
+    }
+
+    function isModalOpen_() {
+      return document.querySelectorAll('.modal-overlay.visible').length > 0;
+    }
+
+    function silentRefreshCustomers_() {
+      serverCall('getCustomers').then(function(result) {
+        if (!result || !result.success) return;
+        var newJson = JSON.stringify(result.data);
+        var oldJson = JSON.stringify(currentCustomers);
+        if (newJson !== oldJson) {
+          currentCustomers = result.data;
+          currentDuplicateSummary = result.duplicateSummary || null;
+          renderDuplicateBanner();
+          applyCustomerFilters();
+        }
+      }).catch(function() {});
+    }
+
+    function renderColumnWarningBanner(warnings) {
+      var banner = document.getElementById('columnWarningBanner');
+      var title = document.getElementById('colWarningTitle');
+      var desc = document.getElementById('colWarningDesc');
+      if (!banner || !title || !desc) return;
+
+      if (!warnings || warnings.length === 0) {
+        banner.style.display = 'none';
+        return;
+      }
+
+      banner.style.display = 'flex';
+      var unresolved = warnings.filter(function(w) { return !w.resolved; });
+      var resolved = warnings.filter(function(w) { return w.resolved; });
+
+      if (unresolved.length > 0) {
+        title.textContent = unresolved.length + ' column mapping' + (unresolved.length !== 1 ? 's' : '') + ' broken';
+        var details = unresolved.map(function(w) { return '"' + w.saved + '" not found in sheet'; }).join('; ');
+        if (resolved.length > 0) {
+          details += '. Auto-resolved: ' + resolved.map(function(w) { return '"' + w.saved + '" \u2192 "' + w.actual + '"'; }).join(', ');
+        }
+        desc.textContent = details + '. Open Settings \u2192 Columns tab to update.';
+      } else {
+        title.textContent = resolved.length + ' column' + (resolved.length !== 1 ? 's' : '') + ' auto-resolved';
+        var resolvedDetails = resolved.map(function(w) { return '"' + w.saved + '" \u2192 "' + w.actual + '"'; }).join(', ');
+        desc.textContent = resolvedDetails + '. Open Settings \u2192 Columns tab to save the updated names.';
+        banner.className = 'callout callout-info';
+      }
+    }
+
+    function renderDuplicateBanner() {
+      var banner = document.getElementById('duplicateBanner');
+      var title = document.getElementById('dupBannerTitle');
+      var desc = document.getElementById('dupBannerDesc');
+      if (!banner || !title || !desc) return;
+
+      if (!currentDuplicateSummary) {
+        banner.style.display = 'none';
+        return;
+      }
+
+      var s = currentDuplicateSummary;
+      if (s.exactCount > 0) {
+        banner.style.display = 'flex';
+        banner.className = 'callout callout-warn';
+        title.textContent = s.exactCount + ' exact duplicate row' + (s.exactCount !== 1 ? 's' : '') + ' detected';
+        desc.textContent = 'Same phone number + due date — likely data entry errors. These will receive multiple messages when sending.';
+      } else if (s.relatedCount > 0) {
+        banner.style.display = 'flex';
+        banner.className = 'callout callout-info';
+        title.textContent = s.relatedCount + ' multi-period entr' + (s.relatedCount !== 1 ? 'ies' : 'y') + ' found';
+        desc.textContent = 'Same phone number across different billing periods. This is informational only.';
+      } else {
+        banner.style.display = 'none';
+      }
+    }
+
+    function filterByDuplicates() {
+      var filterEl = document.getElementById('filterDuplicates');
+      if (filterEl) {
+        filterEl.value = currentDuplicateSummary && currentDuplicateSummary.exactCount > 0 ? 'exact' : 'any';
+        applyCustomerFilters();
+      }
+      var table = document.getElementById('customersTable');
+      if (table) table.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function showTableError(container, message) {
+      while (container.firstChild) container.removeChild(container.firstChild);
+      var alertDiv = document.createElement('div');
+      alertDiv.className = 'alert alert-error';
+      alertDiv.textContent = message;
+      container.appendChild(alertDiv);
+    }
+
+    function refreshCustomers() { loadDashboard(); }
+
+    // Customer table sorting state
+    var customerSortField = '';
+    var customerSortAsc = true;
+
+    function sortCustomers(field) {
+      if (customerSortField === field) {
+        customerSortAsc = !customerSortAsc;
+      } else {
+        customerSortField = field;
+        customerSortAsc = true;
+      }
+      applyCustomerFilters();
+    }
+
+    function renderCustomersTable(customers) {
+      var container = document.getElementById('customersTable');
+      while (container.firstChild) container.removeChild(container.firstChild);
+
+      if (!customers || customers.length === 0) {
+        var emptyState = document.createElement('div');
+        emptyState.className = 'empty-state';
+
+        var iconWrap = document.createElement('div');
+        iconWrap.className = 'empty-state-icon';
+        var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('fill', 'none');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('stroke', 'currentColor');
+        var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('stroke-linecap', 'round');
+        path.setAttribute('stroke-linejoin', 'round');
+        path.setAttribute('stroke-width', '2');
+        path.setAttribute('d', 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z');
+        svg.appendChild(path);
+        iconWrap.appendChild(svg);
+        emptyState.appendChild(iconWrap);
+
+        var title = document.createElement('div');
+        title.className = 'empty-state-title';
+        var desc = document.createElement('div');
+        desc.className = 'empty-state-desc';
+
+        var hasFilters = document.getElementById('filterPayment').value ||
+          document.getElementById('filterNotice').value ||
+          document.getElementById('filterBalanceMin').value ||
+          document.getElementById('filterBalanceMax').value ||
+          document.getElementById('filterSearch').value ||
+          (document.getElementById('filterDuplicates') && document.getElementById('filterDuplicates').value);
+
+        if (hasFilters) {
+          title.textContent = 'No customers match your filters';
+          desc.textContent = 'Try adjusting or clearing your filters to see more results.';
+          emptyState.appendChild(title);
+          emptyState.appendChild(desc);
+          var clearBtn = document.createElement('button');
+          clearBtn.className = 'btn btn-secondary btn-sm';
+          clearBtn.textContent = 'Clear Filters';
+          clearBtn.onclick = clearCustomerFilters;
+          emptyState.appendChild(clearBtn);
+        } else {
+          title.textContent = 'No customer data yet';
+          desc.textContent = 'Customer data will appear here once your spreadsheet is set up and columns are mapped.';
+          emptyState.appendChild(title);
+          emptyState.appendChild(desc);
+        }
+
+        container.appendChild(emptyState);
+        return;
+      }
+
+      var table = document.createElement('table');
+      var thead = document.createElement('thead');
+      var headerRow = document.createElement('tr');
+      var sortableHeaders = [
+        { label: 'Customer', field: 'name' },
+        { label: 'Balance', field: 'balance' },
+        { label: 'Due Date', field: 'month' },
+        { label: 'Payment', field: 'paymentStatus' },
+        { label: 'Status', field: 'messageStatus' },
+        { label: '', field: '' }
+      ];
+      sortableHeaders.forEach(function(h) {
+        var th = document.createElement('th');
+        if (h.field) {
+          th.className = 'sortable' + (customerSortField === h.field ? ' sort-active' : '');
+          th.setAttribute('aria-sort', customerSortField === h.field ? (customerSortAsc ? 'ascending' : 'descending') : 'none');
+          th.onclick = function() { sortCustomers(h.field); };
+          th.textContent = h.label;
+          var arrow = document.createElement('span');
+          arrow.className = 'sort-arrow';
+          if (customerSortField === h.field) {
+            arrow.textContent = customerSortAsc ? '\u25B2' : '\u25BC';
+          } else {
+            arrow.textContent = '\u25B4\u25BE';
+          }
+          th.appendChild(arrow);
+        } else {
+          th.textContent = h.label;
+        }
+        headerRow.appendChild(th);
+      });
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      var tbody = document.createElement('tbody');
+      customers.forEach(function(c) {
+        var tr = document.createElement('tr');
+        var trClasses = [];
+        if (String(c.paymentStatus).toLowerCase() === 'unpaid') {
+          trClasses.push('row-unpaid');
+        }
+        if (c.duplicateType === 'exact') {
+          trClasses.push('row-duplicate-exact');
+        } else if (c.duplicateType === 'related') {
+          trClasses.push('row-duplicate-related');
+        }
+        if (trClasses.length) tr.className = trClasses.join(' ');
+
+        // Combined name + phone cell
+        var tdName = document.createElement('td');
+        var nameStrong = document.createElement('strong');
+        nameStrong.textContent = c.name;
+        nameStrong.style.cssText = 'display: block; font-weight: 600;';
+        tdName.appendChild(nameStrong);
+        var phoneSmall = document.createElement('span');
+        phoneSmall.textContent = c.phone;
+        phoneSmall.style.cssText = 'font-size: 11px; color: var(--color-text-muted);';
+        tdName.appendChild(phoneSmall);
+        if (c.duplicateType) {
+          var dupBadge = document.createElement('span');
+          dupBadge.className = 'status-badge ' + (c.duplicateType === 'exact' ? 'duplicate-exact' : 'duplicate-related');
+          dupBadge.textContent = c.duplicateType === 'exact' ? 'Duplicate' : 'Multi-period';
+          dupBadge.style.marginLeft = '6px';
+          tdName.appendChild(dupBadge);
+        }
+        tr.appendChild(tdName);
+
+        var tdBalance = document.createElement('td');
+        tdBalance.style.fontWeight = '600';
+        tdBalance.textContent = c.formattedBalance;
+        tr.appendChild(tdBalance);
+
+        var tdDate = document.createElement('td');
+        tdDate.textContent = c.month || c.dueDate;
+        tr.appendChild(tdDate);
+
+        var tdPayment = document.createElement('td');
+        var paymentSelect = document.createElement('select');
+        var currentPS = String(c.paymentStatus).toLowerCase();
+        paymentSelect.className = 'payment-status-select status-' + (currentPS === 'paid' ? 'paid' : currentPS === 'unpaid' ? 'unpaid' : 'other');
+        ['Paid', 'Unpaid'].forEach(function(opt) {
+          var option = document.createElement('option');
+          option.value = opt;
+          option.textContent = opt;
+          if (String(c.paymentStatus).toLowerCase() === opt.toLowerCase()) option.selected = true;
+          paymentSelect.appendChild(option);
+        });
+        paymentSelect.onchange = (function(rowIdx, selectEl) {
+          return function() {
+            updatePaymentStatus(rowIdx, selectEl.value, selectEl);
+          };
+        })(c.rowIndex, paymentSelect);
+        tdPayment.appendChild(paymentSelect);
+        tr.appendChild(tdPayment);
+
+        var tdStatus = document.createElement('td');
+        var statusText = c.messageStatus || '';
+        if (statusText.toLowerCase().includes('sent') || statusText.toLowerCase().includes('error')) {
+          var statusBadge = document.createElement('span');
+          statusBadge.className = 'status-badge ' + (statusText.toLowerCase().includes('error') ? 'error' : 'sent');
+          statusBadge.textContent = statusText.substring(0, 30);
+          tdStatus.appendChild(statusBadge);
+        } else {
+          tdStatus.style.color = 'var(--color-text-muted)';
+          tdStatus.textContent = statusText ? statusText.substring(0, 30) : '\u2013';
+        }
+        tr.appendChild(tdStatus);
+
+        var tdActions = document.createElement('td');
+        tdActions.style.textAlign = 'right';
+        var btn = document.createElement('button');
+        btn.className = 'btn btn-secondary btn-sm';
+        btn.textContent = String(c.paymentStatus).toLowerCase() === 'unpaid' ? 'Send Reminder' : 'View';
+        btn.onclick = (function(rowIndex) { return function() { openSendModal(rowIndex); }; })(c.rowIndex);
+        tdActions.appendChild(btn);
+        tr.appendChild(tdActions);
+
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      container.appendChild(table);
+    }
+
+    function applyCustomerFilters() {
+      var payment = document.getElementById('filterPayment').value;
+      var notice = document.getElementById('filterNotice').value;
+      var balMin = parseFloat(document.getElementById('filterBalanceMin').value);
+      var balMax = parseFloat(document.getElementById('filterBalanceMax').value);
+      var searchTerm = (document.getElementById('filterSearch').value || '').toLowerCase().trim();
+      var dupFilter = document.getElementById('filterDuplicates') ? document.getElementById('filterDuplicates').value : '';
+
+      var filtered = (currentCustomers || []).filter(function(c) {
+        if (searchTerm) {
+          var haystack = [c.name, c.phone, c.orderId, c.formattedBalance, c.month].join(' ').toLowerCase();
+          if (haystack.indexOf(searchTerm) === -1) return false;
+        }
+        if (payment) {
+          var ps = (c.paymentStatus || '').toLowerCase();
+          if (payment === 'paid' && ps !== 'paid') return false;
+          if (payment === 'unpaid' && ps !== 'unpaid') return false;
+          if (payment === 'other' && (ps === 'paid' || ps === 'unpaid')) return false;
+        }
+        if (notice) {
+          var ms = (c.messageStatus || '').toLowerCase();
+          if (notice === 'first' && !ms.includes('first notice')) return false;
+          if (notice === 'followup' && !ms.includes('follow-up') && !ms.includes('follow up')) return false;
+          if (notice === 'final' && !ms.includes('final notice')) return false;
+          if (notice === 'thankyou' && !ms.includes('thank you')) return false;
+          if (notice === 'error' && !ms.includes('error')) return false;
+          if (notice === 'none' && ms && ms !== '-') return false;
+        }
+        if (!isNaN(balMin) && c.balance < balMin) return false;
+        if (!isNaN(balMax) && c.balance > balMax) return false;
+        if (dupFilter) {
+          if (dupFilter === 'exact' && c.duplicateType !== 'exact') return false;
+          if (dupFilter === 'related' && c.duplicateType !== 'related') return false;
+          if (dupFilter === 'any' && !c.duplicateType) return false;
+        }
+        return true;
+      });
+
+      // Sort if a sort field is active
+      if (customerSortField) {
+        filtered.sort(function(a, b) {
+          var valA, valB;
+          if (customerSortField === 'balance') {
+            valA = a.balance || 0;
+            valB = b.balance || 0;
+            return customerSortAsc ? valA - valB : valB - valA;
+          }
+          valA = String(a[customerSortField] || '').toLowerCase();
+          valB = String(b[customerSortField] || '').toLowerCase();
+          var cmp = valA < valB ? -1 : valA > valB ? 1 : 0;
+          return customerSortAsc ? cmp : -cmp;
+        });
+      }
+
+      renderCustomersTable(filtered);
+      var countEl = document.getElementById('filterCount');
+      var total = (currentCustomers || []).length;
+      if (filtered.length === total || total === 0) {
+        countEl.textContent = '';
+      } else {
+        countEl.textContent = filtered.length + ' of ' + total;
+      }
+    }
+
+    function clearCustomerFilters() {
+      document.getElementById('filterPayment').value = '';
+      document.getElementById('filterNotice').value = '';
+      document.getElementById('filterBalanceMin').value = '';
+      document.getElementById('filterBalanceMax').value = '';
+      document.getElementById('filterSearch').value = '';
+      if (document.getElementById('filterDuplicates')) document.getElementById('filterDuplicates').value = '';
+      customerSortField = '';
+      customerSortAsc = true;
+      applyCustomerFilters();
+    }
+
+    // Send Action Bar
+    function openSendBar() {
+      var bar = document.getElementById('sendActionBar');
+      if (bar) {
+        bar.classList.add('open');
+        bar.setAttribute('aria-expanded', 'true');
+        updateRecipientCount();
+        bar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+
+    function closeSendBar() {
+      var bar = document.getElementById('sendActionBar');
+      if (bar) {
+        bar.classList.remove('open');
+        bar.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    function toggleDateInput() {
+      var filter = document.getElementById('sendFilter').value;
+      document.getElementById('dueDateGroup').style.display = filter === 'byDate' ? 'block' : 'none';
+    }
+
+    // Setup Checklist
+    function updateSetupChecklist() {
+      var checklist = document.getElementById('setupChecklist');
+      if (!checklist) return;
+
+      var hasCredentials = credentialsConfigured;
+      var hasBusiness = !!(currentSettings && currentSettings.business && currentSettings.business.name);
+      var hasColumns = !!(currentSettings && currentSettings.columns && Object.keys(currentSettings.columns).some(function(k) { return currentSettings.columns[k]; }));
+      var hasTemplates = !!(currentSettings && currentSettings.templates && currentSettings.templates.billMessages && currentSettings.templates.billMessages.firstNotice && currentSettings.templates.billMessages.firstNotice.message);
+
+      var items = [
+        { id: 'setupCredentials', done: hasCredentials },
+        { id: 'setupBusiness', done: hasBusiness },
+        { id: 'setupColumns', done: hasColumns },
+        { id: 'setupTemplates', done: hasTemplates }
+      ];
+
+      var doneCount = 0;
+      items.forEach(function(item) {
+        var el = document.getElementById(item.id);
+        if (el) {
+          if (item.done) {
+            el.classList.add('done');
+            doneCount++;
+          } else {
+            el.classList.remove('done');
+          }
+        }
+      });
+
+      var progressFill = document.getElementById('setupProgressFill');
+      if (progressFill) {
+        progressFill.style.width = (doneCount / items.length * 100) + '%';
+      }
+
+      // Hide checklist when all items are done
+      checklist.style.display = doneCount >= items.length ? 'none' : 'block';
+    }
+
+    // Recipient Count Preview (uses cached customer data)
+    function updateRecipientCount() {
+      var preview = document.getElementById('recipientPreview');
+      if (!preview) return;
+
+      if (!currentCustomers || currentCustomers.length === 0) {
+        preview.textContent = '';
+        return;
+      }
+
+      var filter = document.getElementById('sendFilter').value;
+      var count = 0;
+
+      if (filter === 'unpaid') {
+        count = currentCustomers.filter(function(c) {
+          return String(c.paymentStatus).toLowerCase() !== 'paid';
+        }).length;
+        preview.textContent = count + ' unpaid customer' + (count !== 1 ? 's' : '') + ' will receive messages';
+      } else if (filter === 'byDate') {
+        var dueDate = document.getElementById('dueDate').value.trim().toLowerCase();
+        if (!dueDate) {
+          preview.textContent = 'Enter a due date to see recipient count';
+          return;
+        }
+        count = currentCustomers.filter(function(c) {
+          if (String(c.paymentStatus).toLowerCase() === 'paid') return false;
+          var cDate = String(c.month || c.dueDate || '').toLowerCase();
+          return cDate.indexOf(dueDate) !== -1;
+        }).length;
+        preview.textContent = count + ' matching customer' + (count !== 1 ? 's' : '') + ' will receive messages';
+      }
+
+      updateSendReview();
+    }
+
+    // Update send review section
+    function updateSendReview() {
+      var dryRun = document.getElementById('dryRunCheckbox').checked;
+      var warningDiv = document.getElementById('dryRunWarning');
+      if (warningDiv) {
+        warningDiv.style.display = dryRun ? 'flex' : 'none';
+      }
+      // Sync to currentSettings for header pills
+      if (currentSettings && currentSettings.behavior) {
+        currentSettings.behavior.dryRunMode = dryRun;
+      }
+      updateHeaderStatusPills();
+    }
+
+    function showAlert(containerId, type, message) {
+      var container = document.getElementById(containerId);
+      while (container.firstChild) container.removeChild(container.firstChild);
+      var alertDiv = document.createElement('div');
+      alertDiv.className = 'alert alert-' + type;
+      alertDiv.textContent = message;
+      container.appendChild(alertDiv);
+    }
+
+    function createSvgIcon(pathD) {
+      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('class', 'btn-icon');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('stroke', 'currentColor');
+      var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('stroke-linejoin', 'round');
+      path.setAttribute('stroke-width', '2');
+      path.setAttribute('d', pathD);
+      svg.appendChild(path);
+      return svg;
+    }
+
+    var ICON_CHECK = 'M5 13l4 4L19 7';
+    var ICON_X = 'M6 18L18 6M6 6l12 12';
+    var ICON_WARN = 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z';
+
+    function setButtonState(btn, state) {
+      if (!btn) return;
+      if (!btn.getAttribute('data-original-html')) {
+        btn.setAttribute('data-original-html', btn.innerHTML);
+      }
+      if (btn._revertTimer) {
+        clearTimeout(btn._revertTimer);
+        btn._revertTimer = null;
+      }
+      btn.classList.remove('btn-state-loading', 'btn-state-success', 'btn-state-error');
+
+      if (state === 'loading') {
+        btn.disabled = true;
+        btn.classList.add('btn-state-loading');
+        while (btn.firstChild) btn.removeChild(btn.firstChild);
+        var spinner = document.createElement('span');
+        spinner.className = 'btn-spinner';
+        btn.appendChild(spinner);
+        btn.appendChild(document.createTextNode(' Saving\u2026'));
+      } else if (state === 'success') {
+        btn.disabled = false;
+        btn.classList.add('btn-state-success');
+        while (btn.firstChild) btn.removeChild(btn.firstChild);
+        btn.appendChild(createSvgIcon(ICON_CHECK));
+        btn.appendChild(document.createTextNode(' Saved!'));
+        btn._revertTimer = setTimeout(function() { setButtonState(btn, 'default'); }, 2000);
+      } else if (state === 'error') {
+        btn.disabled = false;
+        btn.classList.add('btn-state-error');
+        while (btn.firstChild) btn.removeChild(btn.firstChild);
+        btn.appendChild(createSvgIcon(ICON_X));
+        btn.appendChild(document.createTextNode(' Failed'));
+        btn._revertTimer = setTimeout(function() { setButtonState(btn, 'default'); }, 2000);
+      } else {
+        // default — restore original content
+        btn.disabled = false;
+        var original = btn.getAttribute('data-original-html');
+        if (original) {
+          // Safe: restoring the button's own original static HTML
+          btn.innerHTML = original; // eslint-disable-line no-unsanitized/property
+        }
+      }
+    }
+
+    // Payment Status Update
+    function updatePaymentStatus(rowIndex, newStatus, selectEl) {
+      var prevClass = selectEl.className;
+      var statusClass = newStatus.toLowerCase() === 'paid' ? 'status-paid' : newStatus.toLowerCase() === 'unpaid' ? 'status-unpaid' : 'status-other';
+      selectEl.className = 'payment-status-select ' + statusClass;
+      selectEl.disabled = true;
+
+      serverCall('updatePaymentStatus', { rowIndex: rowIndex, paymentStatus: newStatus })
+        .then(function(result) {
+          selectEl.disabled = false;
+          if (result.success) {
+            // Update cached data
+            var customer = currentCustomers.find(function(c) { return c.rowIndex === rowIndex; });
+            if (customer) customer.paymentStatus = newStatus;
+            var msg = newStatus + ' - status updated';
+            if (result.data && result.data.thankYouSent === true) {
+              msg += '. Thank-you SMS sent!';
+            }
+            showToast(msg, 'success');
+            loadStats();
+            silentRefreshCustomers_();
+          } else {
+            selectEl.className = prevClass;
+            showToast(result.error || 'Failed to update status', 'error');
+          }
+        })
+        .catch(function(err) {
+          selectEl.disabled = false;
+          selectEl.className = prevClass;
+          showToast('Error: ' + err.message, 'error');
+        });
+    }
+
+    // Header status pills (Dry Run + Auto Thank-You)
+    function updateHeaderStatusPills() {
+      var container = document.getElementById('headerStatusPills');
+      while (container.firstChild) container.removeChild(container.firstChild);
+
+      if (!currentSettings) return;
+
+      var dryRun = currentSettings.behavior && currentSettings.behavior.dryRunMode;
+      var autoTY = currentSettings.behavior && currentSettings.behavior.autoThankYouEnabled !== false;
+
+      var pillTarget = isAdmin() ? 'advanced' : 'business';
+
+      if (dryRun) {
+        var pill = document.createElement('button');
+        pill.className = 'status-pill status-pill--dry-run';
+        pill.title = 'Dry Run Mode is ON' + (isAdmin() ? ' - click to go to settings' : '');
+        pill.onclick = function() { switchTab('settings'); setTimeout(function(){ switchSettingsTab(pillTarget); }, 100); };
+        pill.innerHTML = '<span class="status-pill-dot"></span>Dry Run';
+        container.appendChild(pill);
+      } else {
+        var livePill = document.createElement('button');
+        livePill.className = 'status-pill status-pill--live';
+        livePill.title = 'Live mode - messages will be sent for real';
+        livePill.onclick = function() { switchTab('settings'); setTimeout(function(){ switchSettingsTab(pillTarget); }, 100); };
+        livePill.innerHTML = '<span class="status-pill-dot"></span>Live';
+        container.appendChild(livePill);
+      }
+
+      if (autoTY) {
+        var tyPill = document.createElement('button');
+        tyPill.className = 'status-pill status-pill--auto-ty';
+        tyPill.title = 'Auto Thank-You messages are ON';
+        tyPill.onclick = function() { switchTab('settings'); setTimeout(function(){ switchSettingsTab(pillTarget); }, 100); };
+        tyPill.innerHTML = '<span class="status-pill-dot"></span>Auto Thank-You';
+        container.appendChild(tyPill);
+      }
+    }
+
+    // Current User + Live Users
+    var authorizedUsers = [];
+    var adminUsers = [];
+    var currentLiveUsers = [];
+
+    function loadCurrentUser() {
+      serverCall('getCurrentUser').then(function(result) {
+        if (!result || !result.success) return;
+        var data = result.data;
+        currentUserEmail = data.email || '';
+        isCurrentUserAdmin = data.isAdmin || false;
+
+        // Store authorized users and admin users for settings user management
+        authorizedUsers = data.authorizedUsers || [];
+        adminUsers = data.adminUsers || [];
+
+        // Display live users in the header
+        updateHeaderLiveUsers(data.liveUsers || []);
+
+        // Hide advanced settings tab for non-admin users
+        var advancedNav = document.querySelector('.settings-nav-item[data-settings-tab="advanced"]');
+        if (advancedNav) {
+          advancedNav.style.display = isAdmin() ? '' : 'none';
+        }
+
+        // Start the heartbeat interval
+        startHeartbeat();
+      }).catch(function() {});
+    }
+
+    function buildUsersSvgIcon() {
+      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('stroke', 'currentColor');
+      var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('stroke-linejoin', 'round');
+      path.setAttribute('stroke-width', '2');
+      path.setAttribute('d', 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z');
+      svg.appendChild(path);
+      return svg;
+    }
+
+    function updateHeaderLiveUsers(liveUsers) {
+      currentLiveUsers = liveUsers || [];
+      var usersEl = document.getElementById('headerUsers');
+      if (!usersEl) return;
+
+      while (usersEl.firstChild) usersEl.removeChild(usersEl.firstChild);
+
+      var userCount = liveUsers.length;
+      if (userCount > 0) {
+        usersEl.appendChild(buildUsersSvgIcon());
+        usersEl.appendChild(document.createTextNode(userCount + ' online'));
+
+        var popover = document.createElement('div');
+        popover.className = 'users-popover';
+
+        var title = document.createElement('div');
+        title.className = 'users-popover-title';
+        title.textContent = 'Online Now';
+        popover.appendChild(title);
+
+        var myEmail = currentUserEmail.toLowerCase();
+        liveUsers.forEach(function(email) {
+          var isCurrent = email.toLowerCase() === myEmail;
+          var item = document.createElement('div');
+          item.className = 'users-popover-item' + (isCurrent ? ' current-user' : '');
+
+          var dot = document.createElement('span');
+          dot.className = 'user-dot user-dot--live';
+          item.appendChild(dot);
+
+          var emailSpan = document.createElement('span');
+          emailSpan.textContent = email;
+          item.appendChild(emailSpan);
+
+          if (isCurrent) {
+            var badge = document.createElement('span');
+            badge.className = 'you-badge';
+            badge.textContent = 'you';
+            item.appendChild(badge);
+          }
+          popover.appendChild(item);
+        });
+
+        usersEl.appendChild(popover);
+        usersEl.removeAttribute('title');
+      }
+    }
+
+    // Heartbeat - sends every 60s, updates header live users on response
+    var heartbeatIntervalId = null;
+
+    function startHeartbeat() {
+      if (heartbeatIntervalId) return;
+      heartbeatIntervalId = setInterval(function() {
+        serverCall('heartbeat').then(function(result) {
+          if (result && result.success) {
+            updateHeaderLiveUsers(result.data.liveUsers || []);
+          }
+          if (!document.hidden && !isModalOpen_()) {
+            silentRefreshCustomers_();
+            loadStats();
+          }
+        }).catch(function() {});
+      }, 60000);
+    }
+
+    // Clear Twilio credentials
+    function clearCredentials() {
+      showConfirm({
+        title: 'Clear Credentials',
+        message: 'Are you sure you want to clear all Twilio credentials? You will need to re-enter them to send messages.',
+        confirmLabel: 'Clear',
+        destructive: true
+      }).then(function(ok) {
+        if (!ok) return;
+        var btn = document.getElementById('clearCredsBtn');
+        var defaultLabel = 'Clear';
+        btn.disabled = true;
+        btn.textContent = 'Clearing...';
+        serverCall('clearCredentials')
+          .then(function(result) {
+            if (result.success) {
+              showToast('Twilio credentials cleared', 'success');
+              loadCredentialStatus();
+              closeCredentialsModal();
+            } else {
+              showToast(result.error || 'Failed to clear credentials', 'error');
+            }
+          })
+          .catch(function(err) {
+            showToast(err.message || 'Failed to clear credentials', 'error');
+          })
+          .then(function() {
+            btn.disabled = false;
+            btn.textContent = defaultLabel;
+          });
+      });
+    }
+
+    // User management
+    var currentUserEmail = '';
+    var isCurrentUserAdmin = false;
+
+    function isAdmin() {
+      return isCurrentUserAdmin;
+    }
+
+    function renderUsersList(users) {
+      var container = document.getElementById('usersList');
+      if (!container) return;
+      while (container.firstChild) container.removeChild(container.firstChild);
+      if (!users || users.length === 0) {
+        var emptyMsg = document.createElement('p');
+        emptyMsg.style.cssText = 'font-size: var(--text-sm); color: var(--color-text-muted); padding: var(--space-2);';
+        emptyMsg.textContent = 'No authorized users.';
+        container.appendChild(emptyMsg);
+        return;
+      }
+      // Build set of live user emails for quick lookup
+      var liveSet = {};
+      (currentLiveUsers || []).forEach(function(e) { liveSet[e.toLowerCase()] = true; });
+
+      users.forEach(function(email) {
+        var isCurrentUser = email.toLowerCase() === currentUserEmail.toLowerCase();
+        var isLive = !!liveSet[email.toLowerCase()];
+        var item = document.createElement('div');
+        item.className = 'users-manage-item';
+
+        // Online status dot
+        if (isLive) {
+          var dot = document.createElement('span');
+          dot.className = 'user-dot user-dot--live';
+          dot.title = 'Online now';
+          item.appendChild(dot);
+        }
+
+        var emailSpan = document.createElement('span');
+        emailSpan.className = 'user-email';
+        emailSpan.textContent = email;
+        item.appendChild(emailSpan);
+
+        if (isCurrentUser) {
+          var youTag = document.createElement('span');
+          youTag.className = 'you-tag';
+          youTag.textContent = 'you';
+          item.appendChild(youTag);
+        }
+
+        // Admin badge
+        var isUserAdmin = adminUsers.indexOf(email.toLowerCase()) !== -1;
+        if (isUserAdmin) {
+          var adminTag = document.createElement('span');
+          adminTag.className = 'admin-tag';
+          adminTag.textContent = 'Admin';
+          item.appendChild(adminTag);
+        }
+
+        // Admin toggle button (shield icon)
+        var toggleBtn = document.createElement('button');
+        toggleBtn.className = 'btn-toggle-admin' + (isUserAdmin ? ' is-admin' : '');
+        if (isCurrentUser) {
+          toggleBtn.disabled = true;
+          toggleBtn.title = 'Cannot change your own admin status';
+        } else {
+          toggleBtn.title = isUserAdmin ? 'Revoke admin' : 'Grant admin';
+        }
+        toggleBtn.onclick = (function(userEmail, userIsAdmin) {
+          return function() { toggleAdmin(userEmail, userIsAdmin); };
+        })(email, isUserAdmin);
+        // Shield SVG icon
+        var shieldSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        shieldSvg.setAttribute('width', '16');
+        shieldSvg.setAttribute('height', '16');
+        shieldSvg.setAttribute('fill', 'none');
+        shieldSvg.setAttribute('viewBox', '0 0 24 24');
+        shieldSvg.setAttribute('stroke', 'currentColor');
+        var shieldPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        shieldPath.setAttribute('stroke-linecap', 'round');
+        shieldPath.setAttribute('stroke-linejoin', 'round');
+        shieldPath.setAttribute('stroke-width', '2');
+        shieldPath.setAttribute('d', isUserAdmin
+          ? 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'
+          : 'M20.618 5.984A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z');
+        shieldSvg.appendChild(shieldPath);
+        toggleBtn.appendChild(shieldSvg);
+        item.appendChild(toggleBtn);
+
+        var removeBtn = document.createElement('button');
+        removeBtn.className = 'btn-remove-user';
+        if (isCurrentUser) {
+          removeBtn.disabled = true;
+          removeBtn.title = 'Cannot remove yourself';
+        } else {
+          removeBtn.title = 'Remove user';
+        }
+        removeBtn.onclick = (function(userEmail) {
+          return function() { removeUser(userEmail); };
+        })(email);
+        // Build remove icon with DOM (XSS-safe, no user data in SVG)
+        var removeSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        removeSvg.setAttribute('width', '16');
+        removeSvg.setAttribute('height', '16');
+        removeSvg.setAttribute('fill', 'none');
+        removeSvg.setAttribute('viewBox', '0 0 24 24');
+        removeSvg.setAttribute('stroke', 'currentColor');
+        var removePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        removePath.setAttribute('stroke-linecap', 'round');
+        removePath.setAttribute('stroke-linejoin', 'round');
+        removePath.setAttribute('stroke-width', '2');
+        removePath.setAttribute('d', 'M6 18L18 6M6 6l12 12');
+        removeSvg.appendChild(removePath);
+        removeBtn.appendChild(removeSvg);
+        item.appendChild(removeBtn);
+
+        container.appendChild(item);
+      });
+    }
+
+    function loadUsersList() {
+      serverCall('getCurrentUser').then(function(result) {
+        if (result && result.success) {
+          currentUserEmail = result.data.email || '';
+          isCurrentUserAdmin = result.data.isAdmin || false;
+          authorizedUsers = result.data.authorizedUsers || [];
+          adminUsers = result.data.adminUsers || [];
+          renderUsersList(authorizedUsers);
+        }
+      });
+    }
+
+    function addUser() {
+      var input = document.getElementById('newUserEmail');
+      var email = (input.value || '').trim();
+      if (!email || !email.includes('@')) {
+        showToast('Please enter a valid email address', 'error');
+        return;
+      }
+      serverCall('addUser', { email: email })
+        .then(function(result) {
+          if (result.success) {
+            input.value = '';
+            renderUsersList(result.data.users);
+            loadCurrentUser();
+            showToast('User added successfully', 'success');
+          } else {
+            showToast(result.error || 'Failed to add user', 'error');
+          }
+        })
+        .catch(function(err) {
+          showToast(err.message || 'Failed to add user', 'error');
+        });
+    }
+
+    function removeUser(email) {
+      showConfirm({
+        title: 'Remove User',
+        message: 'Remove ' + email + ' from authorized users?',
+        confirmLabel: 'Remove',
+        destructive: true
+      }).then(function(ok) {
+        if (!ok) return;
+        serverCall('removeUser', { email: email })
+          .then(function(result) {
+            if (result.success) {
+              renderUsersList(result.data.users);
+              loadCurrentUser();
+              showToast('User removed', 'success');
+            } else {
+              showToast(result.error || 'Failed to remove user', 'error');
+            }
+          })
+          .catch(function(err) {
+            showToast(err.message || 'Failed to remove user', 'error');
+          });
+      });
+    }
+
+    function toggleAdmin(email, isCurrentlyAdmin) {
+      var action = isCurrentlyAdmin ? 'Revoke admin from' : 'Grant admin to';
+      showConfirm({
+        title: (isCurrentlyAdmin ? 'Revoke' : 'Grant') + ' Admin',
+        message: action + ' ' + email + '?',
+        confirmLabel: isCurrentlyAdmin ? 'Revoke' : 'Grant',
+        destructive: isCurrentlyAdmin
+      }).then(function(ok) {
+        if (!ok) return;
+        serverCall('toggleAdmin', { email: email, makeAdmin: !isCurrentlyAdmin })
+          .then(function(result) {
+            if (result.success) {
+              adminUsers = result.data.adminUsers || [];
+              authorizedUsers = result.data.users || authorizedUsers;
+              renderUsersList(authorizedUsers);
+              loadCurrentUser();
+              showToast(isCurrentlyAdmin ? 'Admin revoked' : 'Admin granted', 'success');
+            } else {
+              showToast(result.error || 'Failed to toggle admin', 'error');
+            }
+          })
+          .catch(function(err) {
+            showToast(err.message || 'Failed to toggle admin', 'error');
+          });
+      });
+    }
+
+    function sendBills() {
+      // Check for duplicates before sending
+      if (currentDuplicateSummary && currentDuplicateSummary.exactCount > 0) {
+        showConfirm({
+          title: 'Duplicate Rows Detected',
+          message: currentDuplicateSummary.exactCount + ' exact duplicate row(s) found (same phone + due date). This will send multiple messages to the same number. Continue?',
+          confirmLabel: 'Send Anyway',
+          destructive: true
+        }).then(function(ok) {
+          if (ok) executeSendBills_();
+        });
+      } else {
+        executeSendBills_();
+      }
+    }
+
+    function executeSendBills_() {
+      var btn = document.getElementById('sendBillsBtn');
+      var progressBar = document.getElementById('sendProgressBar');
+      var filter = document.getElementById('sendFilter').value;
+      var dueDate = document.getElementById('dueDate').value;
+      var templateType = document.getElementById('templateType').value;
+      var dryRun = document.getElementById('dryRunCheckbox').checked;
+
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+      if (progressBar) progressBar.classList.add('active');
+      document.getElementById('sendAlert').textContent = '';
+
+      serverCall('sendBills', { filter: filter, dueDate: dueDate, templateType: templateType, dryRunMode: dryRun })
+        .then(function(result) {
+          btn.disabled = false;
+          btn.textContent = 'Send Bills';
+          if (progressBar) progressBar.classList.remove('active');
+          if (result.success) {
+            var data = result.data;
+            var msg = 'Sent: ' + data.sentCount + ', Errors: ' + data.errorCount;
+            if (data.skippedCount > 0) msg += ', Skipped: ' + data.skippedCount;
+            if (data.dryRunMode) msg += ' (DRY RUN)';
+            showAlert('sendAlert', 'success', msg);
+            refreshCustomers();
+          } else {
+            showAlert('sendAlert', 'error', result.error || 'Failed to send bills');
+          }
+        })
+        .catch(function(err) {
+          btn.disabled = false;
+          btn.textContent = 'Send Bills';
+          if (progressBar) progressBar.classList.remove('active');
+          showAlert('sendAlert', 'error', 'Error: ' + err.message);
+        });
+    }
+
+    function clearStatuses() {
+      showConfirm({
+        title: 'Clear Statuses',
+        message: 'Are you sure you want to clear all message statuses?',
+        confirmLabel: 'Clear All',
+        destructive: true
+      }).then(function(ok) {
+        if (!ok) return;
+        serverCall('clearStatuses')
+          .then(function(result) {
+            if (result.success) {
+              showToast('Cleared ' + result.data.clearedCount + ' statuses', 'success');
+              refreshCustomers();
+            } else {
+              showToast(result.error || 'Failed to clear statuses', 'error');
+            }
+          })
+          .catch(function(err) {
+            showToast(err.message || 'Failed to clear statuses', 'error');
+          });
+      });
+    }
+
+    // Credentials Modal
+</script>

@@ -35,20 +35,40 @@ Run `runAllSettingsManagerTests()` in Apps Script editor (defined in `settings-m
 - **Web app mode**: Uses `SPREADSHEET_ID` constant in `spreadsheet.gs` for `SpreadsheetApp.openById()`
 
 ### Key Files
+
+**Server-side (.gs) — all compile into one namespace:**
+
 | File | Purpose |
 |------|---------|
 | `main.gs` | Entry points: `onOpen()` menus, `onEdit()` auto-thank-you trigger |
 | `billing-core.gs` | **Shared business logic** — mode-independent core functions called by both modes |
-| `settings-manager.gs` | Settings via `PropertiesService`, template processing, validation, activity log storage |
+| `settings-manager.gs` | Settings CRUD via `PropertiesService`, validation, migration, export/import |
+| `template-manager.gs` | Template processing (`processTemplate()`), preview data builders, template type lookups |
+| `activity-log.gs` | Event logging with sharded storage (`ACTIVITY_LOG_A`/`B`), web API endpoints |
 | `api.gs` | Web app API router — thin wrappers that delegate to `billing-core.gs` |
-| `webapp.gs` | Web app auth (`doGet`/`doPost`), Google account whitelist, live user heartbeat via CacheService |
-| `webapp-main.html` | Web app main UI (customer list, messages, settings tabs) |
+| `webapp.gs` | Web app auth (`doGet`/`doPost`), Google account whitelist, live user heartbeat, `include()` helper |
 | `twilio.gs` | Twilio SMS with exponential backoff retry (max 4 attempts) |
-| `spreadsheet.gs` | Sheet utilities, column mapping, **add-on UI wrappers** that delegate to `billing-core.gs` |
-| `ui.gs` | Menu dialogs, credential management |
-| `settings.html` | Settings modal UI (tabbed interface, used by both modes) |
-| `design-tokens.html` | Shared CSS custom properties and reset, included via `<?!= include('design-tokens') ?>` |
-| `settings-manager.test.gs` | Unit tests - run `runAllSettingsManagerTests()` in Apps Script editor |
+| `spreadsheet.gs` | Sheet access (dual-mode), column auto-detection, formatting, validation helpers |
+| `addon-actions.gs` | **Add-on menu action wrappers** — UI prompts/alerts around `billing-core.gs` calls |
+| `ui.gs` | Settings dialog bridge — functions called by `settings.html` to load/save settings |
+| `credentials-ui.gs` | Add-on credential prompts — menu-driven set/delete for Twilio credentials |
+| `settings-manager.test.gs` | Unit tests — run `runAllSettingsManagerTests()` in Apps Script editor |
+
+**Client-side (.html) — modular via `<?!= include('filename') ?>`:**
+
+| File | Purpose |
+|------|---------|
+| `design-tokens.html` | **Shared CSS** — custom properties, reset, mobile base rules |
+| `webapp-main.html` | Web app HTML shell — structure only, includes all modules below |
+| `webapp-styles.html` | Web app CSS — layout, components, dark theme, responsive breakpoints |
+| `webapp-app.html` | Web app JS core — state, theme, initialization, utilities, tab navigation |
+| `webapp-dashboard.html` | Web app JS — dashboard tab: stats, customer table, filters, send bar |
+| `webapp-messages.html` | Web app JS — messages tab: template editor, credentials modal, preview |
+| `webapp-settings-tab.html` | Web app JS — settings tab: form, column mapping, activity log |
+| `settings.html` | Settings modal HTML shell — structure only, includes modules below |
+| `settings-styles.html` | Settings modal CSS — forms, wizard, cards, footer |
+| `settings-app.html` | Settings modal JS — state, tabs, forms, validation, wizard flow |
+| `shared-utils.html` | Shared JS utilities — `showToast()`, icon definitions |
 
 ### Data Flow
 ```
@@ -66,7 +86,7 @@ Every user-facing feature must work in **both** add-on and web app modes. Busine
 
 **When adding or changing a feature, update BOTH columns:**
 
-| Core Function (`billing-core.gs`) | Add-on Wrapper (`spreadsheet.gs`) | Web Wrapper (`api.gs`) | Notes |
+| Core Function (`billing-core.gs`) | Add-on Wrapper (`addon-actions.gs`) | Web Wrapper (`api.gs`) | Notes |
 |---|---|---|---|
 | `getCustomersCore_()` | — | `getCustomersForWeb()` | Add-on reads sheet directly |
 | `sendBillsCore_()` | `sendBillsToUnpaid()`, `sendUnpaidByDueDate()` | `sendBillsForWeb()` | Add-on has separate menu items per filter |
@@ -79,18 +99,31 @@ Every user-facing feature must work in **both** add-on and web app modes. Busine
 | `getLiveUsers_()` | — | `getLiveUsersForWeb()` | Web only (read live users from cache) |
 | — | `testSingleMessage()` | — | Add-on only (finds first unpaid) |
 | — | — | `getCustomerStatsForWeb()` | Web only (dashboard stats) |
-| `getActivityLog_()` | — | `getActivityLogForWeb()` | Web only, admin-only (both in `settings-manager.gs`) |
-| — | — | `clearActivityLogForWeb()` | Web only, admin-only (in `settings-manager.gs`) |
+| `getActivityLog_()` | — | `getActivityLogForWeb()` | Web only, admin-only (both in `activity-log.gs`) |
+| — | — | `clearActivityLogForWeb()` | Web only, admin-only (in `activity-log.gs`) |
 
-**Shared CSS**: Design tokens live in `design-tokens.html`. Both `settings.html` and `webapp-main.html` include it via `<?!= include('design-tokens') ?>`. Dark theme overrides are webapp-only (in `webapp-main.html`).
+**Shared CSS**: Design tokens live in `design-tokens.html`. Both `settings.html` and `webapp-main.html` include it via `<?!= include('design-tokens') ?>`. Dark theme overrides are webapp-only (in `webapp-styles.html`).
+
+**HTML module include order** (each file wraps its content in `<style>` or `<script>` tags):
+```
+webapp-main.html includes:
+  design-tokens.html → webapp-styles.html → [HTML body] →
+  webapp-app.html → webapp-dashboard.html → webapp-messages.html →
+  webapp-settings-tab.html → shared-utils.html
+
+settings.html includes:
+  design-tokens.html → settings-styles.html → [HTML body] →
+  settings-app.html → shared-utils.html
+```
 
 **Checklist for new features:**
 1. Write core logic in `billing-core.gs` (return `{success, data, error}`)
-2. Add add-on wrapper in `spreadsheet.gs` (UI prompts/alerts around the core call)
+2. Add add-on wrapper in `addon-actions.gs` (UI prompts/alerts around the core call)
 3. Add web wrapper in `api.gs` (extract params from payload, call core)
 4. Add API route in `handleApiRequest_()` switch statement (activity logging lives inside each function via `logEvent_()`, not centralized)
 5. Add menu item in `onOpen()` if needed
-6. Update the parity table above
+6. Add web UI in the appropriate `webapp-*.html` JS module
+7. Update the parity table above
 
 ## Critical Patterns
 

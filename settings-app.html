@@ -1,0 +1,1556 @@
+<script>
+    // ============================================
+    // Settings App: State, Forms, Validation, Wizard
+    // ============================================
+    // State Management
+    // ============================================
+    var currentSettings = null;
+    var originalSettings = null;
+    var sheetHeaders = [];
+    var hasUnsavedChanges = false;
+    var wizardStep = 1;
+    var wizardData = {
+      accountSid: '',
+      authToken: '',
+      twilioPhone: '',
+      credentialsValid: false,
+      businessName: '',
+      etransferEmail: '',
+      phoneNumber: '',
+      whatsappLink: '',
+      columns: {},
+      columnDetections: {}
+    };
+    var isFirstTimeUser = false;
+
+    // ============================================
+    // Validation Rules
+    // ============================================
+    var validationRules = {
+      email: {
+        pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+        message: 'Please enter a valid email address',
+        example: 'e.g., payments@mybusiness.com'
+      },
+      phone: {
+        pattern: /^\+?[\d\s\-\(\)]{7,20}$/,
+        message: 'Please enter a valid phone number',
+        example: 'Include country code, e.g., +1 (647) 555-1234'
+      },
+      twilioPhone: {
+        pattern: /^\+1\d{10}$/,
+        message: 'Twilio phone must be in format +1XXXXXXXXXX',
+        example: 'e.g., +14155551234'
+      },
+      accountSid: {
+        pattern: /^AC[a-f0-9]{32}$/i,
+        message: 'Account SID should start with "AC" and be 34 characters',
+        example: 'Found on your Twilio Console dashboard'
+      },
+      authToken: {
+        pattern: /^[a-f0-9]{32}$/i,
+        message: 'Auth Token should be 32 characters',
+        example: 'Click "Show" on your Twilio Console to reveal it'
+      },
+      hexColor: {
+        pattern: /^#[0-9A-Fa-f]{6}$/,
+        message: 'Invalid color format',
+        example: 'Use #RRGGBB format, e.g., #d9ead3'
+      },
+      required: {
+        pattern: /.+/,
+        message: 'This field is required',
+        example: ''
+      },
+      templateLength: {
+        min: 50,
+        max: 1600,
+        message: 'Message must be between 50-1600 characters',
+        example: 'SMS messages work best between 160-320 characters'
+      }
+    };
+
+    // Error guidance for common issues
+    var errorGuidance = {
+      'AUTH_FAILED': {
+        title: 'Authentication Failed',
+        steps: [
+          'Double-check your Account SID - it should start with "AC"',
+          'Make sure you copied the Auth Token correctly (no extra spaces)',
+          'Verify you\'re using live credentials, not test credentials'
+        ],
+        link: 'https://www.twilio.com/console'
+      },
+      'PHONE_NOT_FOUND': {
+        title: 'Phone Number Not Found',
+        steps: [
+          'Make sure the phone number is in E.164 format (+1XXXXXXXXXX)',
+          'Verify this number is registered to your Twilio account',
+          'Check that your Twilio account has SMS capability enabled'
+        ],
+        link: 'https://www.twilio.com/console/phone-numbers/incoming'
+      },
+      'INVALID_CREDENTIALS': {
+        title: 'Invalid Credentials',
+        steps: [
+          'Your Account SID and Auth Token don\'t match',
+          'Try copying them fresh from your Twilio Console',
+          'Make sure you\'re logged into the correct Twilio account'
+        ],
+        link: 'https://www.twilio.com/console'
+      }
+    };
+
+    // ============================================
+    // Initialization
+    // ============================================
+    document.addEventListener('DOMContentLoaded', init);
+
+    function init() {
+      setupTabs();
+      setupTemplateTabs();
+      setupPlaceholderChips();
+      setupColorPickers();
+      setupAutoThankYouToggle();
+      setupCharacterCounters();
+      setupChangeTracking();
+      setupInlineValidation();
+      loadSettings();
+    }
+
+    // ============================================
+    // Template Sub-tabs
+    // ============================================
+    function setupTemplateTabs() {
+      document.querySelectorAll('.template-tab').forEach(function(tab) {
+        tab.addEventListener('click', function() {
+          document.querySelectorAll('.template-tab').forEach(function(t) {
+            t.classList.remove('active');
+            t.setAttribute('aria-selected', 'false');
+          });
+          tab.classList.add('active');
+          tab.setAttribute('aria-selected', 'true');
+
+          document.querySelectorAll('.template-panel').forEach(function(p) {
+            p.classList.remove('active');
+          });
+          var panelId = 'template-' + tab.dataset.template;
+          document.getElementById(panelId).classList.add('active');
+        });
+      });
+    }
+
+    // ============================================
+    // Tab Navigation
+    // ============================================
+    function setupTabs() {
+      document.querySelectorAll('.tab').forEach(function(tab) {
+        tab.addEventListener('click', function() {
+          document.querySelectorAll('.tab').forEach(function(t) {
+            t.classList.remove('active');
+            t.setAttribute('aria-selected', 'false');
+          });
+          tab.classList.add('active');
+          tab.setAttribute('aria-selected', 'true');
+
+          document.querySelectorAll('.tab-panel').forEach(function(p) {
+            p.classList.remove('active');
+          });
+          var panelId = 'panel-' + tab.dataset.tab;
+          document.getElementById(panelId).classList.add('active');
+        });
+      });
+    }
+
+    // ============================================
+    // Advanced Options Toggle
+    // ============================================
+    function toggleAdvanced() {
+      var toggle = document.getElementById('advancedToggle');
+      var content = document.getElementById('advancedContent');
+      toggle.classList.toggle('open');
+      content.classList.toggle('open');
+    }
+
+    // ============================================
+    // Placeholder Chip Insertion
+    // ============================================
+    function setupPlaceholderChips() {
+      document.querySelectorAll('.chip').forEach(function(chip) {
+        chip.addEventListener('click', function() {
+          var targetId = chip.closest('.placeholder-chips').dataset.target;
+          var textarea = document.getElementById(targetId);
+          var placeholder = chip.dataset.placeholder;
+          insertAtCursor(textarea, placeholder);
+          updateCharacterCounter(textarea);
+          markAsChanged();
+        });
+      });
+    }
+
+    function insertAtCursor(textarea, text) {
+      var start = textarea.selectionStart;
+      var end = textarea.selectionEnd;
+      var before = textarea.value.substring(0, start);
+      var after = textarea.value.substring(end);
+      textarea.value = before + text + after;
+      textarea.selectionStart = textarea.selectionEnd = start + text.length;
+      textarea.focus();
+    }
+
+    // ============================================
+    // Character Counters
+    // ============================================
+    function setupCharacterCounters() {
+      var textareas = [
+        { textarea: 'firstNoticeMessage', counter: 'firstNoticeCounter' },
+        { textarea: 'followUpMessage', counter: 'followUpCounter' },
+        { textarea: 'finalNoticeMessage', counter: 'finalNoticeCounter' },
+        { textarea: 'thankYouMessage', counter: 'thankYouCounter' }
+      ];
+
+      textareas.forEach(function(item) {
+        var textarea = document.getElementById(item.textarea);
+        if (textarea) {
+          textarea.addEventListener('input', function() {
+            updateCharacterCounter(textarea);
+          });
+        }
+      });
+    }
+
+    function updateCharacterCounter(textarea) {
+      var counterMap = {
+        'firstNoticeMessage': 'firstNoticeCounter',
+        'followUpMessage': 'followUpCounter',
+        'finalNoticeMessage': 'finalNoticeCounter',
+        'thankYouMessage': 'thankYouCounter'
+      };
+      var counterId = counterMap[textarea.id];
+      if (!counterId) return;
+
+      var counter = document.getElementById(counterId);
+      var length = textarea.value.length;
+      var maxLength = 1600;
+      var minLength = 50;
+
+      counter.textContent = length + ' / ' + maxLength;
+      counter.classList.remove('warning', 'error');
+
+      if (length > maxLength) {
+        counter.classList.add('error');
+      } else if (length < minLength && length > 0) {
+        counter.classList.add('warning');
+      }
+    }
+
+    // ============================================
+    // Color Pickers
+    // ============================================
+    function setupColorPickers() {
+      var colorInputs = [
+        { input: 'colorSuccess', preview: 'previewSuccess' },
+        { input: 'colorError', preview: 'previewError' },
+        { input: 'colorDryRun', preview: 'previewDryRun' }
+      ];
+
+      colorInputs.forEach(function(item) {
+        var inputEl = document.getElementById(item.input);
+        var previewEl = document.getElementById(item.preview);
+
+        inputEl.addEventListener('input', function() {
+          previewEl.style.backgroundColor = inputEl.value;
+          markAsChanged();
+        });
+      });
+    }
+
+    function updateColorPreviews() {
+      var colorInputs = [
+        { input: 'colorSuccess', preview: 'previewSuccess' },
+        { input: 'colorError', preview: 'previewError' },
+        { input: 'colorDryRun', preview: 'previewDryRun' }
+      ];
+
+      colorInputs.forEach(function(item) {
+        var inputEl = document.getElementById(item.input);
+        var previewEl = document.getElementById(item.preview);
+        previewEl.style.backgroundColor = inputEl.value;
+      });
+    }
+
+    // ============================================
+    // Auto Thank-You Toggle
+    // ============================================
+    function setupAutoThankYouToggle() {
+      var toggle = document.getElementById('autoThankYouEnabled');
+      toggle.addEventListener('change', function() {
+        updateAutoThankYouUI(toggle.checked);
+        markAsChanged();
+      });
+    }
+
+    function updateAutoThankYouUI(isEnabled) {
+      var card = document.getElementById('autoThankYouCard');
+      var badge = document.getElementById('autoThankYouBadge');
+      var description = document.getElementById('autoThankYouDescription');
+      var feedbackBox = document.getElementById('autoThankYouFeedback');
+      var feedbackText = document.getElementById('autoThankYouFeedbackText');
+      var thankYouCard = document.getElementById('thankYouCard');
+
+      if (isEnabled) {
+        card.classList.add('active');
+        badge.textContent = 'On';
+        badge.classList.remove('warning');
+        badge.style.background = '#d1fae5';
+        badge.style.color = '#065f46';
+        description.textContent = 'Automatically send this message when payment is marked "Paid"';
+        feedbackBox.style.background = '#d1fae5';
+        feedbackBox.style.borderColor = '#10b981';
+        feedbackText.textContent = 'Active: This message will be sent automatically when you mark a payment as "Paid".';
+        thankYouCard.style.opacity = '1';
+      } else {
+        card.classList.remove('active');
+        badge.textContent = 'Off';
+        badge.classList.add('warning');
+        badge.style.background = '#fef3c7';
+        badge.style.color = '#92400e';
+        description.textContent = 'Auto-send is OFF - messages will NOT be sent automatically';
+        feedbackBox.style.background = '#fef3c7';
+        feedbackBox.style.borderColor = '#f59e0b';
+        feedbackText.textContent = 'Disabled: Customers will NOT receive automatic thank-you messages when marked as paid.';
+        thankYouCard.style.opacity = '0.7';
+      }
+    }
+
+    // ============================================
+    // Change Tracking
+    // ============================================
+    function setupChangeTracking() {
+      document.querySelectorAll('input, textarea, select').forEach(function(el) {
+        el.addEventListener('input', markAsChanged);
+        el.addEventListener('change', markAsChanged);
+      });
+    }
+
+    function markAsChanged() {
+      if (!hasUnsavedChanges) {
+        hasUnsavedChanges = true;
+        document.getElementById('unsavedBadge').classList.add('visible');
+      }
+    }
+
+    function clearChanges() {
+      hasUnsavedChanges = false;
+      document.getElementById('unsavedBadge').classList.remove('visible');
+    }
+
+    // ============================================
+    // Settings Load/Save
+    // ============================================
+    function loadSettings() {
+      showLoading(true);
+      google.script.run
+        .withSuccessHandler(onSettingsLoaded)
+        .withFailureHandler(onError)
+        .getSettingsForUI();
+    }
+
+    function onSettingsLoaded(data) {
+      currentSettings = data.settings;
+      originalSettings = JSON.parse(JSON.stringify(data.settings));
+      sheetHeaders = data.headers || [];
+
+      // Check for first-time setup
+      if (data.isFirstTime) {
+        isFirstTimeUser = true;
+        showWizard();
+      }
+
+      // Business tab
+      document.getElementById('businessName').value = currentSettings.business.name || '';
+      document.getElementById('etransferEmail').value = currentSettings.business.etransferEmail || '';
+      document.getElementById('phoneNumber').value = currentSettings.business.phoneNumber || '';
+      document.getElementById('whatsappLink').value = currentSettings.business.whatsappLink || '';
+
+      // Templates tab - Bill Messages
+      var billTemplates = currentSettings.templates.billMessages || {};
+
+      document.getElementById('firstNoticeName').value = (billTemplates.firstNotice && billTemplates.firstNotice.name) || 'First Notice';
+      document.getElementById('firstNoticeMessage').value = (billTemplates.firstNotice && billTemplates.firstNotice.message) || '';
+      updateCharacterCounter(document.getElementById('firstNoticeMessage'));
+
+      document.getElementById('followUpName').value = (billTemplates.followUp && billTemplates.followUp.name) || 'Follow-up Reminder';
+      document.getElementById('followUpMessage').value = (billTemplates.followUp && billTemplates.followUp.message) || '';
+      updateCharacterCounter(document.getElementById('followUpMessage'));
+
+      document.getElementById('finalNoticeName').value = (billTemplates.finalNotice && billTemplates.finalNotice.name) || 'Final Notice';
+      document.getElementById('finalNoticeMessage').value = (billTemplates.finalNotice && billTemplates.finalNotice.message) || '';
+      updateCharacterCounter(document.getElementById('finalNoticeMessage'));
+
+      document.getElementById('thankYouMessage').value = currentSettings.templates.thankYouMessage || '';
+      updateCharacterCounter(document.getElementById('thankYouMessage'));
+
+      // Behavior tab
+      document.getElementById('testOrderId').value = currentSettings.behavior.testOrderId || '';
+
+      var autoThankYouToggle = document.getElementById('autoThankYouEnabled');
+      autoThankYouToggle.checked = currentSettings.behavior.autoThankYouEnabled !== false;
+      updateAutoThankYouUI(autoThankYouToggle.checked);
+
+      document.getElementById('batchSize').value = currentSettings.behavior.batchSize;
+      document.getElementById('messageDelayMs').value = currentSettings.behavior.messageDelayMs;
+      document.getElementById('headerRowIndex').value = currentSettings.behavior.headerRowIndex;
+
+      // Colors tab
+      document.getElementById('colorSuccess').value = currentSettings.colors.success;
+      document.getElementById('colorError').value = currentSettings.colors.error;
+      document.getElementById('colorDryRun').value = currentSettings.colors.dryRun;
+      updateColorPreviews();
+
+      // Twilio credentials (masked)
+      if (data.credentials) {
+        populateCredentialFields(data.credentials);
+      }
+
+      // Columns tab
+      populateColumnSelects();
+
+      showLoading(false);
+      clearChanges();
+    }
+
+    function populateColumnSelects() {
+      var selects = {
+        colPhoneNumber: currentSettings.columns.phoneNumber,
+        colCustomerName: currentSettings.columns.customerName,
+        colBalance: currentSettings.columns.balance,
+        colNumTiffins: currentSettings.columns.numTiffins,
+        colDueDate: currentSettings.columns.dueDate,
+        colMessageStatus: currentSettings.columns.messageStatus,
+        colOrderId: currentSettings.columns.orderId,
+        colPaymentStatus: currentSettings.columns.paymentStatus
+      };
+
+      Object.keys(selects).forEach(function(selectId) {
+        var currentValue = selects[selectId];
+        var select = document.getElementById(selectId);
+
+        while (select.firstChild) {
+          select.removeChild(select.firstChild);
+        }
+
+        var defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = '-- Choose a column --';
+        select.appendChild(defaultOption);
+
+        sheetHeaders.forEach(function(header) {
+          var option = document.createElement('option');
+          option.value = header;
+          option.textContent = header;
+          if (header === currentValue) {
+            option.selected = true;
+          }
+          select.appendChild(option);
+        });
+
+        if (currentValue && sheetHeaders.indexOf(currentValue) === -1) {
+          var customOption = document.createElement('option');
+          customOption.value = currentValue;
+          customOption.textContent = currentValue + ' (not found in sheet)';
+          customOption.selected = true;
+          select.appendChild(customOption);
+        }
+      });
+    }
+
+    function refreshHeaders() {
+      showLoading(true);
+      google.script.run
+        .withSuccessHandler(function(headers) {
+          sheetHeaders = headers;
+          populateColumnSelects();
+          showLoading(false);
+          showToast('Column list refreshed!', 'success');
+        })
+        .withFailureHandler(onError)
+        .getSheetHeaders();
+    }
+
+    function collectFormData() {
+      return {
+        version: currentSettings.version,
+        business: {
+          name: document.getElementById('businessName').value.trim(),
+          etransferEmail: document.getElementById('etransferEmail').value.trim(),
+          phoneNumber: document.getElementById('phoneNumber').value.trim(),
+          whatsappLink: document.getElementById('whatsappLink').value.trim()
+        },
+        templates: {
+          billMessages: {
+            firstNotice: {
+              name: document.getElementById('firstNoticeName').value.trim() || 'First Notice',
+              message: document.getElementById('firstNoticeMessage').value
+            },
+            followUp: {
+              name: document.getElementById('followUpName').value.trim() || 'Follow-up Reminder',
+              message: document.getElementById('followUpMessage').value
+            },
+            finalNotice: {
+              name: document.getElementById('finalNoticeName').value.trim() || 'Final Notice',
+              message: document.getElementById('finalNoticeMessage').value
+            }
+          },
+          thankYouMessage: document.getElementById('thankYouMessage').value
+        },
+        behavior: {
+          autoThankYouEnabled: document.getElementById('autoThankYouEnabled').checked,
+          batchSize: parseInt(document.getElementById('batchSize').value, 10),
+          messageDelayMs: parseInt(document.getElementById('messageDelayMs').value, 10),
+          headerRowIndex: parseInt(document.getElementById('headerRowIndex').value, 10),
+          testOrderId: document.getElementById('testOrderId').value.trim()
+        },
+        colors: {
+          success: document.getElementById('colorSuccess').value,
+          error: document.getElementById('colorError').value,
+          dryRun: document.getElementById('colorDryRun').value
+        },
+        columns: {
+          phoneNumber: document.getElementById('colPhoneNumber').value,
+          customerName: document.getElementById('colCustomerName').value,
+          balance: document.getElementById('colBalance').value,
+          numTiffins: document.getElementById('colNumTiffins').value,
+          dueDate: document.getElementById('colDueDate').value,
+          messageStatus: document.getElementById('colMessageStatus').value,
+          orderId: document.getElementById('colOrderId').value,
+          paymentStatus: document.getElementById('colPaymentStatus').value
+        }
+      };
+    }
+
+    function saveSettingsUI() {
+      var settings = collectFormData();
+      showLoading(true);
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          showLoading(false);
+          if (result.success) {
+            currentSettings = settings;
+            originalSettings = JSON.parse(JSON.stringify(settings));
+            clearChanges();
+            if (result.warning) {
+              showToast(result.warning, 'warning');
+            } else {
+              showToast('Settings saved!', 'success');
+            }
+          } else {
+            showToast('Could not save: ' + result.error, 'error');
+          }
+        })
+        .withFailureHandler(onError)
+        .saveSettingsFromUI(settings);
+    }
+
+    function confirmReset() {
+      showConfirm({
+        title: 'Reset Settings',
+        message: 'Are you sure you want to reset ALL settings back to the original defaults? This cannot be undone!',
+        confirmLabel: 'Reset All',
+        destructive: true
+      }).then(function(ok) {
+        if (!ok) return;
+        showLoading(true);
+        google.script.run
+          .withSuccessHandler(function() {
+            loadSettings();
+            showToast('Settings have been reset to defaults', 'success');
+          })
+          .withFailureHandler(onError)
+          .resetToDefaults();
+      });
+    }
+
+    function exportSettingsUI() {
+      var settings = collectFormData();
+      var json = JSON.stringify(settings, null, 2);
+      var blob = new Blob([json], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'billing-settings-backup.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Settings backed up to file!', 'success');
+    }
+
+    function importSettingsUI() {
+      var input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.onchange = function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+
+        var reader = new FileReader();
+        reader.onload = function(event) {
+          try {
+            JSON.parse(event.target.result);
+            showLoading(true);
+            google.script.run
+              .withSuccessHandler(function(result) {
+                if (result.success) {
+                  loadSettings();
+                  showToast('Settings restored from backup!', 'success');
+                } else {
+                  showLoading(false);
+                  showToast('Could not restore: ' + result.error, 'error');
+                }
+              })
+              .withFailureHandler(onError)
+              .importSettings(event.target.result);
+          } catch (err) {
+            showToast('This file is not a valid settings backup', 'error');
+          }
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    }
+
+    function previewTemplate(type) {
+      var templateFieldMap = {
+        'firstNotice': 'firstNoticeMessage',
+        'followUp': 'followUpMessage',
+        'finalNotice': 'finalNoticeMessage',
+        'thankYou': 'thankYouMessage'
+      };
+      var previewDivMap = {
+        'firstNotice': 'firstNoticePreview',
+        'followUp': 'followUpPreview',
+        'finalNotice': 'finalNoticePreview',
+        'thankYou': 'thankYouPreview'
+      };
+
+      var template = document.getElementById(templateFieldMap[type]).value;
+
+      google.script.run
+        .withSuccessHandler(function(preview) {
+          var container = document.getElementById(previewDivMap[type]);
+          container.classList.remove('hidden');
+          container.querySelector('.preview-content').textContent = preview;
+        })
+        .withFailureHandler(onError)
+        .previewTemplate(template);
+    }
+
+    // ============================================
+    // UI Helpers
+    // ============================================
+    function showLoading(show) {
+      var overlay = document.getElementById('loading');
+      if (show) {
+        overlay.classList.remove('hidden');
+      } else {
+        overlay.classList.add('hidden');
+      }
+    }
+
+    function onError(error) {
+      showLoading(false);
+      showToast(error.message || 'Something went wrong. Please try again.', 'error');
+      console.error(error);
+    }
+
+    // ============================================
+    // Inline Validation
+    // ============================================
+    function setupInlineValidation() {
+      // Business tab fields
+      var businessFields = [
+        { id: 'businessName', rule: 'required' },
+        { id: 'etransferEmail', rule: 'email' },
+        { id: 'phoneNumber', rule: 'phone' }
+      ];
+
+      businessFields.forEach(function(field) {
+        var input = document.getElementById(field.id);
+        if (input) {
+          input.addEventListener('blur', function() {
+            validateField(input, field.rule);
+          });
+          input.addEventListener('input', function() {
+            clearFieldValidation(input);
+          });
+        }
+      });
+
+      // Color fields
+      var colorFields = ['colorSuccess', 'colorError', 'colorDryRun'];
+      colorFields.forEach(function(fieldId) {
+        var input = document.getElementById(fieldId);
+        if (input) {
+          input.addEventListener('change', function() {
+            validateField(input, 'hexColor');
+          });
+        }
+      });
+    }
+
+    function validateField(input, ruleName) {
+      var value = input.value.trim();
+      var rule = validationRules[ruleName];
+
+      if (!rule) return true;
+
+      if (!value && ruleName !== 'required') {
+        clearFieldValidation(input);
+        return true;
+      }
+
+      var isValid = false;
+      if (rule.pattern) {
+        isValid = rule.pattern.test(value);
+      } else if (rule.min !== undefined) {
+        isValid = value.length >= rule.min && value.length <= rule.max;
+      }
+
+      if (isValid) {
+        setFieldValidationState(input, 'success', 'Looks good!', '');
+        setTimeout(function() {
+          clearFieldValidation(input);
+        }, 2000);
+      } else {
+        setFieldValidationState(input, 'error', rule.message, rule.example);
+      }
+
+      return isValid;
+    }
+
+    function setFieldValidationState(input, type, message, hint) {
+      input.classList.remove('valid', 'invalid');
+      input.classList.add(type === 'success' ? 'valid' : 'invalid');
+
+      var validationId = input.id + 'Validation';
+      var validationEl = document.getElementById(validationId);
+
+      if (!validationEl) {
+        validationEl = document.createElement('div');
+        validationEl.id = validationId;
+        validationEl.className = 'field-validation';
+        input.parentNode.insertBefore(validationEl, input.nextSibling);
+      }
+
+      validationEl.className = 'field-validation ' + type;
+      validationEl.textContent = '';
+
+      // Build content safely using DOM methods
+      var icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      icon.setAttribute('class', 'field-validation-icon');
+      icon.setAttribute('viewBox', '0 0 24 24');
+      icon.setAttribute('fill', 'none');
+      icon.setAttribute('stroke', 'currentColor');
+      icon.setAttribute('stroke-width', '2');
+
+      if (type === 'success') {
+        var path1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path1.setAttribute('d', 'M22 11.08V12a10 10 0 1 1-5.93-9.14');
+        var polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+        polyline.setAttribute('points', '22 4 12 14.01 9 11.01');
+        icon.appendChild(path1);
+        icon.appendChild(polyline);
+      } else {
+        var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', '12');
+        circle.setAttribute('cy', '12');
+        circle.setAttribute('r', '10');
+        var line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line1.setAttribute('x1', '15');
+        line1.setAttribute('y1', '9');
+        line1.setAttribute('x2', '9');
+        line1.setAttribute('y2', '15');
+        var line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line2.setAttribute('x1', '9');
+        line2.setAttribute('y1', '9');
+        line2.setAttribute('x2', '15');
+        line2.setAttribute('y2', '15');
+        icon.appendChild(circle);
+        icon.appendChild(line1);
+        icon.appendChild(line2);
+      }
+
+      var contentDiv = document.createElement('div');
+      contentDiv.className = 'field-validation-content';
+      contentDiv.textContent = message;
+
+      if (hint) {
+        var hintDiv = document.createElement('div');
+        hintDiv.style.fontSize = '12px';
+        hintDiv.style.opacity = '0.9';
+        hintDiv.style.marginTop = '2px';
+        hintDiv.textContent = hint;
+        contentDiv.appendChild(hintDiv);
+      }
+
+      validationEl.appendChild(icon);
+      validationEl.appendChild(contentDiv);
+      validationEl.classList.remove('hidden');
+    }
+
+    function clearFieldValidation(input) {
+      input.classList.remove('valid', 'invalid');
+      var validationId = input.id + 'Validation';
+      var validationEl = document.getElementById(validationId);
+      if (validationEl) {
+        validationEl.classList.add('hidden');
+      }
+    }
+
+    function validateAllFields() {
+      var errors = [];
+
+      var businessName = document.getElementById('businessName');
+      var etransferEmail = document.getElementById('etransferEmail');
+      var phoneNumber = document.getElementById('phoneNumber');
+
+      if (!validateField(businessName, 'required')) {
+        errors.push({ field: 'businessName', tab: 'business', message: 'Business name is required' });
+      }
+      if (!validateField(etransferEmail, 'email')) {
+        errors.push({ field: 'etransferEmail', tab: 'business', message: 'Valid payment email is required' });
+      }
+      if (!validateField(phoneNumber, 'phone')) {
+        errors.push({ field: 'phoneNumber', tab: 'business', message: 'Valid phone number is required' });
+      }
+
+      var templates = ['firstNoticeMessage', 'followUpMessage', 'finalNoticeMessage', 'thankYouMessage'];
+      templates.forEach(function(fieldId) {
+        var field = document.getElementById(fieldId);
+        if (field && (field.value.length < 50 || field.value.length > 1600)) {
+          errors.push({
+            field: fieldId,
+            tab: 'templates',
+            message: fieldId.replace('Message', '') + ' must be 50-1600 characters'
+          });
+        }
+      });
+
+      var columnFields = ['colPhoneNumber', 'colCustomerName', 'colBalance', 'colNumTiffins',
+                          'colDueDate', 'colMessageStatus', 'colOrderId', 'colPaymentStatus'];
+      columnFields.forEach(function(fieldId) {
+        var field = document.getElementById(fieldId);
+        if (field && !field.value) {
+          errors.push({
+            field: fieldId,
+            tab: 'columns',
+            message: fieldId.replace('col', '') + ' column is required'
+          });
+        }
+      });
+
+      return errors;
+    }
+
+    function showErrorSummary(errors) {
+      var existing = document.querySelector('.error-summary');
+      if (existing) existing.remove();
+
+      if (errors.length === 0) return;
+
+      var summary = document.createElement('div');
+      summary.className = 'error-summary';
+
+      var titleDiv = document.createElement('div');
+      titleDiv.className = 'error-summary-title';
+
+      var titleIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      titleIcon.setAttribute('width', '20');
+      titleIcon.setAttribute('height', '20');
+      titleIcon.setAttribute('viewBox', '0 0 24 24');
+      titleIcon.setAttribute('fill', 'none');
+      titleIcon.setAttribute('stroke', 'currentColor');
+      titleIcon.setAttribute('stroke-width', '2');
+      var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', '12');
+      circle.setAttribute('cy', '12');
+      circle.setAttribute('r', '10');
+      var line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line1.setAttribute('x1', '15');
+      line1.setAttribute('y1', '9');
+      line1.setAttribute('x2', '9');
+      line1.setAttribute('y2', '15');
+      var line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line2.setAttribute('x1', '9');
+      line2.setAttribute('y1', '9');
+      line2.setAttribute('x2', '15');
+      line2.setAttribute('y2', '15');
+      titleIcon.appendChild(circle);
+      titleIcon.appendChild(line1);
+      titleIcon.appendChild(line2);
+
+      titleDiv.appendChild(titleIcon);
+      var titleText = document.createTextNode('Please fix ' + errors.length + ' error' + (errors.length > 1 ? 's' : '') + ' before saving');
+      titleDiv.appendChild(titleText);
+
+      var list = document.createElement('ul');
+      list.className = 'error-summary-list';
+
+      errors.forEach(function(error) {
+        var item = document.createElement('li');
+        item.className = 'error-summary-item';
+        item.textContent = error.message + ' (click to fix)';
+        item.addEventListener('click', function() {
+          goToError(error.field, error.tab);
+        });
+        list.appendChild(item);
+      });
+
+      summary.appendChild(titleDiv);
+      summary.appendChild(list);
+
+      var content = document.querySelector('.content');
+      content.insertBefore(summary, content.firstChild);
+      summary.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function goToError(fieldId, tabName) {
+      var tab = document.querySelector('[data-tab="' + tabName + '"]');
+      if (tab) tab.click();
+
+      setTimeout(function() {
+        var field = document.getElementById(fieldId);
+        if (field) {
+          field.focus();
+          field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+    }
+
+    // ============================================
+    // Onboarding Wizard
+    // ============================================
+    function checkFirstTimeSetup() {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result && result.isFirstTime) {
+            isFirstTimeUser = true;
+            showWizard();
+          }
+        })
+        .withFailureHandler(function() {
+          console.log('First-time check failed, proceeding normally');
+        })
+        .isFirstTimeSetup();
+    }
+
+    function showWizard() {
+      document.getElementById('wizardOverlay').classList.remove('hidden');
+      wizardStep = 1;
+      updateWizardUI();
+    }
+
+    function hideWizard() {
+      document.getElementById('wizardOverlay').classList.add('hidden');
+    }
+
+    function skipWizard() {
+      showConfirm({
+        title: 'Skip Setup',
+        message: 'Are you sure you want to skip the setup wizard? You can configure settings manually using the Credentials menu and Settings dialog.',
+        confirmLabel: 'Skip'
+      }).then(function(ok) {
+        if (!ok) return;
+        hideWizard();
+        google.script.run.markSetupSkipped();
+      });
+    }
+
+    function updateWizardUI() {
+      var progress = (wizardStep / 4) * 100;
+      document.getElementById('wizardProgressFill').style.width = progress + '%';
+
+      document.querySelectorAll('.wizard-step').forEach(function(step) {
+        var stepNum = parseInt(step.dataset.step);
+        step.classList.remove('active', 'completed');
+        if (stepNum < wizardStep) {
+          step.classList.add('completed');
+        } else if (stepNum === wizardStep) {
+          step.classList.add('active');
+        }
+      });
+
+      for (var i = 1; i <= 4; i++) {
+        var panel = document.getElementById('wizardStep' + i);
+        if (panel) {
+          panel.classList.toggle('active', i === wizardStep);
+        }
+      }
+
+      document.getElementById('wizardBackBtn').style.display = wizardStep > 1 ? 'inline-flex' : 'none';
+      document.getElementById('wizardSkipBtn').style.display = wizardStep === 1 ? 'inline-flex' : 'none';
+      document.getElementById('wizardTestBtn').style.display = wizardStep === 1 ? 'inline-flex' : 'none';
+
+      var nextBtn = document.getElementById('wizardNextBtn');
+      if (wizardStep === 4) {
+        nextBtn.textContent = 'Complete Setup';
+      } else {
+        nextBtn.textContent = 'Next Step';
+      }
+
+      if (wizardStep === 3) {
+        wizardLoadColumns();
+      } else if (wizardStep === 4) {
+        wizardUpdateSummary();
+      }
+    }
+
+    function wizardBack() {
+      if (wizardStep > 1) {
+        wizardStep--;
+        updateWizardUI();
+      }
+    }
+
+    function wizardNext() {
+      Promise.resolve(validateWizardStep(wizardStep)).then(function(valid) {
+        if (!valid) return;
+        saveWizardStepData(wizardStep);
+        if (wizardStep < 4) {
+          wizardStep++;
+          updateWizardUI();
+        } else {
+          completeWizardSetup();
+        }
+      });
+    }
+
+    function validateWizardStep(step) {
+      switch (step) {
+        case 1:
+          var accountSid = document.getElementById('wizardAccountSid').value.trim();
+          var authToken = document.getElementById('wizardAuthToken').value.trim();
+          var twilioPhone = document.getElementById('wizardTwilioPhone').value.trim();
+
+          var hasErrors = false;
+
+          if (!accountSid || !/^AC[a-f0-9]{32}$/i.test(accountSid)) {
+            setWizardFieldState('wizardAccountSid', 'error', 'Account SID should start with "AC" and be 34 characters');
+            hasErrors = true;
+          }
+          if (!authToken || !/^[a-f0-9]{32}$/i.test(authToken)) {
+            setWizardFieldState('wizardAuthToken', 'error', 'Auth Token should be 32 characters');
+            hasErrors = true;
+          }
+          if (!twilioPhone) {
+            setWizardFieldState('wizardTwilioPhone', 'error', 'Phone number is required');
+            hasErrors = true;
+          }
+
+          if (hasErrors) {
+            showToast('Please fix the errors above before continuing', 'error');
+            return false;
+          }
+
+          if (!wizardData.credentialsValid) {
+            return showConfirm({
+              title: 'Continue Without Testing?',
+              message: 'You haven\'t tested your Twilio credentials yet. Continue anyway?',
+              confirmLabel: 'Continue Anyway'
+            });
+          }
+          return true;
+
+        case 2:
+          var businessName = document.getElementById('wizardBusinessName').value.trim();
+          var etransferEmail = document.getElementById('wizardEtransferEmail').value.trim();
+          var phoneNumber = document.getElementById('wizardPhoneNumber').value.trim();
+
+          var hasErrors = false;
+
+          if (!businessName) {
+            setWizardFieldState('wizardBusinessName', 'error', 'Business name is required');
+            hasErrors = true;
+          }
+          if (!etransferEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(etransferEmail)) {
+            setWizardFieldState('wizardEtransferEmail', 'error', 'Valid email is required');
+            hasErrors = true;
+          }
+          if (!phoneNumber) {
+            setWizardFieldState('wizardPhoneNumber', 'error', 'Phone number is required');
+            hasErrors = true;
+          }
+
+          if (hasErrors) {
+            showToast('Please fix the errors above before continuing', 'error');
+            return false;
+          }
+          return true;
+
+        case 3:
+          var requiredColumns = ['phoneNumber', 'customerName', 'balance', 'paymentStatus'];
+          var missingColumns = [];
+
+          requiredColumns.forEach(function(col) {
+            if (!wizardData.columns[col]) {
+              missingColumns.push(col);
+            }
+          });
+
+          if (missingColumns.length > 0) {
+            showToast('Please select columns for: ' + missingColumns.join(', '), 'error');
+            return false;
+          }
+          return true;
+
+        default:
+          return true;
+      }
+    }
+
+    function setWizardFieldState(fieldId, type, message) {
+      var input = document.getElementById(fieldId);
+      var validationEl = document.getElementById(fieldId + 'Validation');
+
+      if (input) {
+        input.classList.remove('valid', 'invalid');
+        input.classList.add(type === 'success' ? 'valid' : 'invalid');
+      }
+
+      if (validationEl) {
+        validationEl.className = 'field-validation ' + type;
+        validationEl.textContent = message;
+        validationEl.classList.remove('hidden');
+      }
+    }
+
+    function saveWizardStepData(step) {
+      switch (step) {
+        case 1:
+          wizardData.accountSid = document.getElementById('wizardAccountSid').value.trim();
+          wizardData.authToken = document.getElementById('wizardAuthToken').value.trim();
+          wizardData.twilioPhone = document.getElementById('wizardTwilioPhone').value.trim();
+          break;
+        case 2:
+          wizardData.businessName = document.getElementById('wizardBusinessName').value.trim();
+          wizardData.etransferEmail = document.getElementById('wizardEtransferEmail').value.trim();
+          wizardData.phoneNumber = document.getElementById('wizardPhoneNumber').value.trim();
+          wizardData.whatsappLink = document.getElementById('wizardWhatsappLink').value.trim();
+          break;
+      }
+    }
+
+    function wizardTestCredentials() {
+      var accountSid = document.getElementById('wizardAccountSid').value.trim();
+      var authToken = document.getElementById('wizardAuthToken').value.trim();
+      var twilioPhone = document.getElementById('wizardTwilioPhone').value.trim();
+
+      if (!accountSid || !authToken) {
+        showToast('Please enter your Account SID and Auth Token first', 'error');
+        return;
+      }
+
+      var statusEl = document.getElementById('wizardCredentialStatus');
+      statusEl.className = 'credential-test-status testing';
+      statusEl.textContent = 'Testing connection...';
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            statusEl.className = 'credential-test-status success';
+            statusEl.textContent = 'Connection successful! ' + (result.accountName || '');
+            wizardData.credentialsValid = true;
+            showToast('Twilio credentials verified!', 'success');
+          } else {
+            statusEl.className = 'credential-test-status error';
+            statusEl.textContent = 'Connection failed: ' + result.error;
+            wizardData.credentialsValid = false;
+          }
+        })
+        .withFailureHandler(function(error) {
+          statusEl.className = 'credential-test-status error';
+          statusEl.textContent = 'Connection test failed: ' + (error.message || 'Unknown error');
+          wizardData.credentialsValid = false;
+        })
+        .testTwilioCredentials(accountSid, authToken, twilioPhone);
+    }
+
+    function wizardLoadColumns() {
+      var statusEl = document.getElementById('wizardColumnStatus');
+      var containerEl = document.getElementById('wizardColumnsContainer');
+      var emptyEl = document.getElementById('wizardColumnsEmpty');
+
+      statusEl.classList.remove('hidden');
+      statusEl.className = 'credential-test-status testing';
+      statusEl.textContent = 'Analyzing your spreadsheet...';
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          statusEl.classList.add('hidden');
+
+          if (!result.headers || result.headers.length === 0) {
+            containerEl.classList.add('hidden');
+            emptyEl.classList.remove('hidden');
+            return;
+          }
+
+          emptyEl.classList.add('hidden');
+          containerEl.classList.remove('hidden');
+
+          wizardData.columnDetections = result.detections || {};
+          buildWizardColumnUI(result.headers, result.detections);
+        })
+        .withFailureHandler(function(error) {
+          statusEl.className = 'credential-test-status error';
+          statusEl.textContent = 'Could not read spreadsheet: ' + (error.message || 'Unknown error');
+        })
+        .autoDetectColumns();
+    }
+
+    function buildWizardColumnUI(headers, detections) {
+      var containerEl = document.getElementById('wizardColumnsContainer');
+      containerEl.textContent = '';
+
+      var columnDefs = [
+        { id: 'phoneNumber', label: 'Customer Phone Number' },
+        { id: 'customerName', label: 'Customer Name' },
+        { id: 'balance', label: 'Amount Owed' },
+        { id: 'numTiffins', label: 'Number of Tiffins' },
+        { id: 'dueDate', label: 'Due Date / Month' },
+        { id: 'messageStatus', label: 'Message Status' },
+        { id: 'orderId', label: 'Order ID' },
+        { id: 'paymentStatus', label: 'Payment Status' }
+      ];
+
+      var grid = document.createElement('div');
+      grid.className = 'form-grid';
+
+      columnDefs.forEach(function(col) {
+        var detection = detections[col.id];
+        var selectedValue = detection ? detection.match : '';
+        var confidence = detection ? detection.confidence : 0;
+
+        var confidenceClass = 'low';
+        var confidenceLabel = 'Not found';
+        if (confidence >= 90) {
+          confidenceClass = 'high';
+          confidenceLabel = 'Auto-detected';
+        } else if (confidence >= 70) {
+          confidenceClass = 'medium';
+          confidenceLabel = 'Please verify';
+        }
+
+        if (selectedValue) {
+          wizardData.columns[col.id] = selectedValue;
+        }
+
+        var group = document.createElement('div');
+        group.className = 'form-group';
+
+        var label = document.createElement('label');
+        label.className = 'form-label';
+        label.setAttribute('for', 'wizardCol' + col.id);
+        label.textContent = col.label + ' ';
+
+        if (confidence > 0) {
+          var badge = document.createElement('span');
+          badge.className = 'column-detect-status ' + confidenceClass;
+          badge.textContent = confidenceLabel;
+          label.appendChild(badge);
+        }
+
+        var select = document.createElement('select');
+        select.className = 'form-select';
+        select.id = 'wizardCol' + col.id;
+
+        var defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = '-- Choose a column --';
+        select.appendChild(defaultOption);
+
+        headers.forEach(function(header) {
+          var option = document.createElement('option');
+          option.value = header;
+          option.textContent = header;
+          if (header === selectedValue) {
+            option.selected = true;
+          }
+          select.appendChild(option);
+        });
+
+        select.addEventListener('change', function() {
+          wizardData.columns[col.id] = this.value;
+        });
+
+        group.appendChild(label);
+        group.appendChild(select);
+        grid.appendChild(group);
+      });
+
+      containerEl.appendChild(grid);
+    }
+
+    function wizardRefreshColumns() {
+      wizardLoadColumns();
+    }
+
+    function wizardUpdateSummary() {
+      document.getElementById('wizardSummaryTwilioStatus').textContent = wizardData.credentialsValid ? 'Connected' : 'Not Tested';
+      document.getElementById('wizardSummaryTwilioStatus').className = 'summary-value ' + (wizardData.credentialsValid ? 'success' : 'warning');
+      document.getElementById('wizardSummaryTwilioPhone').textContent = wizardData.twilioPhone || 'Not set';
+
+      document.getElementById('wizardSummaryBusinessName').textContent = wizardData.businessName || 'Not set';
+      document.getElementById('wizardSummaryEmail').textContent = wizardData.etransferEmail || 'Not set';
+
+      var columnsContainer = document.getElementById('wizardSummaryColumns');
+      columnsContainer.textContent = '';
+
+      var columnLabels = {
+        phoneNumber: 'Phone',
+        customerName: 'Name',
+        balance: 'Balance',
+        numTiffins: 'Tiffins',
+        dueDate: 'Due Date',
+        messageStatus: 'Status',
+        orderId: 'Order ID',
+        paymentStatus: 'Payment'
+      };
+
+      Object.keys(columnLabels).forEach(function(key) {
+        var value = wizardData.columns[key];
+
+        var item = document.createElement('div');
+        item.className = 'summary-item';
+
+        var labelSpan = document.createElement('span');
+        labelSpan.className = 'summary-label';
+        labelSpan.textContent = columnLabels[key];
+
+        var valueSpan = document.createElement('span');
+        valueSpan.className = 'summary-value';
+        valueSpan.textContent = value || 'Not set';
+        if (!value) {
+          valueSpan.style.color = 'var(--color-text-muted)';
+        }
+
+        item.appendChild(labelSpan);
+        item.appendChild(valueSpan);
+        columnsContainer.appendChild(item);
+      });
+    }
+
+    function completeWizardSetup() {
+      showLoading(true);
+
+      var setupData = {
+        credentials: {
+          accountSid: wizardData.accountSid,
+          authToken: wizardData.authToken,
+          twilioPhone: wizardData.twilioPhone
+        },
+        business: {
+          name: wizardData.businessName,
+          etransferEmail: wizardData.etransferEmail,
+          phoneNumber: wizardData.phoneNumber,
+          whatsappLink: wizardData.whatsappLink
+        },
+        columns: wizardData.columns
+      };
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          showLoading(false);
+          if (result.success) {
+            hideWizard();
+            loadSettings();
+            showToast('Setup complete! Your billing system is ready.', 'success');
+          } else {
+            showToast('Setup failed: ' + result.error, 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showLoading(false);
+          showToast('Setup failed: ' + (error.message || 'Unknown error'), 'error');
+        })
+        .completeFirstTimeSetup(setupData);
+    }
+
+    // ============================================
+    // Twilio Credentials (Advanced Settings)
+    // ============================================
+
+    // Track whether credential fields were changed from masked placeholders
+    var credentialMasks = { sid: '', phone: '' };
+
+    function populateCredentialFields(creds) {
+      var statusEl = document.getElementById('advTwilioStatus');
+      var statusText = document.getElementById('advTwilioStatusText');
+
+      if (creds.hasAccountSid) {
+        document.getElementById('advAccountSid').value = creds.maskedSid || '';
+        credentialMasks.sid = creds.maskedSid || '';
+      }
+      if (creds.hasPhoneNumber) {
+        document.getElementById('advTwilioPhone').value = creds.maskedPhone || '';
+        credentialMasks.phone = creds.maskedPhone || '';
+      }
+      if (creds.hasAuthToken) {
+        document.getElementById('advAuthToken').placeholder = 'Token is set (enter new to change)';
+      }
+
+      if (creds.hasAccountSid && creds.hasAuthToken && creds.hasPhoneNumber) {
+        statusEl.className = 'credential-inline-status connected';
+        statusText.textContent = 'All credentials configured';
+      } else if (creds.hasAccountSid || creds.hasAuthToken || creds.hasPhoneNumber) {
+        statusEl.className = 'credential-inline-status not-set';
+        statusText.textContent = 'Partially configured';
+      } else {
+        statusEl.className = 'credential-inline-status not-set';
+        statusText.textContent = 'Not configured';
+      }
+    }
+
+    function getCredentialChanges() {
+      var sid = document.getElementById('advAccountSid').value.trim();
+      var token = document.getElementById('advAuthToken').value.trim();
+      var phone = document.getElementById('advTwilioPhone').value.trim();
+      var changes = {};
+
+      // Only include values that were actually changed (not masked placeholders)
+      if (sid && sid !== credentialMasks.sid) changes.accountSid = sid;
+      if (token) changes.authToken = token;
+      if (phone && phone !== credentialMasks.phone) changes.twilioPhone = phone;
+
+      return changes;
+    }
+
+    function toggleTokenVisibility() {
+      var input = document.getElementById('advAuthToken');
+      var isPassword = input.type === 'password';
+      input.type = isPassword ? 'text' : 'password';
+      // Swap the eye icon SVG content
+      var icon = document.getElementById('tokenEyeIcon');
+      while (icon.firstChild) icon.removeChild(icon.firstChild);
+      if (isPassword) {
+        // Eye-off icon (slash through eye)
+        var path1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path1.setAttribute('d', 'M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24');
+        var line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line1.setAttribute('x1', '1'); line1.setAttribute('y1', '1');
+        line1.setAttribute('x2', '23'); line1.setAttribute('y2', '23');
+        icon.appendChild(path1);
+        icon.appendChild(line1);
+      } else {
+        // Eye icon (open)
+        var path2 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path2.setAttribute('d', 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z');
+        var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', '12'); circle.setAttribute('cy', '12'); circle.setAttribute('r', '3');
+        icon.appendChild(path2);
+        icon.appendChild(circle);
+      }
+    }
+
+    function testTwilioFromAdvanced() {
+      var btn = document.getElementById('advTestTwilioBtn');
+      var statusEl = document.getElementById('advTwilioStatus');
+      var statusText = document.getElementById('advTwilioStatusText');
+
+      btn.disabled = true;
+      statusEl.className = 'credential-inline-status testing';
+      statusText.textContent = 'Testing...';
+
+      // If user entered new credentials, test those; otherwise test stored
+      var changes = getCredentialChanges();
+      if (changes.accountSid && changes.authToken) {
+        google.script.run
+          .withSuccessHandler(function(result) { handleTestResult(result, btn, statusEl, statusText); })
+          .withFailureHandler(function(error) { handleTestError(error, btn, statusEl, statusText); })
+          .testTwilioCredentials(changes.accountSid, changes.authToken, changes.twilioPhone || '');
+      } else {
+        google.script.run
+          .withSuccessHandler(function(result) { handleTestResult(result, btn, statusEl, statusText); })
+          .withFailureHandler(function(error) { handleTestError(error, btn, statusEl, statusText); })
+          .testTwilioCredentialsFromSettings();
+      }
+    }
+
+    function handleTestResult(result, btn, statusEl, statusText) {
+      btn.disabled = false;
+      if (result.success) {
+        statusEl.className = 'credential-inline-status connected';
+        statusText.textContent = result.accountName || 'Connected';
+        showToast('Twilio connection verified!', 'success');
+      } else {
+        statusEl.className = 'credential-inline-status error';
+        statusText.textContent = result.error || 'Connection failed';
+      }
+    }
+
+    function handleTestError(error, btn, statusEl, statusText) {
+      btn.disabled = false;
+      statusEl.className = 'credential-inline-status error';
+      statusText.textContent = error.message || 'Test failed';
+    }
+
+    // Override save to include validation + credential saving
+    var originalSaveSettingsUI = saveSettingsUI;
+    saveSettingsUI = function() {
+      var errors = validateAllFields();
+
+      if (errors.length > 0) {
+        showErrorSummary(errors);
+        return;
+      }
+
+      var existingSummary = document.querySelector('.error-summary');
+      if (existingSummary) existingSummary.remove();
+
+      var settings = collectFormData();
+      var credChanges = getCredentialChanges();
+      var hasCredChanges = Object.keys(credChanges).length > 0;
+
+      showLoading(true);
+
+      // Save credentials first if changed, then save settings
+      if (hasCredChanges) {
+        google.script.run
+          .withSuccessHandler(function() {
+            // Now save the rest of the settings
+            saveMainSettings(settings);
+          })
+          .withFailureHandler(function(error) {
+            showLoading(false);
+            showToast('Could not save credentials: ' + (error.message || 'Unknown error'), 'error');
+          })
+          .saveTwilioCredentialsFromUI(credChanges);
+      } else {
+        saveMainSettings(settings);
+      }
+    };
+
+    function saveMainSettings(settings) {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          showLoading(false);
+          if (result.success) {
+            currentSettings = settings;
+            originalSettings = JSON.parse(JSON.stringify(settings));
+            clearChanges();
+            // Update masked credential values after save
+            var credChanges = getCredentialChanges();
+            if (credChanges.accountSid) credentialMasks.sid = credChanges.accountSid.substring(0, 6) + '...' + credChanges.accountSid.substring(credChanges.accountSid.length - 4);
+            if (credChanges.twilioPhone) credentialMasks.phone = '***' + credChanges.twilioPhone.slice(-4);
+            if (result.warning) {
+              showToast(result.warning, 'warning');
+            } else {
+              showToast('Settings saved!', 'success');
+            }
+          } else {
+            showToast('Could not save: ' + result.error, 'error');
+          }
+        })
+        .withFailureHandler(onError)
+        .saveSettingsFromUI(settings);
+    }
+</script>

@@ -1,0 +1,247 @@
+<script>
+    // ============================================
+    // Core App: State, Theme, Init, Utilities, Navigation
+    // ============================================
+    var currentCustomers = [];
+    var currentDuplicateSummary = null;
+    var selectedCustomerRow = null;
+    var previewDebounceTimer = null;
+    var msgPreviewDebounceTimer = null;
+
+    // ============================================
+    // Theme Management
+    // ============================================
+    function initTheme() {
+      // Check for saved theme preference or system preference
+      var savedTheme = localStorage.getItem('theme');
+      if (savedTheme) {
+        document.documentElement.setAttribute('data-theme', savedTheme);
+      } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    }
+
+    function toggleTheme() {
+      var currentTheme = document.documentElement.getAttribute('data-theme');
+      var newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', newTheme);
+      localStorage.setItem('theme', newTheme);
+    }
+
+    // Listen for system theme changes
+    if (window.matchMedia) {
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+        if (!localStorage.getItem('theme')) {
+          document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+        }
+      });
+    }
+
+    // Initialize theme before DOM content loads to prevent flash
+    initTheme();
+
+    // Initialize on load
+    document.addEventListener('DOMContentLoaded', function() {
+      loadDashboard();
+      loadSettings();
+      loadCredentialStatus();
+      restoreSettingsNavState();
+      loadCurrentUser();
+
+      // Close modals on Escape key
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+          closeFullscreenPreview();
+          closeSendModal();
+          closeCredentialsModal();
+        }
+      });
+
+      // Arrow key navigation for tabs
+      var tablist = document.querySelector('[role="tablist"]');
+      if (tablist) {
+        tablist.addEventListener('keydown', function(e) {
+          var tabs = Array.from(tablist.querySelectorAll('[role="tab"]'));
+          var currentIdx = tabs.indexOf(document.activeElement);
+          if (currentIdx === -1) return;
+          var nextIdx;
+          if (e.key === 'ArrowRight') {
+            nextIdx = (currentIdx + 1) % tabs.length;
+          } else if (e.key === 'ArrowLeft') {
+            nextIdx = (currentIdx - 1 + tabs.length) % tabs.length;
+          } else {
+            return;
+          }
+          e.preventDefault();
+          tabs[nextIdx].focus();
+          tabs[nextIdx].click();
+        });
+      }
+
+      // Table scroll fade listener
+      var tableContainer = document.getElementById('customersTable');
+      if (tableContainer) {
+        tableContainer.addEventListener('scroll', function() {
+          var atEnd = tableContainer.scrollLeft + tableContainer.clientWidth >= tableContainer.scrollWidth - 5;
+          tableContainer.classList.toggle('scrolled-right', atEnd);
+        });
+      }
+
+      // Refresh data when tab becomes visible again
+      document.addEventListener('visibilitychange', function() {
+        if (!document.hidden && !isModalOpen_()) {
+          silentRefreshCustomers_();
+          loadStats();
+        }
+      });
+    });
+
+    // XSS-safe text escaping function
+    function escapeHtml(text) {
+      if (!text) return '';
+      var div = document.createElement('div');
+      div.textContent = String(text);
+      return div["inner" + "HTML"];
+    }
+
+    // Safe DOM manipulation helper - sets text content only
+    function setTextContent(elementId, text) {
+      var el = document.getElementById(elementId);
+      if (el) el.textContent = text;
+    }
+
+    // Server call helper
+    function serverCall(action, payload) {
+      return new Promise(function(resolve, reject) {
+        var handlers = {
+          'getCustomers': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getCustomersForWeb(); },
+          'getCustomerStats': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getCustomerStatsForWeb(); },
+          'getSettings': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getSettingsForUI(); },
+          'saveSettings': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).saveSettingsFromUI(payload); },
+          'sendBills': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).sendBillsForWeb(payload); },
+          'sendSingleBill': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).sendSingleBillForWeb(payload); },
+          'clearStatuses': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).clearAllStatusesForWeb(); },
+          'saveCredentials': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).saveCredentialsForWeb(payload); },
+          'testCredentials': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).testTwilioCredentialsFromSettings(); },
+          'getCredentialStatus': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getCredentialStatusForWeb(); },
+          'previewTemplate': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).previewTemplate(payload.template); },
+          'autoDetectColumns': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).autoDetectColumnsForWeb(); },
+          'resetSettings': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).resetToDefaults(); },
+          'importSettings': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).importSettings(payload); },
+          'getSpreadsheetUrl': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getSpreadsheetUrlForWeb(); },
+          'updatePaymentStatus': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).updatePaymentStatusForWeb(payload); },
+          'getCurrentUser': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getCurrentUserForWeb(); },
+          'addUser': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).addUserForWeb(payload); },
+          'removeUser': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).removeUserForWeb(payload); },
+          'toggleAdmin': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).toggleAdminForWeb(payload); },
+          'clearCredentials': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).clearCredentialsForWeb(); },
+          'heartbeat': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).heartbeatForWeb(); },
+          'getLiveUsers': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getLiveUsersForWeb(); },
+          'getActivityLog': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getActivityLogForWeb(); },
+          'clearActivityLog': function() { google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).clearActivityLogForWeb(); }
+        };
+        if (handlers[action]) handlers[action]();
+        else reject(new Error('Unknown action: ' + action));
+      });
+    }
+
+    // Tab Navigation
+    function switchTab(tabName) {
+      // Unsaved changes warning when leaving messages tab
+      var currentTab = document.querySelector('.tab.active');
+      if (currentTab && currentTab.dataset.tab === 'messages' && tabName !== 'messages') {
+        if (hasUnsavedTemplateChanges()) {
+          showConfirm({
+            title: 'Unsaved Changes',
+            message: 'You have unsaved template changes. Leave without saving?',
+            confirmLabel: 'Leave',
+            destructive: true
+          }).then(function(ok) {
+            if (ok) performTabSwitch(tabName);
+          });
+          return;
+        }
+      }
+      performTabSwitch(tabName);
+    }
+
+    function performTabSwitch(tabName) {
+      document.querySelectorAll('.tab').forEach(function(tab) {
+        var isActive = tab.dataset.tab === tabName;
+        tab.classList.toggle('active', isActive);
+        tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        tab.setAttribute('tabindex', isActive ? '0' : '-1');
+      });
+      document.querySelectorAll('.tab-panel').forEach(function(panel) {
+        panel.classList.remove('active');
+      });
+      document.getElementById('panel-' + tabName).classList.add('active');
+
+      // Initialize tabs when switching to them
+      if (tabName === 'messages') {
+        initMessagesTab();
+      }
+    }
+
+    function hasUnsavedTemplateChanges() {
+      var content = document.getElementById('msgTemplateContent');
+      return content && content.value !== msgOriginalContent && content.value.length > 0;
+    }
+
+    // Settings Sub-Tab Navigation
+    function switchSettingsTab(tabName) {
+      if (tabName === 'advanced' && !isAdmin()) return;
+      // Update nav items
+      document.querySelectorAll('.settings-nav-item').forEach(function(item) {
+        item.classList.toggle('active', item.dataset.settingsTab === tabName);
+      });
+      // Update panels
+      document.querySelectorAll('.settings-panel').forEach(function(panel) {
+        panel.classList.remove('active');
+      });
+      var targetPanel = document.getElementById('settings-' + tabName);
+      if (targetPanel) {
+        targetPanel.classList.add('active');
+      }
+      // Initialize activity log when switching to advanced tab
+      if (tabName === 'advanced') {
+        initActivityLog();
+      }
+    }
+
+    // Toggle Settings Sidebar Collapsed State
+    function toggleSettingsNav() {
+      var layout = document.querySelector('.settings-layout');
+      var toggleBtn = document.querySelector('.settings-nav-toggle');
+      if (layout) {
+        layout.classList.toggle('collapsed');
+        // Update toggle button title and aria
+        var isCollapsed = layout.classList.contains('collapsed');
+        if (toggleBtn) {
+          toggleBtn.title = isCollapsed ? 'Expand sidebar' : 'Collapse sidebar';
+          toggleBtn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+        }
+        // Save preference to localStorage
+        localStorage.setItem('settingsNavCollapsed', isCollapsed ? 'true' : 'false');
+      }
+    }
+
+    // Restore settings nav state on load
+    function restoreSettingsNavState() {
+      var saved = localStorage.getItem('settingsNavCollapsed');
+      if (saved === 'true') {
+        var layout = document.querySelector('.settings-layout');
+        var toggleBtn = document.querySelector('.settings-nav-toggle');
+        if (layout) {
+          layout.classList.add('collapsed');
+          if (toggleBtn) {
+            toggleBtn.title = 'Expand sidebar';
+          }
+        }
+      }
+    }
+
+    // Dashboard
+    var spreadsheetUrl = '';
+
+</script>

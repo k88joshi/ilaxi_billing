@@ -1,0 +1,871 @@
+<script>
+    // ============================================
+    // Settings Tab: Form, Columns, Templates, Activity Log
+    // ============================================
+    function loadSettings() {
+      serverCall('getSettings').then(function(result) {
+        if (!result) {
+          console.error('Failed to load settings: No response from server');
+          showAlert('settingsAlert', 'error', 'Failed to load settings. Please refresh the page.');
+          return;
+        }
+        if (result.settings) {
+          currentSettings = result.settings;
+          populateSettingsForm(result.settings);
+        }
+      }).catch(function(err) { console.error('Failed to load settings:', err); });
+      loadUsersList();
+    }
+
+    function populateSettingsForm(settings) {
+      document.getElementById('businessName').value = settings.business.name || '';
+      document.getElementById('etransferEmail').value = settings.business.etransferEmail || '';
+      document.getElementById('businessPhone').value = settings.business.phoneNumber || '';
+      document.getElementById('whatsappLink').value = settings.business.whatsappLink || '';
+      document.getElementById('batchSize').value = settings.behavior.batchSize || 75;
+      document.getElementById('messageDelay').value = settings.behavior.messageDelayMs || 1000;
+      document.getElementById('headerRow').value = settings.behavior.headerRowIndex || 1;
+      document.getElementById('testOrderId').value = settings.behavior.testOrderId || '';
+      document.getElementById('autoThankYouEnabled').checked = settings.behavior.autoThankYouEnabled !== false;
+      document.getElementById('dryRunCheckbox').checked = !!settings.behavior.dryRunMode;
+
+      // Load first template
+      loadSelectedTemplate();
+
+      // Auto-detect columns to populate dropdowns (auto-apply on first load if none configured)
+      autoDetectColumns(true);
+
+      // Update setup checklist with loaded settings
+      updateSetupChecklist();
+
+      // Update header status pills
+      updateHeaderStatusPills();
+      updateSendReview();
+    }
+
+    function saveSettings(btn) {
+      if (!currentSettings) {
+        showAlert('settingsAlert', 'error', 'Settings not loaded. Please refresh.');
+        return;
+      }
+      currentSettings.business.name = document.getElementById('businessName').value;
+      currentSettings.business.etransferEmail = document.getElementById('etransferEmail').value;
+      currentSettings.business.phoneNumber = document.getElementById('businessPhone').value;
+      currentSettings.business.whatsappLink = document.getElementById('whatsappLink').value;
+      currentSettings.behavior.batchSize = parseInt(document.getElementById('batchSize').value) || 75;
+      currentSettings.behavior.messageDelayMs = parseInt(document.getElementById('messageDelay').value) || 1000;
+      currentSettings.behavior.headerRowIndex = parseInt(document.getElementById('headerRow').value) || 1;
+      currentSettings.behavior.testOrderId = document.getElementById('testOrderId').value.trim();
+      currentSettings.behavior.autoThankYouEnabled = document.getElementById('autoThankYouEnabled').checked;
+
+      setButtonState(btn, 'loading');
+      serverCall('saveSettings', currentSettings).then(function(result) {
+        if (!result) {
+          setButtonState(btn, 'error');
+          showToast('No response from server', 'error');
+          showAlert('settingsAlert', 'error', 'No response from server.');
+          return;
+        }
+        if (result.success) {
+          if (result.warning) {
+            setButtonState(btn, 'success');
+            showToast('Settings saved with warning', 'warning');
+            showAlert('settingsAlert', 'warning', result.warning);
+          } else {
+            setButtonState(btn, 'success');
+            showToast('Settings saved!', 'success');
+            showAlert('settingsAlert', 'success', 'Settings saved successfully!');
+          }
+          updateSetupChecklist();
+        } else {
+          setButtonState(btn, 'error');
+          showToast(result.error || 'Failed to save', 'error');
+          showAlert('settingsAlert', 'error', result.error || 'Failed to save');
+        }
+      }).catch(function(err) {
+        setButtonState(btn, 'error');
+        showToast('Error: ' + err.message, 'error');
+        showAlert('settingsAlert', 'error', 'Error: ' + err.message);
+      });
+    }
+
+    // Column Mapping
+    var sheetHeaders = [];
+
+    function autoDetectColumns(autoApply) {
+      var statusDiv = document.getElementById('columnMappingStatus');
+      statusDiv.style.display = 'flex';
+
+      serverCall('autoDetectColumns').then(function(result) {
+        statusDiv.style.display = 'none';
+
+        if (!result) {
+          showAlert('columnsAlert', 'error', 'No response from server.');
+          return;
+        }
+        if (result.success) {
+          var data = result.data;
+          sheetHeaders = data.headers || [];
+          populateColumnDropdowns(data.headers, data.detections);
+
+          // Sync dropdown state back to currentSettings so checklist sees actual values
+          if (currentSettings && currentSettings.columns) {
+            var columnFields = ['phoneNumber', 'customerName', 'balance', 'numTiffins', 'dueDate', 'messageStatus', 'orderId', 'paymentStatus'];
+            columnFields.forEach(function(field) {
+              var select = document.getElementById('col' + field.charAt(0).toUpperCase() + field.slice(1));
+              if (select) {
+                currentSettings.columns[field] = select.value || '';
+              }
+            });
+          }
+          updateSetupChecklist();
+
+          var detectedCount = Object.keys(data.detections || {}).length;
+          showAlert('columnsAlert', 'success', 'Columns analyzed! ' + detectedCount + ' fields auto-detected.');
+
+          // On first load, auto-apply detected columns if none are configured
+          if (autoApply && detectedCount > 0 && currentSettings && currentSettings.columns) {
+            var hasExisting = Object.keys(currentSettings.columns).some(function(k) { return currentSettings.columns[k]; });
+            if (!hasExisting) {
+              var columnFields = ['phoneNumber', 'customerName', 'balance', 'numTiffins', 'dueDate', 'messageStatus', 'orderId', 'paymentStatus'];
+              columnFields.forEach(function(field) {
+                var det = data.detections[field];
+                if (det && det.match) {
+                  currentSettings.columns[field] = det.match;
+                }
+              });
+              // Save auto-detected columns silently
+              serverCall('saveSettings', currentSettings).then(function() {
+                updateSetupChecklist();
+              }).catch(function() {});
+            }
+          }
+        } else {
+          showAlert('columnsAlert', 'error', result.error || 'Failed to detect columns');
+        }
+      }).catch(function(err) {
+        statusDiv.style.display = 'none';
+        showAlert('columnsAlert', 'error', 'Error: ' + err.message);
+      });
+    }
+
+    function populateColumnDropdowns(headers, detections) {
+      var columnFields = ['phoneNumber', 'customerName', 'balance', 'numTiffins', 'dueDate', 'messageStatus', 'orderId', 'paymentStatus'];
+
+      columnFields.forEach(function(field) {
+        var select = document.getElementById('col' + field.charAt(0).toUpperCase() + field.slice(1));
+        var badge = document.getElementById('badge' + field.charAt(0).toUpperCase() + field.slice(1));
+        if (!select) return;
+
+        // Clear existing options
+        while (select.firstChild) select.removeChild(select.firstChild);
+
+        // Add default option
+        var defaultOpt = document.createElement('option');
+        defaultOpt.value = '';
+        defaultOpt.textContent = '-- Select column --';
+        select.appendChild(defaultOpt);
+
+        // Add header options
+        headers.forEach(function(header) {
+          var opt = document.createElement('option');
+          opt.value = header;
+          opt.textContent = header;
+          select.appendChild(opt);
+        });
+
+        // Apply saved setting (priority) or auto-detection (fallback)
+        var detection = detections ? detections[field] : null;
+        var currentValue = currentSettings && currentSettings.columns ? currentSettings.columns[field] : '';
+
+        if (currentValue && headers.indexOf(currentValue) !== -1) {
+          // Saved setting exists and matches a sheet header — use it
+          select.value = currentValue;
+          if (badge) {
+            badge.className = 'column-detect-badge';
+            badge.textContent = 'Saved';
+            badge.classList.add('high');
+          }
+        } else if (detection && detection.match) {
+          select.value = detection.match;
+
+          // Show confidence badge
+          if (badge) {
+            badge.className = 'column-detect-badge';
+            if (detection.confidence >= 90) {
+              badge.textContent = 'Auto-detected';
+              badge.classList.add('high');
+            } else if (detection.confidence >= 70) {
+              badge.textContent = 'Please verify';
+              badge.classList.add('medium');
+            } else {
+              badge.textContent = 'Low confidence';
+              badge.classList.add('low');
+            }
+          }
+        } else if (currentValue) {
+          // Saved value doesn't match any header — warn user
+          var staleOpt = document.createElement('option');
+          staleOpt.value = currentValue;
+          staleOpt.textContent = currentValue + ' (not in sheet)';
+          select.appendChild(staleOpt);
+          select.value = currentValue;
+          if (badge) {
+            badge.className = 'column-detect-badge low';
+            badge.textContent = 'Not in sheet';
+            badge.style.display = '';
+          }
+        }
+      });
+      updateColumnCompleteness();
+    }
+
+    function updateColumnCompleteness() {
+      var container = document.getElementById('columnCompleteness');
+      var label = document.getElementById('columnCompletenessLabel');
+      var fill = document.getElementById('columnCompletenessFill');
+      if (!container || !label || !fill) return;
+
+      var fields = ['phoneNumber', 'customerName', 'balance', 'numTiffins', 'dueDate', 'messageStatus', 'orderId', 'paymentStatus'];
+      var mapped = 0;
+      fields.forEach(function(field) {
+        var select = document.getElementById('col' + field.charAt(0).toUpperCase() + field.slice(1));
+        if (select && select.value) mapped++;
+      });
+
+      var total = fields.length;
+      var pct = Math.round((mapped / total) * 100);
+      label.textContent = mapped + ' of ' + total + ' mapped';
+      fill.style.width = pct + '%';
+
+      // Color: green (100%), yellow (50-99%), red (<50%)
+      fill.classList.remove('green', 'yellow', 'red');
+      if (pct >= 100) { fill.classList.add('green'); }
+      else if (pct >= 50) { fill.classList.add('yellow'); }
+      else { fill.classList.add('red'); }
+
+      container.style.display = '';
+    }
+
+    function loadColumnMappings() {
+      if (!currentSettings || !currentSettings.columns) return;
+
+      var columnFields = ['phoneNumber', 'customerName', 'balance', 'numTiffins', 'dueDate', 'messageStatus', 'orderId', 'paymentStatus'];
+
+      columnFields.forEach(function(field) {
+        var select = document.getElementById('col' + field.charAt(0).toUpperCase() + field.slice(1));
+        if (select && currentSettings.columns[field]) {
+          // Check if value exists in options
+          var found = false;
+          for (var i = 0; i < select.options.length; i++) {
+            if (select.options[i].value === currentSettings.columns[field]) {
+              found = true;
+              break;
+            }
+          }
+          if (found) {
+            select.value = currentSettings.columns[field];
+          } else if (currentSettings.columns[field]) {
+            // Add missing option
+            var opt = document.createElement('option');
+            opt.value = currentSettings.columns[field];
+            opt.textContent = currentSettings.columns[field] + ' (not in sheet)';
+            select.appendChild(opt);
+            select.value = currentSettings.columns[field];
+          }
+        }
+        if (select) select.onchange = updateColumnCompleteness;
+      });
+      updateColumnCompleteness();
+    }
+
+    function saveColumnMappings() {
+      var btn = document.getElementById('saveColumnsBtn');
+      if (!currentSettings) {
+        showAlert('columnsAlert', 'error', 'Settings not loaded. Please refresh.');
+        return;
+      }
+
+      var columnFields = ['phoneNumber', 'customerName', 'balance', 'numTiffins', 'dueDate', 'messageStatus', 'orderId', 'paymentStatus'];
+
+      columnFields.forEach(function(field) {
+        var select = document.getElementById('col' + field.charAt(0).toUpperCase() + field.slice(1));
+        if (select && select.value) {
+          currentSettings.columns[field] = select.value;
+        }
+      });
+
+      setButtonState(btn, 'loading');
+      serverCall('saveSettings', currentSettings).then(function(result) {
+        if (!result) {
+          setButtonState(btn, 'error');
+          showToast('No response from server', 'error');
+          showAlert('columnsAlert', 'error', 'No response from server.');
+          return;
+        }
+        if (result.success) {
+          setButtonState(btn, 'success');
+          showToast('Column mappings saved!', 'success');
+          showAlert('columnsAlert', 'success', 'Column mappings saved successfully!');
+          updateSetupChecklist();
+        } else {
+          setButtonState(btn, 'error');
+          showToast(result.error || 'Failed to save', 'error');
+          showAlert('columnsAlert', 'error', result.error || 'Failed to save');
+        }
+      }).catch(function(err) {
+        setButtonState(btn, 'error');
+        showToast('Error: ' + err.message, 'error');
+        showAlert('columnsAlert', 'error', 'Error: ' + err.message);
+      });
+    }
+
+    // Template Management
+    var currentTemplateType = 'firstNotice';
+    var originalTemplateContent = '';
+
+    function switchTemplate(templateType) {
+      currentTemplateType = templateType;
+
+      // Update tab UI
+      document.querySelectorAll('.template-tab').forEach(function(tab) {
+        tab.classList.toggle('active', tab.dataset.template === templateType);
+      });
+
+      loadSelectedTemplate();
+    }
+
+    function loadSelectedTemplate() {
+      if (!currentSettings || !currentSettings.templates) {
+        return;
+      }
+
+      var templateNameGroup = document.getElementById('templateNameGroup');
+      var template;
+
+      if (currentTemplateType === 'thankYou') {
+        templateNameGroup.style.display = 'none';
+        document.getElementById('templateMessage').value = currentSettings.templates.thankYouMessage || '';
+      } else {
+        templateNameGroup.style.display = 'block';
+        template = currentSettings.templates.billMessages[currentTemplateType];
+        if (template) {
+          document.getElementById('templateName').value = template.name || '';
+          document.getElementById('templateMessage').value = template.message || '';
+        }
+      }
+
+      // Store original content for change detection
+      originalTemplateContent = document.getElementById('templateMessage').value;
+
+      // Update char count and preview
+      updateCharCount();
+      updateLivePreview();
+      updateTemplateStatus('');
+    }
+
+    function updateCharCount() {
+      var textarea = document.getElementById('templateMessage');
+      var counter = document.getElementById('charCounter');
+      var fill = document.getElementById('charCounterFill');
+      var length = textarea.value.length;
+      var maxLength = 1600;
+      var percentage = Math.min((length / maxLength) * 100, 100);
+
+      counter.textContent = length + ' / ' + maxLength;
+      fill.style.width = percentage + '%';
+
+      // Update colors based on length
+      counter.classList.remove('warning', 'error');
+      fill.classList.remove('warning', 'error');
+
+      if (length > maxLength) {
+        counter.classList.add('error');
+        fill.classList.add('error');
+      } else if (length > maxLength * 0.85) {
+        counter.classList.add('warning');
+        fill.classList.add('warning');
+      }
+
+      // Check for modifications
+      if (textarea.value !== originalTemplateContent) {
+        updateTemplateStatus('modified');
+      } else {
+        updateTemplateStatus('');
+      }
+
+      // Update live preview
+      updateLivePreview();
+    }
+
+    function updateTemplateStatus(status) {
+      var statusEl = document.getElementById('templateStatus');
+      statusEl.className = 'template-status';
+      if (status === 'modified') {
+        statusEl.textContent = 'Unsaved changes';
+        statusEl.classList.add('modified');
+      } else if (status === 'saved') {
+        statusEl.textContent = 'Saved';
+        statusEl.classList.add('saved');
+        setTimeout(function() {
+          if (statusEl.textContent === 'Saved') {
+            statusEl.textContent = '';
+            statusEl.className = 'template-status';
+          }
+        }, 2000);
+      } else {
+        statusEl.textContent = '';
+      }
+    }
+
+    function updateLivePreview() {
+      clearTimeout(previewDebounceTimer);
+      var message = document.getElementById('templateMessage').value;
+      var previewContent = document.getElementById('previewContent');
+
+      if (!message) {
+        // Clear and add placeholder using safe DOM methods
+        while (previewContent.firstChild) previewContent.removeChild(previewContent.firstChild);
+        var placeholder = document.createElement('p');
+        placeholder.className = 'preview-placeholder';
+        placeholder.textContent = 'Start typing to see preview...';
+        previewContent.appendChild(placeholder);
+        return;
+      }
+
+      previewDebounceTimer = setTimeout(function() {
+        serverCall('previewTemplate', { template: message })
+          .then(function(result) {
+            if (result.success && result.preview) {
+              previewContent.textContent = result.preview;
+            } else {
+              previewContent.textContent = message;
+            }
+          })
+          .catch(function() {
+            previewContent.textContent = message;
+          });
+      }, 500);
+    }
+
+    function insertPlaceholder(name) {
+      var textarea = document.getElementById('templateMessage');
+      var start = textarea.selectionStart;
+      var end = textarea.selectionEnd;
+      var text = textarea.value;
+      var placeholder = '{{' + name + '}}';
+
+      textarea.value = text.substring(0, start) + placeholder + text.substring(end);
+      textarea.selectionStart = textarea.selectionEnd = start + placeholder.length;
+      textarea.focus();
+
+      updateCharCount();
+    }
+
+    function saveTemplate() {
+      if (!currentSettings || !currentSettings.templates) {
+        showAlert('templatesAlert', 'error', 'Settings not loaded. Please refresh.');
+        return;
+      }
+
+      var name = document.getElementById('templateName').value.trim();
+      var message = document.getElementById('templateMessage').value;
+
+      if (!message || message.length < 50) {
+        showAlert('templatesAlert', 'error', 'Message must be at least 50 characters.');
+        return;
+      }
+      if (message.length > 1600) {
+        showAlert('templatesAlert', 'error', 'Message must be less than 1600 characters (SMS limit).');
+        return;
+      }
+
+      // Show loading state
+      var btn = document.getElementById('saveTemplateBtn');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      if (currentTemplateType === 'thankYou') {
+        currentSettings.templates.thankYouMessage = message;
+      } else {
+        if (!currentSettings.templates.billMessages[currentTemplateType]) {
+          currentSettings.templates.billMessages[currentTemplateType] = {};
+        }
+        currentSettings.templates.billMessages[currentTemplateType].name = name;
+        currentSettings.templates.billMessages[currentTemplateType].message = message;
+      }
+
+      serverCall('saveSettings', currentSettings).then(function(result) {
+        btn.disabled = false;
+        btn.textContent = 'Save Template';
+
+        if (!result) {
+          showAlert('templatesAlert', 'error', 'No response from server.');
+          return;
+        }
+        if (result.success) {
+          originalTemplateContent = message;
+          updateTemplateStatus('saved');
+          showAlert('templatesAlert', 'success', 'Template saved successfully!');
+          updateSetupChecklist();
+        } else {
+          showAlert('templatesAlert', 'error', result.error || 'Failed to save template');
+        }
+      }).catch(function(err) {
+        btn.disabled = false;
+        btn.textContent = 'Save Template';
+        showAlert('templatesAlert', 'error', 'Error: ' + err.message);
+      });
+    }
+
+    // ============================================
+    // Messages Tab - New Dedicated Template Editor
+    // ============================================
+    var msgCurrentTemplate = 'firstNotice';
+    var msgOriginalContent = '';
+
+
+    // Settings Management
+    function exportSettingsUI() {
+      if (!currentSettings) {
+        showToast('Settings not loaded. Please refresh.', 'error');
+        return;
+      }
+      try {
+        var json = JSON.stringify(currentSettings, null, 2);
+        var blob = new Blob([json], { type: 'application/json' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'billing-settings-backup.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('Settings exported', 'success');
+      } catch (err) {
+        showToast('Export failed: ' + err.message, 'error');
+      }
+    }
+
+    function importSettingsUI() {
+      var input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.onchange = function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+          try {
+            JSON.parse(ev.target.result); // validate JSON
+          } catch (err) {
+            showToast('Invalid JSON file', 'error');
+            return;
+          }
+          serverCall('importSettings', ev.target.result).then(function(result) {
+            if (result && result.success) {
+              showToast('Settings imported', 'success');
+              loadSettings();
+            } else {
+              showToast((result && result.error) || 'Import failed', 'error');
+            }
+          }).catch(function(err) {
+            showToast('Import error: ' + err.message, 'error');
+          });
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    }
+
+    function confirmResetSettings() {
+      showConfirm({
+        title: 'Reset Settings',
+        message: 'Reset all settings to defaults? This cannot be undone.',
+        confirmLabel: 'Reset',
+        destructive: true
+      }).then(function(ok) {
+        if (!ok) return;
+        serverCall('resetSettings')
+          .then(function(result) {
+            if (result && result.success) {
+              showToast('Settings reset to defaults', 'success');
+              loadSettings();
+            } else {
+              showToast((result && result.error) || 'Reset failed', 'error');
+            }
+          })
+          .catch(function(err) {
+            showToast('Reset error: ' + err.message, 'error');
+          });
+      });
+    }
+
+    // ========================================
+    // ACTIVITY LOG
+    // ========================================
+
+    var activityLogData = [];
+    var activityLogAutoRefreshTimer = null;
+    var activityLogInitialized = false;
+
+    function initActivityLog() {
+      if (!activityLogInitialized) {
+        activityLogInitialized = true;
+        loadActivityLog();
+      }
+    }
+
+    function loadActivityLog() {
+      var loading = document.getElementById('activityLogLoading');
+      var empty = document.getElementById('activityLogEmpty');
+      var tableWrap = document.getElementById('activityLogTableWrap');
+      if (loading) loading.style.display = 'block';
+      if (empty) empty.style.display = 'none';
+      if (tableWrap) tableWrap.style.display = 'none';
+
+      serverCall('getActivityLog')
+        .then(function(result) {
+          if (loading) loading.style.display = 'none';
+          if (result && result.success) {
+            activityLogData = result.data || [];
+            applyLogCategoryFilter();
+          } else {
+            showAlert('activityLogAlert', 'error', (result && result.error) || 'Failed to load activity log');
+          }
+        })
+        .catch(function(err) {
+          if (loading) loading.style.display = 'none';
+          showAlert('activityLogAlert', 'error', 'Error: ' + err.message);
+        });
+    }
+
+    function relativeTime(ts) {
+      var now = Date.now();
+      var diff = now - new Date(ts).getTime();
+      if (diff < 0) return 'Just now';
+      var sec = Math.floor(diff / 1000);
+      if (sec < 60) return 'Just now';
+      var min = Math.floor(sec / 60);
+      if (min < 60) return min + 'm ago';
+      var hrs = Math.floor(min / 60);
+      if (hrs < 24) return hrs + 'h ago';
+      var days = Math.floor(hrs / 24);
+      if (days < 7) return days + 'd ago';
+      return new Date(ts).toLocaleDateString();
+    }
+
+    function renderActivityLog(entries) {
+      var empty = document.getElementById('activityLogEmpty');
+      var tableWrap = document.getElementById('activityLogTableWrap');
+
+      if (!entries || entries.length === 0) {
+        if (empty) empty.style.display = 'block';
+        if (tableWrap) tableWrap.style.display = 'none';
+        return;
+      }
+
+      if (empty) empty.style.display = 'none';
+      if (tableWrap) tableWrap.style.display = 'block';
+
+      var now = Date.now();
+      var fiveMinAgo = now - 5 * 60 * 1000;
+
+      // Build table with DOM (XSS-safe)
+      var table = document.createElement('table');
+      table.className = 'log-table';
+
+      var thead = document.createElement('thead');
+      var headRow = document.createElement('tr');
+      ['Time', 'User', 'Action', 'Details', 'Status'].forEach(function(h) {
+        var th = document.createElement('th');
+        th.textContent = h;
+        headRow.appendChild(th);
+      });
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+
+      var tbody = document.createElement('tbody');
+      entries.forEach(function(entry, idx) {
+        var tr = document.createElement('tr');
+        var entryTime = new Date(entry.ts).getTime();
+        var isFresh = entryTime >= fiveMinAgo;
+        if (isFresh) tr.classList.add('log-fresh');
+
+        // Stagger animation for first 10 rows
+        if (idx < 10) {
+          tr.classList.add('animate-in');
+          tr.style.animationDelay = (idx * 50) + 'ms';
+        }
+
+        // Timestamp — relative, with full timestamp on hover
+        var tdTime = document.createElement('td');
+        tdTime.className = 'log-timestamp';
+        tdTime.textContent = relativeTime(entry.ts);
+        tdTime.title = new Date(entry.ts).toLocaleString();
+        tr.appendChild(tdTime);
+
+        // User
+        var tdUser = document.createElement('td');
+        tdUser.className = 'log-user';
+        tdUser.textContent = entry.user || '—';
+        tdUser.title = entry.user || '';
+        tr.appendChild(tdUser);
+
+        // Action (with category badge)
+        var tdAction = document.createElement('td');
+        var badge = document.createElement('span');
+        badge.className = 'log-cat-badge log-cat-' + (entry.cat || 'system');
+        badge.textContent = entry.cat || 'system';
+        tdAction.appendChild(badge);
+        tdAction.appendChild(document.createTextNode(' ' + (entry.act || '')));
+        tr.appendChild(tdAction);
+
+        // Details (truncated, full detail on row expand)
+        var tdDet = document.createElement('td');
+        tdDet.className = 'log-details';
+        tdDet.textContent = entry.det || '—';
+        tdDet.title = entry.det || '';
+        tr.appendChild(tdDet);
+
+        // Status
+        var tdStatus = document.createElement('td');
+        tdStatus.className = entry.ok ? 'log-status-ok' : 'log-status-err';
+        tdStatus.textContent = entry.ok ? 'OK' : 'Error';
+        tr.appendChild(tdStatus);
+
+        // Build hidden detail row
+        var detailRow = document.createElement('tr');
+        detailRow.className = 'log-detail-row';
+        detailRow.style.display = 'none';
+        var detailTd = document.createElement('td');
+        detailTd.colSpan = 5;
+        var dl = document.createElement('dl');
+        dl.className = 'log-detail-content';
+        var fields = [
+          ['Time', new Date(entry.ts).toLocaleString()],
+          ['User', entry.user || '—'],
+          ['Category', entry.cat || 'system'],
+          ['Action', entry.act || '—'],
+          ['Details', entry.det || '—'],
+          ['Status', entry.ok ? 'OK' : 'Error']
+        ];
+        fields.forEach(function(f) {
+          var dt = document.createElement('dt');
+          dt.textContent = f[0];
+          dl.appendChild(dt);
+          var dd = document.createElement('dd');
+          dd.textContent = f[1];
+          dl.appendChild(dd);
+        });
+        detailTd.appendChild(dl);
+        detailRow.appendChild(detailTd);
+
+        // Toggle detail row on click
+        tr.addEventListener('click', function() {
+          var isVisible = detailRow.style.display !== 'none';
+          detailRow.style.display = isVisible ? 'none' : '';
+          tr.classList.toggle('active', !isVisible);
+        });
+
+        tbody.appendChild(tr);
+        tbody.appendChild(detailRow);
+      });
+      table.appendChild(tbody);
+
+      // Replace content
+      while (tableWrap.firstChild) tableWrap.removeChild(tableWrap.firstChild);
+      tableWrap.appendChild(table);
+    }
+
+    function applyLogCategoryFilter() {
+      var filter = document.getElementById('logCategoryFilter');
+      var cat = filter ? filter.value : 'all';
+      var filtered = cat === 'all'
+        ? activityLogData
+        : activityLogData.filter(function(e) { return e.cat === cat; });
+      renderActivityLog(filtered);
+    }
+
+    function toggleLogAutoRefresh() {
+      if (activityLogAutoRefreshTimer) {
+        clearInterval(activityLogAutoRefreshTimer);
+        activityLogAutoRefreshTimer = null;
+      }
+      var checkbox = document.getElementById('logAutoRefresh');
+      if (checkbox && checkbox.checked) {
+        activityLogAutoRefreshTimer = setInterval(loadActivityLog, 30000);
+      }
+    }
+
+    function downloadActivityLog() {
+      // Use currently filtered data
+      var filter = document.getElementById('logCategoryFilter');
+      var cat = filter ? filter.value : 'all';
+      var entries = cat === 'all'
+        ? activityLogData
+        : activityLogData.filter(function(e) { return e.cat === cat; });
+
+      if (!entries || entries.length === 0) {
+        showToast('No log entries to download', 'error');
+        return;
+      }
+
+      // Build CSV with proper escaping
+      var csvRows = [['Time', 'User', 'Category', 'Action', 'Details', 'Status']];
+      entries.forEach(function(entry) {
+        csvRows.push([
+          new Date(entry.ts).toISOString(),
+          entry.user || '',
+          entry.cat || 'system',
+          entry.act || '',
+          entry.det || '',
+          entry.ok ? 'OK' : 'Error'
+        ]);
+      });
+
+      var csv = csvRows.map(function(row) {
+        return row.map(function(cell) {
+          var str = String(cell).replace(/"/g, '""');
+          return '"' + str + '"';
+        }).join(',');
+      }).join('\n');
+
+      var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      var dateStr = new Date().toISOString().slice(0, 10);
+      a.download = 'activity-log-' + dateStr + (cat !== 'all' ? '-' + cat : '') + '.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function clearActivityLog() {
+      showConfirm({
+        title: 'Clear Activity Log',
+        message: 'Delete all activity log entries? This cannot be undone.',
+        confirmLabel: 'Clear',
+        destructive: true
+      }).then(function(ok) {
+        if (!ok) return;
+        serverCall('clearActivityLog')
+          .then(function(result) {
+            if (result && result.success) {
+              activityLogData = [];
+              renderActivityLog([]);
+              showToast('Activity log cleared', 'success');
+            } else {
+              showToast((result && result.error) || 'Failed to clear log', 'error');
+            }
+          })
+          .catch(function(err) {
+            showToast('Error: ' + err.message, 'error');
+          });
+      });
+    }
+
+</script>

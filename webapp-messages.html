@@ -1,0 +1,485 @@
+<script>
+    // ============================================
+    // Messages: Credentials, Send Modal, Template Editor
+    // ============================================
+    function openCredentialsModal() {
+      loadCredentialStatus();
+      document.getElementById('credentialsModal').classList.add('visible');
+    }
+
+    function closeCredentialsModal() {
+      document.getElementById('credentialsModal').classList.remove('visible');
+      // Reset form fields
+      document.getElementById('accountSid').value = '';
+      document.getElementById('authToken').value = '';
+      document.getElementById('twilioPhone').value = '';
+      document.getElementById('connectionTestSteps').style.display = 'none';
+      var alertEl = document.getElementById('credentialAlert');
+      if (alertEl) alertEl.textContent = '';
+      // Reset test steps
+      ['testStep1', 'testStep2', 'testStep3'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) { el.classList.remove('active', 'done', 'fail'); }
+      });
+      // Reset field errors
+      var sidErr = document.getElementById('sidError');
+      var phoneErr = document.getElementById('phoneError');
+      if (sidErr) sidErr.classList.remove('visible');
+      if (phoneErr) phoneErr.classList.remove('visible');
+    }
+
+    // Single Bill Modal
+    function openSendModal(rowIndex) {
+      selectedCustomerRow = rowIndex;
+      var customer = currentCustomers.find(function(c) { return c.rowIndex === rowIndex; });
+      if (customer) {
+        setTextContent('modalCustomerName', customer.name);
+        setTextContent('modalBalance', customer.formattedBalance);
+        document.getElementById('sendSingleModal').classList.add('visible');
+      }
+    }
+
+    function closeSendModal() {
+      document.getElementById('sendSingleModal').classList.remove('visible');
+      selectedCustomerRow = null;
+    }
+
+    function openFullscreenPreview() {
+      var bubble = document.getElementById('msgPreviewBubble');
+      var fullscreenContent = document.getElementById('fullscreenPreviewContent');
+      if (bubble && fullscreenContent) {
+        fullscreenContent.textContent = bubble.textContent || 'No preview available.';
+      }
+      document.getElementById('previewFullscreenModal').classList.add('visible');
+    }
+
+    function closeFullscreenPreview() {
+      document.getElementById('previewFullscreenModal').classList.remove('visible');
+    }
+
+    function sendSingleBill() {
+      if (!selectedCustomerRow) return;
+      var btn = document.getElementById('modalSendBtn');
+      var templateType = document.getElementById('modalTemplate').value;
+      var dryRun = document.getElementById('dryRunCheckbox').checked;
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+
+      serverCall('sendSingleBill', { rowIndex: selectedCustomerRow, templateType: templateType, dryRunMode: dryRun })
+        .then(function(result) {
+          btn.disabled = false;
+          btn.textContent = 'Send Bill';
+          closeSendModal();
+          if (result.success) {
+            var msg = 'Bill sent to ' + result.data.customerName;
+            if (result.data.dryRunMode) msg += ' (DRY RUN)';
+            showToast(msg, 'success');
+            refreshCustomers();
+          } else {
+            showToast(result.error || 'Failed to send bill', 'error');
+          }
+        })
+        .catch(function(err) {
+          btn.disabled = false;
+          btn.textContent = 'Send Bill';
+          showToast(err.message || 'Failed to send bill', 'error');
+        });
+    }
+
+    // Credentials
+    var credentialsConfigured = false;
+
+    function loadCredentialStatus() {
+      serverCall('getCredentialStatus').then(function(result) {
+        var loadingEl = document.getElementById('credStatusLoading');
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (!result) {
+          console.error('Failed to load credential status: No response from server');
+          return;
+        }
+        if (result.success) {
+          var data = result.data;
+          credentialsConfigured = !!data.allSet;
+          var statusDiv = document.getElementById('credentialStatus');
+          while (statusDiv.firstChild) statusDiv.removeChild(statusDiv.firstChild);
+          if (data.allSet) {
+            statusDiv.className = 'alert alert-success';
+            statusDiv.textContent = 'Credentials configured. SID: ' + data.maskedSid + ', Phone: ' + data.maskedPhone;
+          } else {
+            statusDiv.className = 'alert alert-warning';
+            statusDiv.textContent = 'Some credentials are not set. Please configure all fields.';
+          }
+          statusDiv.style.display = 'flex';
+          // Update inline badge in Advanced Settings
+          var badge = document.getElementById('credStatusBadge');
+          if (badge) {
+            if (data.allSet) {
+              badge.textContent = 'Connected';
+              badge.style.background = 'var(--color-success-bg, #dcfce7)';
+              badge.style.color = 'var(--color-success-text, #166534)';
+            } else {
+              badge.textContent = 'Not configured';
+              badge.style.background = 'var(--color-warning-bg, #fef9c3)';
+              badge.style.color = 'var(--color-warning-text, #854d0e)';
+            }
+          }
+          updateSetupChecklist();
+        }
+      }).catch(function(err) { console.error('Failed to load credential status:', err); });
+    }
+
+    function saveCredentials() {
+      var btn = document.getElementById('saveCredentialsBtn');
+      var sid = document.getElementById('accountSid').value.trim();
+      var token = document.getElementById('authToken').value.trim();
+      var phone = document.getElementById('twilioPhone').value.trim();
+
+      if (!sid && !token && !phone) {
+        showAlert('credentialAlert', 'warning', 'Please enter at least one credential to save.');
+        return;
+      }
+
+      setButtonState(btn, 'loading');
+      serverCall('saveCredentials', { accountSid: sid || undefined, authToken: token || undefined, twilioPhone: phone || undefined })
+        .then(function(result) {
+          if (result.success) {
+            setButtonState(btn, 'success');
+            showToast('Credentials saved!', 'success');
+            showAlert('credentialAlert', 'success', 'Credentials saved successfully!');
+            document.getElementById('accountSid').value = '';
+            document.getElementById('authToken').value = '';
+            document.getElementById('twilioPhone').value = '';
+            loadCredentialStatus();
+          } else {
+            setButtonState(btn, 'error');
+            showToast(result.error || 'Failed to save', 'error');
+            showAlert('credentialAlert', 'error', result.error || 'Failed to save');
+          }
+        })
+        .catch(function(err) {
+          setButtonState(btn, 'error');
+          showToast('Error: ' + err.message, 'error');
+          showAlert('credentialAlert', 'error', 'Error: ' + err.message);
+        });
+    }
+
+    function testCredentials() {
+      var stepsContainer = document.getElementById('connectionTestSteps');
+      var steps = stepsContainer ? stepsContainer.querySelectorAll('.step-item') : [];
+      var testBtn = document.getElementById('testConnectionBtn');
+
+      // Reset and show steps
+      steps.forEach(function(s) { s.className = 'step-item'; });
+      if (stepsContainer) stepsContainer.style.display = 'flex';
+      if (testBtn) testBtn.disabled = true;
+      showAlert('credentialAlert', '', '');
+
+      // Step 1: Connecting
+      if (steps[0]) steps[0].classList.add('active');
+
+      setTimeout(function() {
+        // Step 2: Authenticating
+        if (steps[0]) { steps[0].classList.remove('active'); steps[0].classList.add('done'); }
+        if (steps[1]) steps[1].classList.add('active');
+
+        setTimeout(function() {
+          // Step 3: Verifying — make actual server call
+          if (steps[1]) { steps[1].classList.remove('active'); steps[1].classList.add('done'); }
+          if (steps[2]) steps[2].classList.add('active');
+
+          serverCall('testCredentials').then(function(result) {
+            if (testBtn) testBtn.disabled = false;
+            if (!result) {
+              if (steps[2]) { steps[2].classList.remove('active'); steps[2].classList.add('error'); }
+              showAlert('credentialAlert', 'error', 'No response from server.');
+              return;
+            }
+            if (result.success) {
+              if (steps[2]) { steps[2].classList.remove('active'); steps[2].classList.add('done'); }
+              showAlert('credentialAlert', 'success', 'Connection successful! Account: ' + result.accountName);
+            } else {
+              if (steps[2]) { steps[2].classList.remove('active'); steps[2].classList.add('error'); }
+              showAlert('credentialAlert', 'error', result.error || 'Connection failed');
+            }
+          }).catch(function(err) {
+            if (testBtn) testBtn.disabled = false;
+            if (steps[2]) { steps[2].classList.remove('active'); steps[2].classList.add('error'); }
+            showAlert('credentialAlert', 'error', 'Error: ' + err.message);
+          });
+        }, 600);
+      }, 600);
+    }
+
+    // Inline credential field validation
+    function showFieldError(input, errorEl, msg) {
+      input.classList.add('input-error');
+      input.classList.remove('input-valid');
+      if (errorEl) { errorEl.textContent = msg; errorEl.classList.add('visible'); }
+    }
+
+    function hideFieldError(input, errorEl) {
+      input.classList.remove('input-error');
+      if (errorEl) { errorEl.textContent = ''; errorEl.classList.remove('visible'); }
+    }
+
+    function validateSidField() {
+      var input = document.getElementById('accountSid');
+      var errorEl = document.getElementById('sidError');
+      if (!input || !input.value.trim()) { hideFieldError(input, errorEl); return; }
+      var val = input.value.trim();
+      if (val.length < 2 || val.substring(0, 2) !== 'AC') {
+        showFieldError(input, errorEl, 'Account SID must start with "AC"');
+      } else if (val.length !== 34) {
+        showFieldError(input, errorEl, 'Account SID should be 34 characters');
+      } else {
+        hideFieldError(input, errorEl);
+        input.classList.add('input-valid');
+      }
+    }
+
+    function validatePhoneField() {
+      var input = document.getElementById('twilioPhone');
+      var errorEl = document.getElementById('phoneError');
+      if (!input || !input.value.trim()) { hideFieldError(input, errorEl); return; }
+      var val = input.value.trim();
+      if (val.charAt(0) !== '+') {
+        showFieldError(input, errorEl, 'Phone number must start with "+" (e.g., +1...)');
+      } else if (!/^\+\d{10,15}$/.test(val)) {
+        showFieldError(input, errorEl, 'Enter a valid phone number (e.g., +14155551234)');
+      } else {
+        hideFieldError(input, errorEl);
+        input.classList.add('input-valid');
+      }
+    }
+
+    // Settings
+
+    function selectTemplateCard(templateType) {
+      if (templateType === msgCurrentTemplate) return;
+
+      function doSwitch() {
+        msgCurrentTemplate = templateType;
+        document.querySelectorAll('.template-card').forEach(function(card) {
+          card.classList.toggle('active', card.dataset.template === templateType);
+        });
+        loadMsgTemplate();
+      }
+
+      if (hasUnsavedTemplateChanges()) {
+        showConfirm({
+          title: 'Unsaved Changes',
+          message: 'You have unsaved changes to this template. Discard and switch?',
+          confirmLabel: 'Discard',
+          destructive: true
+        }).then(function(ok) {
+          if (ok) doSwitch();
+        });
+      } else {
+        doSwitch();
+      }
+    }
+
+    function loadMsgTemplate() {
+      if (!currentSettings || !currentSettings.templates) {
+        return;
+      }
+
+      var nameInput = document.getElementById('msgTemplateName');
+      var contentArea = document.getElementById('msgTemplateContent');
+      var template;
+
+      if (msgCurrentTemplate === 'thankYou') {
+        nameInput.value = 'Thank You Message';
+        nameInput.disabled = true;
+        contentArea.value = currentSettings.templates.thankYouMessage || '';
+      } else {
+        nameInput.disabled = false;
+        template = currentSettings.templates.billMessages[msgCurrentTemplate];
+        if (template) {
+          nameInput.value = template.name || '';
+          contentArea.value = template.message || '';
+        } else {
+          nameInput.value = '';
+          contentArea.value = '';
+        }
+      }
+
+      msgOriginalContent = contentArea.value;
+      updateMsgCharCount();
+      updateMsgPreview();
+      updateMsgSaveStatus('');
+    }
+
+    function updateMsgCharCount() {
+      var textarea = document.getElementById('msgTemplateContent');
+      var counter = document.getElementById('msgCharCounter');
+      var fill = document.getElementById('msgCharFill');
+      var segmentInfo = document.getElementById('msgSegmentInfo');
+      var length = textarea.value.length;
+      var maxLength = 1600;
+      var percentage = Math.min((length / maxLength) * 100, 100);
+
+      counter.textContent = length + ' / ' + maxLength;
+      fill.style.width = percentage + '%';
+
+      // SMS segment calculation
+      if (segmentInfo && length > 0) {
+        // Detect Unicode: any char outside GSM 7-bit basic + extended set
+        var hasUnicode = /[^\x20-\x7E\n\r\u00A3\u00A5\u00E8\u00E9\u00F9\u00EC\u00F2\u00C7\u00D8\u00F8\u00C5\u00E5\u0394\u03A6\u0393\u039B\u03A9\u03A0\u03A8\u03A3\u0398\u039E\u00C6\u00E6\u00DF\u00C9\u00A4\u00A1\u00C4\u00D6\u00D1\u00DC\u00A7\u00BF\u00E4\u00F6\u00F1\u00FC\u00E0]/.test(textarea.value);
+        var singleLimit = hasUnicode ? 70 : 160;
+        var multiLimit = hasUnicode ? 67 : 153;
+        var segments = length <= singleLimit ? 1 : Math.ceil(length / multiLimit);
+        segmentInfo.textContent = length + ' chars \u00B7 ' + segments + ' segment' + (segments !== 1 ? 's' : '') + (hasUnicode ? ' (Unicode)' : '');
+      } else if (segmentInfo) {
+        segmentInfo.textContent = '';
+      }
+
+      counter.classList.remove('warning', 'error');
+      fill.classList.remove('warning', 'error');
+
+      if (length > maxLength) {
+        counter.classList.add('error');
+        fill.classList.add('error');
+      } else if (length > maxLength * 0.85) {
+        counter.classList.add('warning');
+        fill.classList.add('warning');
+      }
+
+      // Track modifications
+      if (textarea.value !== msgOriginalContent) {
+        updateMsgSaveStatus('modified');
+      } else {
+        updateMsgSaveStatus('');
+      }
+    }
+
+    function updateMsgPreview() {
+      clearTimeout(msgPreviewDebounceTimer);
+      var message = document.getElementById('msgTemplateContent').value;
+      var preview = document.getElementById('msgPreviewBubble');
+
+      if (!message.trim()) {
+        preview.textContent = 'Start typing to see your message preview...';
+        preview.style.fontStyle = 'italic';
+        preview.style.opacity = '0.7';
+        preview.classList.remove('updating');
+        return;
+      }
+
+      preview.style.fontStyle = 'normal';
+      preview.style.opacity = '1';
+      preview.classList.add('updating');
+
+      msgPreviewDebounceTimer = setTimeout(function() {
+        serverCall('previewTemplate', { template: message })
+          .then(function(result) {
+            preview.classList.remove('updating');
+            if (typeof result === 'string') {
+              preview.textContent = result;
+            } else if (result && result.success && result.preview) {
+              preview.textContent = result.preview;
+            } else {
+              preview.textContent = message;
+            }
+          })
+          .catch(function() {
+            preview.classList.remove('updating');
+            preview.textContent = message;
+          });
+      }, 500);
+    }
+
+    function insertMsgPlaceholder(placeholder) {
+      var textarea = document.getElementById('msgTemplateContent');
+      var start = textarea.selectionStart;
+      var end = textarea.selectionEnd;
+      var text = textarea.value;
+      var tag = '{{' + placeholder + '}}';
+
+      textarea.value = text.substring(0, start) + tag + text.substring(end);
+      textarea.focus();
+      textarea.selectionStart = textarea.selectionEnd = start + tag.length;
+
+      updateMsgCharCount();
+      updateMsgPreview();
+    }
+
+    function updateMsgSaveStatus(status) {
+      var statusEl = document.getElementById('globalTemplateStatus');
+      statusEl.classList.remove('visible', 'saved', 'modified');
+
+      if (status === 'saved') {
+        statusEl.textContent = 'Saved';
+        statusEl.classList.add('visible', 'saved');
+      } else if (status === 'modified') {
+        statusEl.textContent = 'Unsaved changes';
+        statusEl.classList.add('visible', 'modified');
+      }
+    }
+
+
+
+    function saveMsgTemplate() {
+      if (!currentSettings || !currentSettings.templates) {
+        showAlert('messagesTabAlert', 'error', 'Settings not loaded. Please refresh.');
+        return;
+      }
+
+      var name = document.getElementById('msgTemplateName').value.trim();
+      var message = document.getElementById('msgTemplateContent').value;
+
+      if (!message || message.length < 50) {
+        showAlert('messagesTabAlert', 'error', 'Message must be at least 50 characters.');
+        return;
+      }
+      if (message.length > 1600) {
+        showAlert('messagesTabAlert', 'error', 'Message must be less than 1600 characters (SMS limit).');
+        return;
+      }
+
+      var btn = document.getElementById('msgSaveBtn');
+      setButtonState(btn, 'loading');
+
+      if (msgCurrentTemplate === 'thankYou') {
+        currentSettings.templates.thankYouMessage = message;
+      } else {
+        if (!currentSettings.templates.billMessages[msgCurrentTemplate]) {
+          currentSettings.templates.billMessages[msgCurrentTemplate] = {};
+        }
+        currentSettings.templates.billMessages[msgCurrentTemplate].name = name;
+        currentSettings.templates.billMessages[msgCurrentTemplate].message = message;
+      }
+
+      serverCall('saveSettings', currentSettings).then(function(result) {
+        if (!result) {
+          setButtonState(btn, 'error');
+          showToast('No response from server', 'error');
+          showAlert('messagesTabAlert', 'error', 'No response from server.');
+          return;
+        }
+        if (result.success) {
+          setButtonState(btn, 'success');
+          showToast('Template saved!', 'success');
+          msgOriginalContent = message;
+          updateMsgSaveStatus('saved');
+          updateSetupChecklist();
+        } else {
+          setButtonState(btn, 'error');
+          showToast(result.error || 'Failed to save', 'error');
+          showAlert('messagesTabAlert', 'error', result.error || 'Failed to save template');
+        }
+      }).catch(function(err) {
+        setButtonState(btn, 'error');
+        showToast('Error: ' + err.message, 'error');
+        showAlert('messagesTabAlert', 'error', 'Error: ' + err.message);
+      });
+    }
+
+    // Initialize Messages tab when switching to it
+    function initMessagesTab() {
+      if (currentSettings && currentSettings.templates) {
+        loadMsgTemplate();
+      }
+    }
+
+</script>
