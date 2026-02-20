@@ -899,7 +899,13 @@
                 </div>
                 <div id="activityLogAlert"></div>
                 <div id="activityLogLoading" style="display:none; text-align:center; padding: var(--space-3); color: var(--color-text-muted); font-size: var(--text-sm);">Loading activity log...</div>
-                <div id="activityLogEmpty" style="display:none; text-align:center; padding: var(--space-4); color: var(--color-text-muted); font-size: var(--text-sm);">No activity logged yet. Actions like sending bills, saving settings, and managing users will appear here.</div>
+                <div id="activityLogEmpty" class="empty-state" style="display:none; padding: var(--space-6) var(--space-4);">
+                  <div class="empty-state-icon">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                  </div>
+                  <div class="empty-state-title">No activity yet</div>
+                  <div class="empty-state-desc">Actions like sending bills, saving settings, and managing users will appear here.</div>
+                </div>
                 <div id="activityLogTableWrap" style="display:none; max-height: 320px; overflow-y: auto; border: 1px solid var(--color-border); border-radius: var(--radius-md);"></div>
               </div>
             </div>

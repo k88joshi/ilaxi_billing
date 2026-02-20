@@ -211,10 +211,25 @@
       if (!container) return;
       while (container.firstChild) container.removeChild(container.firstChild);
       if (!users || users.length === 0) {
-        var emptyMsg = document.createElement('p');
-        emptyMsg.style.cssText = 'font-size: var(--text-sm); color: var(--color-text-muted); padding: var(--space-2);';
-        emptyMsg.textContent = 'No authorized users.';
-        container.appendChild(emptyMsg);
+        var empty = document.createElement('div');
+        empty.className = 'empty-state';
+        empty.style.padding = 'var(--space-4) var(--space-3)';
+        var icon = document.createElement('div');
+        icon.className = 'empty-state-icon';
+        icon.style.cssText = 'width:40px;height:40px;margin-bottom:var(--space-2);';
+        icon.innerHTML = '<svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>';
+        empty.appendChild(icon);
+        var title = document.createElement('div');
+        title.className = 'empty-state-title';
+        title.style.fontSize = 'var(--text-sm)';
+        title.textContent = 'No authorized users';
+        empty.appendChild(title);
+        var desc = document.createElement('div');
+        desc.className = 'empty-state-desc';
+        desc.style.cssText = 'font-size:var(--text-xs);margin-bottom:0;';
+        desc.textContent = 'Add an email above to grant web app access.';
+        empty.appendChild(desc);
+        container.appendChild(empty);
         return;
       }
       // Build set of live user emails for quick lookup
