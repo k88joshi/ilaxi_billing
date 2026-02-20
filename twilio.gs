@@ -257,6 +257,15 @@ function sendBill_(customerPhone, customerName, balance, numTiffins, dueDate, te
   }, effectiveSettings);
 
   const message = processTemplate(template.message, templateData);
+
+  // Safety: never send a message with unresolved {{placeholder}} text to a customer
+  const unresolvedMatch = message.match(/\{\{\w+\}\}/g);
+  if (unresolvedMatch) {
+    const errorMsg = `Error: Message has unresolved placeholders: ${unresolvedMatch.join(', ')}`;
+    Logger.log(`✗ ${errorMsg} for ${customerName}`);
+    return { success: false, status: errorMsg, color: effectiveSettings.colors.error };
+  }
+
   return sendTwilioMessage_(formattedPhone, message, template.name, customerName, effectiveSettings);
 }
 
@@ -290,6 +299,14 @@ function sendThankYouMessage_(customerPhone, customerName, orderId, settings) {
 
   const templateData = buildThankYouTemplateData({ customerName, orderId }, settings);
   const message = processTemplate(settings.templates.thankYouMessage, templateData);
+
+  // Safety: never send a message with unresolved {{placeholder}} text to a customer
+  const unresolvedMatch = message.match(/\{\{\w+\}\}/g);
+  if (unresolvedMatch) {
+    Logger.log(`✗ Thank-you message has unresolved placeholders for ${customerName}: ${unresolvedMatch.join(', ')}`);
+    return { success: false, status: 'Thank You Error: Unresolved template placeholders', color: settings.colors.error };
+  }
+
   return sendTwilioMessage_(formattedPhone, message, "Thank You", customerName, settings);
 }
 

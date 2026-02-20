@@ -126,23 +126,25 @@ function formatPhoneNumber_(phone) {
 
 /**
  * Formats a balance/amount value into a consistent "$XXX.XX" currency format.
+ * Returns null for truly invalid data (NaN, garbage strings) so callers
+ * can distinguish between "no balance" and "bad balance".
  *
  * @param {string|number} balance - The balance value (raw from sheet).
- * @returns {string} Formatted string in format "$XXX.XX".
+ * @returns {string|null} Formatted string in format "$XXX.XX", or null if unparseable.
  */
 function formatBalance_(balance) {
   if (!balance && balance !== 0) return "$0.00";
-  
+
   // Remove all non-numeric characters except the decimal point
   let cleaned = String(balance).replace(/[^\d.]/g, '');
   let num = parseFloat(cleaned);
-  
+
   // Validate that we have a valid number
   if (isNaN(num)) {
-    Logger.log(`⚠️ Warning: Invalid balance format "${balance}", using $0.00`);
-    return "$0.00";
+    Logger.log(`⚠️ Warning: Invalid balance format "${balance}"`);
+    return null;
   }
-  
+
   // Return formatted with 2 decimal places
   return `$${num.toFixed(2)}`;
 }
@@ -417,6 +419,15 @@ function processRowsForSending(rowsToProcess, columns, cols, settings, templateT
       continue;
     }
 
+    // Validate balance is a real number before sending (prevents silent $0.00 in SMS)
+    if (formatBalance_(rowData[balanceCol]) === null) {
+      errorCount++;
+      const balancePreview = String(rowData[balanceCol]).substring(0, 30);
+      errorDetails.push({ name: rowData[nameCol] || `Row ${row}`, error: `Invalid balance: "${balancePreview}"` });
+      statusUpdates.push({ row, status: `Error: Invalid balance "${balancePreview}"`, color: settings.colors.error });
+      continue;
+    }
+
     const result = sendBill_(rowData[phoneCol], rowData[nameCol], rowData[balanceCol], rowData[tiffinsCol], rowData[dueDateCol], templateType, dryRunMode, settings);
     statusUpdates.push({ row, status: result.status, color: result.color });
 
@@ -517,7 +528,7 @@ function sendBillByOrderID() {
   const dryRunNote = dryRunMode ? "\n\n[TEST MODE - No actual SMS will be sent]" : "";
   const confirmResult = getUi_().alert(
     "Confirm Send by Order ID",
-    `Found Order ID ${targetOrderID}:\n\nName: ${customer.name}\nPhone: ${customer.phone}\nBalance: ${formatBalance_(customer.balance)}\nMessage Type: ${templateName}\n\nContinue?${dryRunNote}`,
+    `Found Order ID ${targetOrderID}:\n\nName: ${customer.name}\nPhone: ${customer.phone}\nBalance: ${formatBalance_(customer.balance) || 'N/A'}\nMessage Type: ${templateName}\n\nContinue?${dryRunNote}`,
     getUi_().ButtonSet.YES_NO
   );
 
@@ -566,7 +577,7 @@ function testSingleMessage() {
       const templateName = getBillTemplate(templateType, settings).name;
       const confirmResult = getUi_().alert(
         "Test Message Preview",
-        `About to send a test "${templateName}" to configured test customer (Order ID: ${testOrderId}):\n\nName: ${customer.name}\nPhone: ${customer.phone}\nBalance: ${formatBalance_(customer.balance)}\n\n[TEST MODE - No actual SMS will be sent]\n\nContinue?`,
+        `About to send a test "${templateName}" to configured test customer (Order ID: ${testOrderId}):\n\nName: ${customer.name}\nPhone: ${customer.phone}\nBalance: ${formatBalance_(customer.balance) || 'N/A'}\n\n[TEST MODE - No actual SMS will be sent]\n\nContinue?`,
         getUi_().ButtonSet.YES_NO
       );
 
@@ -633,7 +644,7 @@ function testSingleMessage() {
   const templateName = getBillTemplate(templateType, settings).name;
   const confirmResult = getUi_().alert(
     "Test Message Preview",
-    `About to send a test "${templateName}" to the first UNPAID customer (row ${currentRow}):\n\nName: ${name}\nPhone: ${phone}\nBalance: ${formatBalance_(balance)}\n\n[TEST MODE - No actual SMS will be sent]\n\nContinue?`,
+    `About to send a test "${templateName}" to the first UNPAID customer (row ${currentRow}):\n\nName: ${name}\nPhone: ${phone}\nBalance: ${formatBalance_(balance) || 'N/A'}\n\n[TEST MODE - No actual SMS will be sent]\n\nContinue?`,
     getUi_().ButtonSet.YES_NO
   );
 

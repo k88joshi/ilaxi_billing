@@ -640,6 +640,33 @@
 
     // Payment Status Update
     function updatePaymentStatus(rowIndex, newStatus, selectEl) {
+      var customer = currentCustomers.find(function(c) { return c.rowIndex === rowIndex; });
+      var previousStatus = customer ? customer.paymentStatus : 'Unpaid';
+
+      // Confirm when marking as Paid with auto-thank-you enabled (sends an SMS!)
+      var autoTY = currentSettings && currentSettings.behavior && currentSettings.behavior.autoThankYouEnabled;
+      if (newStatus.toLowerCase() === 'paid' && autoTY) {
+        showConfirm({
+          title: 'Confirm Payment Status',
+          message: 'Marking as Paid will send an automatic thank-you SMS to ' + (customer ? customer.name : 'this customer') + '. Continue?',
+          confirmLabel: 'Mark Paid & Send SMS',
+          destructive: false
+        }).then(function(ok) {
+          if (ok) {
+            executePaymentStatusUpdate_(rowIndex, newStatus, selectEl, previousStatus);
+          } else {
+            selectEl.value = previousStatus;
+            var revertClass = previousStatus.toLowerCase() === 'paid' ? 'status-paid' : previousStatus.toLowerCase() === 'unpaid' ? 'status-unpaid' : 'status-other';
+            selectEl.className = 'payment-status-select ' + revertClass;
+          }
+        });
+        return;
+      }
+
+      executePaymentStatusUpdate_(rowIndex, newStatus, selectEl, previousStatus);
+    }
+
+    function executePaymentStatusUpdate_(rowIndex, newStatus, selectEl, previousStatus) {
       var prevClass = selectEl.className;
       var statusClass = newStatus.toLowerCase() === 'paid' ? 'status-paid' : newStatus.toLowerCase() === 'unpaid' ? 'status-unpaid' : 'status-other';
       selectEl.className = 'payment-status-select ' + statusClass;
@@ -652,11 +679,19 @@
             // Update cached data
             var customer = currentCustomers.find(function(c) { return c.rowIndex === rowIndex; });
             if (customer) customer.paymentStatus = newStatus;
-            var msg = newStatus + ' - status updated';
-            if (result.data && result.data.thankYouSent === true) {
+            var msg = newStatus + ' \u2014 status updated';
+            var thankYouSent = result.data && result.data.thankYouSent === true;
+            if (thankYouSent) {
               msg += '. Thank-you SMS sent!';
             }
-            showToast(msg, 'success');
+            // Offer undo for status changes that didn't trigger an SMS (can't unsend)
+            if (!thankYouSent) {
+              showUndoToast(msg, function() {
+                executePaymentStatusUpdate_(rowIndex, previousStatus, selectEl, newStatus);
+              });
+            } else {
+              showToast(msg, 'success');
+            }
             loadStats();
             silentRefreshCustomers_();
           } else {
