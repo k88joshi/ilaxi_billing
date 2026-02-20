@@ -113,6 +113,9 @@ function isAdminUser_(email) {
 
 /**
  * Gets the email address of the currently logged-in user.
+ * Tries Session.getActiveUser() first, then falls back to decoding
+ * the OpenID Connect identity token (JWT) which is more reliable
+ * across different Google account domains.
  *
  * @returns {string|null} The user's email address, or null if unavailable
  * @private
@@ -120,11 +123,25 @@ function isAdminUser_(email) {
 function getCurrentUserEmail_() {
   try {
     const email = Session.getActiveUser().getEmail();
-    return email || null;
+    if (email) return email;
   } catch (e) {
-    Logger.log(`getCurrentUserEmail_ error: ${e.message}`);
-    return null;
+    Logger.log(`getCurrentUserEmail_ getActiveUser error: ${e.message}`);
   }
+
+  // Fallback: decode the OpenID Connect identity token (requires "openid" scope)
+  try {
+    const token = ScriptApp.getIdentityToken();
+    if (token) {
+      const payload = JSON.parse(
+        Utilities.newBlob(Utilities.base64Decode(token.split('.')[1])).getDataAsString()
+      );
+      if (payload.email) return payload.email;
+    }
+  } catch (e) {
+    Logger.log(`getCurrentUserEmail_ identity token error: ${e.message}`);
+  }
+
+  return null;
 }
 
 /**
