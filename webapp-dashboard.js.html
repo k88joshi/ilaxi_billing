@@ -33,8 +33,16 @@
 
     function loadStats() {
       serverCall('getCustomerStats').then(function(result) {
+        // Remove skeleton loading from all stats cards
+        var heroStats = document.querySelectorAll('.hero-stat');
+        heroStats.forEach(function(card) { card.classList.remove('hero-stat--loading'); });
+
         if (!result) {
           console.error('Failed to load stats: No response from server');
+          setTextContent('statBalance', '\u2014');
+          setTextContent('statUnpaid', '\u2014');
+          setTextContent('statPaid', '\u2014');
+          setTextContent('statTotal', 'Unable to load stats');
           return;
         }
         if (result.success) {
@@ -49,14 +57,21 @@
           animateValue('statBalance', stats.unpaidBalance.toFixed(2), '$');
 
           // Stagger animate hero stat cards on first load
-          var heroStats = document.querySelectorAll('.hero-stat');
           heroStats.forEach(function(card, i) {
             if (!card.classList.contains('animate-in')) {
               card.classList.add('animate-in', 'stagger-' + (i + 1));
             }
           });
         }
-      }).catch(function(err) { console.error('Failed to load stats:', err); });
+      }).catch(function(err) {
+        console.error('Failed to load stats:', err);
+        var heroStats = document.querySelectorAll('.hero-stat');
+        heroStats.forEach(function(card) { card.classList.remove('hero-stat--loading'); });
+        setTextContent('statBalance', '\u2014');
+        setTextContent('statUnpaid', '\u2014');
+        setTextContent('statPaid', '\u2014');
+        setTextContent('statTotal', 'Unable to load stats');
+      });
     }
 
     function renderSkeletonTable(container, rowCount) {
@@ -114,11 +129,11 @@
           applyCustomerFilters();
         } else {
           console.error('getCustomers failed:', result.error);
-          showTableError(container, result.error || 'Failed to load customers');
+          showTableError(container, (result.error || 'Failed to load customers') + ' Try refreshing the page. If this persists, check that the spreadsheet is accessible.');
         }
       }).catch(function(err) {
         console.error('getCustomers exception:', err);
-        showTableError(container, 'Error: ' + err.message);
+        showTableError(container, 'Could not reach the server: ' + err.message + '. Try refreshing the page.');
       });
     }
 
@@ -742,21 +757,81 @@
           if (progressBar) progressBar.classList.remove('active');
           if (result.success) {
             var data = result.data;
-            var msg = 'Sent: ' + data.sentCount + ', Errors: ' + data.errorCount;
-            if (data.skippedCount > 0) msg += ', Skipped: ' + data.skippedCount;
-            if (data.dryRunMode) msg += ' (DRY RUN)';
-            showAlert('sendAlert', 'success', msg);
+            renderSendResult_('sendAlert', data);
             refreshCustomers();
           } else {
-            showAlert('sendAlert', 'error', result.error || 'Failed to send bills');
+            var errMsg = result.error || 'Failed to send bills';
+            if (errMsg.toLowerCase().indexOf('credentials') !== -1) {
+              errMsg += ' Go to Settings \u2192 Advanced \u2192 Twilio Credentials to configure.';
+            }
+            showAlert('sendAlert', 'error', errMsg);
           }
         })
         .catch(function(err) {
           btn.disabled = false;
           btn.textContent = 'Send Bills';
           if (progressBar) progressBar.classList.remove('active');
-          showAlert('sendAlert', 'error', 'Error: ' + err.message);
+          showAlert('sendAlert', 'error', 'Could not reach the server: ' + err.message + '. Check your connection and try again.');
         });
+    }
+
+    function renderSendResult_(containerId, data) {
+      var container = document.getElementById(containerId);
+      while (container.firstChild) container.removeChild(container.firstChild);
+
+      var hasErrors = data.errorCount > 0;
+      var alertDiv = document.createElement('div');
+      alertDiv.className = 'alert alert-' + (hasErrors ? 'warning' : 'success');
+
+      // Summary line
+      var summary = document.createElement('div');
+      summary.style.cssText = 'display:flex; align-items:center; gap:8px; flex-wrap:wrap;';
+      if (data.dryRunMode) {
+        var badge = document.createElement('span');
+        badge.style.cssText = 'background:rgba(0,0,0,0.15); padding:1px 8px; border-radius:10px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;';
+        badge.textContent = 'DRY RUN';
+        summary.appendChild(badge);
+      }
+      var text = document.createElement('span');
+      if (!hasErrors) {
+        text.textContent = data.sentCount + ' message' + (data.sentCount !== 1 ? 's' : '') + ' sent successfully!';
+      } else {
+        text.textContent = data.sentCount + ' sent, ' + data.errorCount + ' error' + (data.errorCount !== 1 ? 's' : '');
+        if (data.skippedCount > 0) text.textContent += ', ' + data.skippedCount + ' skipped';
+      }
+      summary.appendChild(text);
+      alertDiv.appendChild(summary);
+
+      // Error details (collapsible)
+      if (data.errorDetails && data.errorDetails.length > 0) {
+        var details = document.createElement('details');
+        details.style.cssText = 'margin-top:8px;';
+        var summaryEl = document.createElement('summary');
+        summaryEl.style.cssText = 'cursor:pointer; font-size:13px; font-weight:500; opacity:0.85;';
+        summaryEl.textContent = 'Show ' + data.errorDetails.length + ' error' + (data.errorDetails.length !== 1 ? 's' : '');
+        details.appendChild(summaryEl);
+
+        var list = document.createElement('ul');
+        list.style.cssText = 'margin:6px 0 0; padding-left:20px; font-size:12px; line-height:1.6;';
+        data.errorDetails.forEach(function(err) {
+          var li = document.createElement('li');
+          var nameSpan = document.createElement('strong');
+          nameSpan.textContent = err.name;
+          li.appendChild(nameSpan);
+          li.appendChild(document.createTextNode(' \u2014 ' + err.error));
+          list.appendChild(li);
+        });
+        details.appendChild(list);
+        if (data.errorCount > data.errorDetails.length) {
+          var more = document.createElement('p');
+          more.style.cssText = 'font-size:12px; opacity:0.7; margin-top:4px;';
+          more.textContent = '...and ' + (data.errorCount - data.errorDetails.length) + ' more';
+          details.appendChild(more);
+        }
+        alertDiv.appendChild(details);
+      }
+
+      container.appendChild(alertDiv);
     }
 
     function clearStatuses() {
@@ -830,13 +905,19 @@
             showToast(msg, 'success');
             refreshCustomers();
           } else {
-            showToast(result.error || 'Failed to send bill', 'error');
+            var customer = currentCustomers.find(function(c) { return c.rowIndex === selectedCustomerRow; });
+            var who = customer ? customer.name : 'customer';
+            var errMsg = result.error || 'Failed to send bill';
+            if (errMsg.toLowerCase().indexOf('credentials') !== -1) {
+              errMsg += ' Configure in Settings \u2192 Advanced \u2192 Twilio Credentials.';
+            }
+            showToast('Failed to send to ' + who + ': ' + errMsg, 'error');
           }
         })
         .catch(function(err) {
           btn.disabled = false;
           btn.textContent = 'Send Bill';
-          showToast(err.message || 'Failed to send bill', 'error');
+          showToast('Could not reach the server: ' + (err.message || 'Unknown error'), 'error');
         });
     }
 </script>

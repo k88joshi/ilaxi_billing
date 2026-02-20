@@ -42,20 +42,42 @@
     textSpan.textContent = message;
     toast.appendChild(textSpan);
 
-    // Add timer bar
-    var timerBar = document.createElement('div');
-    timerBar.className = 'toast-timer';
-    toast.style.position = 'relative';
-    toast.appendChild(timerBar);
+    var isError = (type === 'error');
+
+    // Error toasts get a close button and persist until dismissed
+    if (isError) {
+      var closeBtn = document.createElement('button');
+      closeBtn.className = 'toast-close-btn';
+      closeBtn.setAttribute('aria-label', 'Dismiss');
+      closeBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+      closeBtn.onclick = function() {
+        toast.classList.add('toast-out');
+        setTimeout(function() {
+          if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 250);
+      };
+      toast.appendChild(closeBtn);
+    }
+
+    // Add timer bar (not for persistent error toasts)
+    if (!isError) {
+      var timerBar = document.createElement('div');
+      timerBar.className = 'toast-timer';
+      toast.style.position = 'relative';
+      toast.appendChild(timerBar);
+    }
 
     container.appendChild(toast);
 
-    setTimeout(function() {
-      toast.classList.add('toast-out');
+    // Auto-dismiss success/warning after 5s; errors persist
+    if (!isError) {
       setTimeout(function() {
-        if (toast.parentNode) toast.parentNode.removeChild(toast);
-      }, 250);
-    }, 3500);
+        toast.classList.add('toast-out');
+        setTimeout(function() {
+          if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 250);
+      }, 5000);
+    }
   }
 
   /**
