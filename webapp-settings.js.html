@@ -108,8 +108,19 @@
 
       var userCount = liveUsers.length;
       if (userCount > 0) {
+        // Live dot indicator
+        var liveDot = document.createElement('span');
+        liveDot.className = 'user-online-dot';
+        usersEl.appendChild(liveDot);
+
+        // Users icon
         usersEl.appendChild(buildUsersSvgIcon());
-        usersEl.appendChild(document.createTextNode(userCount + ' online'));
+
+        // Text label
+        var label = document.createElement('span');
+        label.className = 'user-online-label';
+        label.textContent = userCount + ' online';
+        usersEl.appendChild(label);
 
         var popover = document.createElement('div');
         popover.className = 'users-popover';
