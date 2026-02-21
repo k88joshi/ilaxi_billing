@@ -38,6 +38,50 @@
     // Initialize theme before DOM content loads to prevent flash
     initTheme();
 
+    // ============================================
+    // Sidebar Management
+    // ============================================
+    function initSidebar() {
+      var sidebar = document.getElementById('appSidebar');
+      if (!sidebar) return;
+      var collapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+      if (collapsed) {
+        sidebar.classList.add('collapsed');
+      }
+      // On mobile, start collapsed
+      if (window.innerWidth < 768) {
+        sidebar.classList.add('collapsed');
+      }
+    }
+
+    function toggleSidebar() {
+      var sidebar = document.getElementById('appSidebar');
+      if (!sidebar) return;
+      sidebar.classList.toggle('collapsed');
+      localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+    }
+
+    // Update topbar title when switching tabs
+    function updateTopbarTitle(tabName) {
+      var titleEl = document.getElementById('topbarTitle');
+      if (!titleEl) return;
+      var titles = { dashboard: 'Dashboard', messages: 'Message Templates', settings: 'Settings' };
+      titleEl.textContent = titles[tabName] || tabName;
+    }
+
+    // Close sidebar on mobile when clicking outside
+    document.addEventListener('click', function(e) {
+      if (window.innerWidth >= 768) return;
+      var sidebar = document.getElementById('appSidebar');
+      if (!sidebar || sidebar.classList.contains('collapsed')) return;
+      if (!sidebar.contains(e.target) && !e.target.closest('.sidebar-toggle-btn')) {
+        sidebar.classList.add('collapsed');
+      }
+    });
+
+    // Initialize sidebar before DOM content loads
+    initSidebar();
+
     // Initialize on load
     document.addEventListener('DOMContentLoaded', function() {
       loadDashboard();
@@ -174,7 +218,22 @@
       document.querySelectorAll('.tab-panel').forEach(function(panel) {
         panel.classList.remove('active');
       });
-      document.getElementById('panel-' + tabName).classList.add('active');
+      var targetPanel = document.getElementById('panel-' + tabName);
+      targetPanel.classList.add('active');
+
+      // Animate panel entrance
+      targetPanel.style.animation = 'none';
+      targetPanel.offsetHeight; // trigger reflow
+      targetPanel.style.animation = 'fadeInUp 0.35s ease-out';
+
+      // Update topbar title
+      updateTopbarTitle(tabName);
+
+      // Close sidebar on mobile after selection
+      if (window.innerWidth < 768) {
+        var sidebar = document.getElementById('appSidebar');
+        if (sidebar) sidebar.classList.add('collapsed');
+      }
 
       // Initialize tabs when switching to them
       if (tabName === 'messages') {

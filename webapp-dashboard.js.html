@@ -22,13 +22,45 @@
     function animateValue(elementId, newValue, prefix) {
       var el = document.getElementById(elementId);
       if (!el) return;
+      var pfx = prefix || '';
+      var display = pfx + newValue;
       var current = el.textContent;
-      var display = (prefix || '') + newValue;
-      if (current !== display) {
+      if (current === display) return;
+
+      // Parse numeric target
+      var target = parseFloat(newValue);
+      if (isNaN(target)) {
         el.textContent = display;
-        el.classList.add('stat-value-bump');
-        setTimeout(function() { el.classList.remove('stat-value-bump'); }, 200);
+        return;
       }
+
+      // Parse current numeric value (strip prefix)
+      var startStr = current.replace(pfx, '').replace(/[^0-9.\-]/g, '');
+      var start = parseFloat(startStr);
+      if (isNaN(start)) start = 0;
+
+      // Determine decimal places
+      var decimals = String(newValue).indexOf('.') >= 0 ? String(newValue).split('.')[1].length : 0;
+
+      // Smooth count-up animation (600ms duration)
+      var duration = 600;
+      var startTime = null;
+      function step(ts) {
+        if (!startTime) startTime = ts;
+        var progress = Math.min((ts - startTime) / duration, 1);
+        // Ease-out cubic
+        var ease = 1 - Math.pow(1 - progress, 3);
+        var val = start + (target - start) * ease;
+        el.textContent = pfx + val.toFixed(decimals);
+        if (progress < 1) {
+          requestAnimationFrame(step);
+        } else {
+          el.textContent = display;
+          el.classList.add('stat-value-bump');
+          setTimeout(function() { el.classList.remove('stat-value-bump'); }, 250);
+        }
+      }
+      requestAnimationFrame(step);
     }
 
     function loadStats() {
