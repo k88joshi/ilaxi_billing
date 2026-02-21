@@ -392,7 +392,44 @@
     height: 3px;
     background: rgba(255, 255, 255, 0.4);
     border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-    animation: toastTimer 3.5s linear forwards;
+    animation: toastTimer 5s linear forwards;
+  }
+  .toast-timer-slow {
+    animation: toastTimer 8s linear forwards;
+  }
+  .toast-undo-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    padding: var(--space-1) var(--space-3);
+    margin-left: var(--space-2);
+    font-size: var(--text-xs);
+    border-radius: var(--radius-md);
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .toast-undo-btn:hover {
+    background: rgba(255, 255, 255, 0.35);
+  }
+  .toast-close-btn {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    padding: 0;
+    margin-left: var(--space-2);
+    flex-shrink: 0;
+    line-height: 0;
+    transition: color 0.15s;
+  }
+  .toast-close-btn:hover {
+    color: white;
+  }
+  .toast-close-btn svg {
+    width: 14px;
+    height: 14px;
   }
 
   /* Empty state component */

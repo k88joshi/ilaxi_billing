@@ -769,6 +769,21 @@
     .hero-stat--unpaid .hero-stat-icon { background: var(--color-warning-light); color: var(--color-warning); }
     .hero-stat--paid .hero-stat-icon { background: var(--color-success-light); color: var(--color-success); }
 
+    /* Skeleton loading state for stats cards */
+    .hero-stat--loading .hero-stat-value,
+    .hero-stat--loading .hero-stat-detail {
+      color: transparent;
+      background: linear-gradient(90deg, var(--color-border-light) 25%, var(--color-border) 50%, var(--color-border-light) 75%);
+      background-size: 200% 100%;
+      animation: skeleton-shimmer 1.5s ease-in-out infinite;
+      border-radius: var(--radius-sm);
+      pointer-events: none;
+    }
+    .hero-stat--loading .hero-stat-cta {
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
     .hero-stat-detail {
       font-size: var(--text-xs);
       color: var(--color-text-muted);
@@ -3084,4 +3099,68 @@
       }
       .settings-nav-footer-actions .btn span { display: none; }
       .settings-nav-footer-actions .btn { width: auto; padding: var(--space-2); }
+    }
+
+    /* ============================================
+       Mobile: Customer Table Column Hiding
+       Hide less-critical columns on small screens
+       ============================================ */
+    @media (max-width: 640px) {
+      /* Hide Due Date (col 3) and Status (col 5) on small screens */
+      .table-container table th:nth-child(3),
+      .table-container table td:nth-child(3),
+      .table-container table th:nth-child(5),
+      .table-container table td:nth-child(5) {
+        display: none;
+      }
+      /* Tighter cell padding */
+      .table-container th, .table-container td {
+        padding: var(--space-2) var(--space-2);
+      }
+      /* Compact action buttons */
+      .table-container .btn-sm {
+        padding: 4px var(--space-2);
+        font-size: 11px;
+      }
+
+      /* Activity log: hide User (col 2) and Details (col 4) for compact view */
+      .log-table th:nth-child(2),
+      .log-table td:nth-child(2),
+      .log-table th:nth-child(4),
+      .log-table td:nth-child(4) {
+        display: none;
+      }
+      .log-table th, .log-table td {
+        padding: var(--space-1) var(--space-2);
+        font-size: 11px;
+      }
+
+      /* Stack filter bar vertically */
+      .filter-bar {
+        gap: var(--space-2);
+      }
+      .filter-group {
+        min-width: 100%;
+      }
+      .filter-search {
+        width: 100%;
+      }
+
+      /* Send form grid single column */
+      .send-form-grid {
+        grid-template-columns: 1fr;
+      }
+      /* Settings form rows single column */
+      .form-field-row {
+        grid-template-columns: 1fr;
+      }
+      /* User management row: stack email + button */
+      .adv-action-row {
+        flex-wrap: wrap;
+        gap: var(--space-2);
+      }
+      .adv-action-row input[type="email"] {
+        width: 100% !important;
+        min-width: 0;
+      }
     }

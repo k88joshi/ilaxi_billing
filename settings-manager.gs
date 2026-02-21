@@ -689,7 +689,7 @@ function getSampleDataForPreview() {
       if (lookup.success) {
         return Object.assign({}, businessData, {
           customerName: String(lookup.data.name || ""),
-          balance: formatBalance_(lookup.data.balance),
+          balance: formatBalance_(lookup.data.balance) || "$0.00",
           numTiffins: String(lookup.data.tiffins || "0"),
           month: getMonthFromValue_(lookup.data.dueDate),
           orderId: testOrderId

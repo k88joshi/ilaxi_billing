@@ -42,20 +42,97 @@
     textSpan.textContent = message;
     toast.appendChild(textSpan);
 
-    // Add timer bar
+    var isError = (type === 'error');
+
+    // Error toasts get a close button and persist until dismissed
+    if (isError) {
+      var closeBtn = document.createElement('button');
+      closeBtn.className = 'toast-close-btn';
+      closeBtn.setAttribute('aria-label', 'Dismiss');
+      closeBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+      closeBtn.onclick = function() {
+        toast.classList.add('toast-out');
+        setTimeout(function() {
+          if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 250);
+      };
+      toast.appendChild(closeBtn);
+    }
+
+    // Add timer bar (not for persistent error toasts)
+    if (!isError) {
+      var timerBar = document.createElement('div');
+      timerBar.className = 'toast-timer';
+      toast.style.position = 'relative';
+      toast.appendChild(timerBar);
+    }
+
+    container.appendChild(toast);
+
+    // Auto-dismiss success/warning after 5s; errors persist
+    if (!isError) {
+      setTimeout(function() {
+        toast.classList.add('toast-out');
+        setTimeout(function() {
+          if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 250);
+      }, 5000);
+    }
+  }
+
+  /**
+   * Shows a toast with an "Undo" button and an extended 8-second dismiss timer.
+   * Used for reversible actions like payment status changes.
+   *
+   * @param {string} message - Text to display
+   * @param {Function} onUndo - Callback invoked when the user clicks Undo
+   */
+  function showUndoToast(message, onUndo) {
+    var container = document.getElementById('toastContainer');
+    while (container.firstChild) container.removeChild(container.firstChild);
+
+    var toast = document.createElement('div');
+    toast.className = 'toast toast-success';
+
+    var iconSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    iconSvg.setAttribute('fill', 'none');
+    iconSvg.setAttribute('viewBox', '0 0 24 24');
+    iconSvg.setAttribute('stroke', 'currentColor');
+    var iconPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    iconPath.setAttribute('stroke-linecap', 'round');
+    iconPath.setAttribute('stroke-linejoin', 'round');
+    iconPath.setAttribute('stroke-width', '2');
+    iconPath.setAttribute('d', 'M5 13l4 4L19 7');
+    iconSvg.appendChild(iconPath);
+    toast.appendChild(iconSvg);
+
+    var textSpan = document.createElement('span');
+    textSpan.textContent = message;
+    toast.appendChild(textSpan);
+
+    var undoBtn = document.createElement('button');
+    undoBtn.className = 'toast-undo-btn';
+    undoBtn.textContent = 'Undo';
+    undoBtn.onclick = function() {
+      clearTimeout(dismissTimer);
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+      if (onUndo) onUndo();
+    };
+    toast.appendChild(undoBtn);
+
     var timerBar = document.createElement('div');
-    timerBar.className = 'toast-timer';
+    timerBar.className = 'toast-timer toast-timer-slow';
     toast.style.position = 'relative';
     toast.appendChild(timerBar);
 
     container.appendChild(toast);
 
-    setTimeout(function() {
+    var dismissTimer = setTimeout(function() {
       toast.classList.add('toast-out');
       setTimeout(function() {
         if (toast.parentNode) toast.parentNode.removeChild(toast);
       }, 250);
-    }, 3500);
+    }, 8000);
   }
 
   /**

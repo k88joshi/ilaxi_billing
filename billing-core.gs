@@ -45,7 +45,7 @@ function getCustomersCore_(options) {
         phone: String(row[phoneCol] || ''),
         name: String(row[nameCol] || ''),
         balance: row[colMap[cols.balance]] || 0,
-        formattedBalance: formatBalance_(row[colMap[cols.balance]]),
+        formattedBalance: formatBalance_(row[colMap[cols.balance]]) || "$0.00",
         numTiffins: row[colMap[cols.numTiffins]] || 0,
         dueDate: dueDateValue,
         month: getMonthFromValue_(dueDateRaw),
@@ -200,6 +200,11 @@ function sendSingleBillCore_(params) {
 
     if (!phone || !name || !balance || !tiffins) {
       return { success: false, error: 'Customer is missing required data (phone, name, balance, or tiffins)' };
+    }
+
+    // Validate balance is parseable before sending (prevents silent $0.00 in SMS)
+    if (formatBalance_(balance) === null) {
+      return { success: false, error: `Invalid balance value: "${String(balance).substring(0, 30)}"` };
     }
 
     const result = sendBill_(phone, name, balance, tiffins, dueDate, templateType, dryRunMode, settings);
