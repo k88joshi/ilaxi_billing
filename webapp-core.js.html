@@ -22,8 +22,14 @@
     function toggleTheme() {
       var currentTheme = document.documentElement.getAttribute('data-theme');
       var newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      // Enable smooth color transition
+      document.body.classList.add('theme-transitioning');
       document.documentElement.setAttribute('data-theme', newTheme);
       localStorage.setItem('theme', newTheme);
+      // Remove transition class after animation completes
+      setTimeout(function() {
+        document.body.classList.remove('theme-transitioning');
+      }, 350);
     }
 
     // Listen for system theme changes
